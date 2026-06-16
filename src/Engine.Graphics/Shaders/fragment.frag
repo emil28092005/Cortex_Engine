@@ -15,17 +15,24 @@ layout(push_constant) uniform PushConstants
     float pad2;
     vec3 ambientColor;
     float pad3;
+    vec3 cameraPosition;
+    float pad4;
 } push;
 
 void main()
 {
     vec3 normal = normalize(fragNormal);
     vec3 lightDir = normalize(-push.lightDirection);
+    vec3 viewDir = normalize(push.cameraPosition - fragWorldPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
 
     float diff = max(dot(normal, lightDir), 0.0);
+    float spec = pow(max(dot(normal, halfDir), 0.0), 64.0) * 0.5;
+
     vec3 diffuse = push.lightColor * diff;
+    vec3 specular = push.lightColor * spec;
     vec3 ambient = push.ambientColor;
 
-    vec3 result = (ambient + diffuse) * fragColor;
+    vec3 result = (ambient + diffuse + specular) * fragColor;
     outColor = vec4(result, 1.0);
 }

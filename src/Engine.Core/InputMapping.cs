@@ -18,11 +18,13 @@ public sealed class InputMapping
     public bool MouseLeft { get; private set; }
     public bool MouseRight { get; private set; }
     public bool MouseMiddle { get; private set; }
+    public float MouseWheelDelta { get; private set; }
 
     public void BeginFrame()
     {
         _keysPressed.Clear();
         _keysReleased.Clear();
+        MouseWheelDelta = 0;
     }
 
     public void ProcessEvent(SDL_Event evt)
@@ -51,6 +53,10 @@ public sealed class InputMapping
 
             case SDL_EventType.SDL_EVENT_MOUSE_BUTTON_UP:
                 SetMouseButton(evt.button.button, false);
+                break;
+
+            case SDL_EventType.SDL_EVENT_MOUSE_WHEEL:
+                MouseWheelDelta += evt.wheel.y;
                 break;
         }
     }

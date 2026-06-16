@@ -59,7 +59,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
         {
             StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
             Offset = 0,
-            Size = (uint)(28 * sizeof(float))
+            Size = (uint)(32 * sizeof(float))
         };
 
         var createInfo = new PipelineLayoutCreateInfo

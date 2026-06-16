@@ -261,6 +261,13 @@ public struct Camera : IComponent
     public float Far;
 }
 
+public struct Material : IComponent
+{
+    public Vector3 Albedo;
+    public float Roughness;
+    public float Metallic;
+}
+
 public struct SemanticClass : IComponent
 {
     public byte ClassId; // 0=environment, 1=enemy, 2=player, 3=interactive, 4=trigger
@@ -283,7 +290,17 @@ When the AI generates a C# script, the engine:
 
 **Important caveat:** Flecs stores component type metadata in its native C memory. If old C# types are still referenced by Flecs, the old `AssemblyLoadContext` cannot be fully unloaded. The migration step must remove old components and re-add them as the new types.
 
-### 4.5 SystemSlotRegistry
+### 4.5 Rendering & Shading
+
+The renderer uses a simple forward-lit pipeline:
+
+- **Vertex format**: position, color, normal.
+- **Per-entity**: Mesh + Transform + optional Material.
+- **Per-frame constants** via push constants: MVP matrix, light direction/color, ambient color, camera position.
+- **Lighting model**: directional light with ambient + diffuse + Blinn-Phong specular.
+- **Material**: CPU-side tint; `Material.Albedo` multiplies vertex color, `Roughness` and `Metallic` reserved for future PBR extension.
+
+### 4.6 SystemSlotRegistry
 
 ```csharp
 public class SystemSlotRegistry
@@ -490,7 +507,9 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   ├── EngineApp.cs                  # Entry point, main loop
 │   │   ├── Sdl3Window.cs                 # SDL3 window wrapper
 │   │   ├── Timing.cs                     # DeltaTime, fixed timestep
-│   │   └── InputMapping.cs               # Keyboard, mouse, gamepad input
+│   │   ├── InputMapping.cs               # Keyboard, mouse, gamepad input
+│   │   ├── OrbitCameraController.cs      # Mouse orbit camera
+│   │   └── Components/                   # Transform, Camera, Material, Mesh
 │   │
 │   ├── Engine.Data/
 │   │   ├── GameObject.cs                 # Thin struct facade
@@ -657,13 +676,13 @@ Stack:
 - ModelContextProtocol for AI tool integration
 
 Rules:
-1. All state lives in ECS components. GameObject is a struct facade.
-2. All AI mutations go through AiGateway.
+1. All state lives in ECS components (Transform, Camera, Mesh, Material).
+2. All AI mutations go through Engine.AI (AiCommandProcessor / MCP tools).
 3. All Dev-Mode AI scripts must be AOT-compatible and avoid unsafe, Reflection.Emit, Assembly.Load, File I/O.
 4. All systems are registered in SystemSlotRegistry and tagged with [Slot("name")].
 5. Use Roslyn syntax trees for validation before compilation.
 6. Prefer Flecs native reflection (ecs_world_to_json) over C# reflection.
-7. Keep modules isolated; do not create circular dependencies between Engine.Core, Engine.Data, Engine.Graphics, Engine.Diagnostics, Engine.AiGateway, Engine.Editor.
+7. Keep modules isolated; do not create circular dependencies between Engine.Core, Engine.Graphics, Engine.AI.
 
 Current file context: [insert path here]
 ```

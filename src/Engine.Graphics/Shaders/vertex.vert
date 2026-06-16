@@ -17,6 +17,8 @@ layout(push_constant) uniform PushConstants
     float pad2;
     vec3 ambientColor;
     float pad3;
+    vec3 cameraPosition;
+    float pad4;
 } push;
 
 void main()

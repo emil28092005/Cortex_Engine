@@ -38,6 +38,8 @@ public sealed unsafe class MeshRenderer : IDisposable
         public float Pad2;
         public Vector3 AmbientColor;
         public float Pad3;
+        public Vector3 CameraPosition;
+        public float Pad4;
     }
 
     private sealed class MeshBuffers : IDisposable
@@ -201,19 +203,19 @@ public sealed unsafe class MeshRenderer : IDisposable
                 _buffers[e] = buffers;
             }
 
-            var bytes = BuildMeshVertices(mesh, transform);
+            var material = e.Has<Material>() ? e.Get<Material>() : Material.Default;
+            var bytes = BuildMeshVertices(mesh, transform, material);
             buffers.VertexBuffer.Update(bytes);
 
-            var model = transform.GetMatrix();
-            var mvp = Matrix4x4.Multiply(Matrix4x4.Multiply(model, view), proj);
-            var mvpT = Matrix4x4.Transpose(mvp);
+            var mvp = Matrix4x4.Transpose(Matrix4x4.Multiply(view, proj));
 
             var push = new PushConstants
             {
-                Mvp = mvpT,
+                Mvp = mvp,
                 LightDirection = new Vector3(0.5f, -1.0f, -0.5f),
                 LightColor = new Vector3(1.0f, 0.95f, 0.8f),
-                AmbientColor = new Vector3(0.15f, 0.15f, 0.2f)
+                AmbientColor = new Vector3(0.15f, 0.15f, 0.2f),
+                CameraPosition = camera.Position
             };
 
             var pushSize = (uint)sizeof(PushConstants);
@@ -306,7 +308,7 @@ public sealed unsafe class MeshRenderer : IDisposable
             new IndexBuffer(_context, indexBytes, (uint)mesh.Indices.Length));
     }
 
-    private byte[] BuildMeshVertices(Mesh mesh, Transform transform)
+    private byte[] BuildMeshVertices(Mesh mesh, Transform transform, Material material)
     {
         var matrix = transform.GetMatrix();
         var bytes = new byte[mesh.Vertices.Length * 9 * sizeof(float)];
@@ -316,14 +318,15 @@ public sealed unsafe class MeshRenderer : IDisposable
             for (var i = 0; i < mesh.Vertices.Length; i++)
             {
                 var v = mesh.Vertices[i];
-                var transformed = Vector3.Transform(v.Position, matrix);
+                var worldPos = Vector3.Transform(v.Position, matrix);
                 var normal = transform.TransformNormal(v.Normal);
-                dst[i * 9 + 0] = transformed.X;
-                dst[i * 9 + 1] = transformed.Y;
-                dst[i * 9 + 2] = transformed.Z;
-                dst[i * 9 + 3] = v.Color.X;
-                dst[i * 9 + 4] = v.Color.Y;
-                dst[i * 9 + 5] = v.Color.Z;
+                var color = v.Color * material.Albedo;
+                dst[i * 9 + 0] = worldPos.X;
+                dst[i * 9 + 1] = worldPos.Y;
+                dst[i * 9 + 2] = worldPos.Z;
+                dst[i * 9 + 3] = color.X;
+                dst[i * 9 + 4] = color.Y;
+                dst[i * 9 + 5] = color.Z;
                 dst[i * 9 + 6] = normal.X;
                 dst[i * 9 + 7] = normal.Y;
                 dst[i * 9 + 8] = normal.Z;

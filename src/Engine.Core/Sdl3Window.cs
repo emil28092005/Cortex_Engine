@@ -45,11 +45,13 @@ public sealed unsafe class Sdl3Window : IDisposable
         }
     }
 
-    public void PumpEvents()
+    public void PumpEvents(InputMapping? input = null)
     {
         SDL_Event evt;
         while (SDL3.SDL_PollEvent(&evt))
         {
+            input?.ProcessEvent(evt);
+
             switch ((SDL_EventType)evt.type)
             {
                 case SDL_EventType.SDL_EVENT_QUIT:
