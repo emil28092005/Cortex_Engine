@@ -529,7 +529,9 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   ├── Sdl3Window.cs                 # SDL3 window wrapper
 │   │   ├── Timing.cs                     # DeltaTime, fixed timestep
 │   │   ├── InputMapping.cs               # Keyboard, mouse, gamepad input
+│   │   ├── ICameraController.cs            # Camera controller interface
 │   │   ├── OrbitCameraController.cs      # Mouse orbit camera
+│   │   ├── FreeFlyCameraController.cs    # WASD + mouse look camera
 │   │   └── Components/                   # Transform, Camera, Light, Material, Mesh
 │   │
 │   ├── Engine.Data/
@@ -760,7 +762,9 @@ dotnet run --project src/CortexEngine.App/CortexEngine.App.csproj
 
 - `SDL3 2026.520.0` API: `SDL_Init` returns `SDLBool`, `SDL_PollEvent` returns `SDLBool`, `evt.type` is `uint`.
 - Keyboard: `evt.key.key`; Mouse: `evt.motion.x`, `evt.motion.y`, `evt.wheel.y`.
-- Orbit camera: right mouse drag rotates, mouse wheel zooms, `ESC` exits.
+- **Orbit camera** (по умолчанию): правый клик + движение мыши — вращать, колесо — zoom.
+- **FreeFly camera** (переключается клавишей `F`): `WASD` — двигаться, `Q`/`E` — вниз/вверх, `Shift` — ускорение, правый клик + мышь — осмотр.
+- `ESC` — выход.
 
 ### 13.5 MCP Client Config
 

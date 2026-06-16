@@ -8,7 +8,7 @@ namespace Engine.Core;
 /// Orbit camera controller. Right mouse drag rotates around the target,
 /// mouse wheel zooms in/out.
 /// </summary>
-public sealed class OrbitCameraController
+public sealed class OrbitCameraController : ICameraController
 {
     private readonly Entity _cameraEntity;
     private float _distance;
@@ -18,6 +18,8 @@ public sealed class OrbitCameraController
     private int _lastMouseX;
     private int _lastMouseY;
     private bool _isDragging;
+
+    public string Name => "Orbit";
 
     public OrbitCameraController(Entity cameraEntity, Vector3? target = null)
     {

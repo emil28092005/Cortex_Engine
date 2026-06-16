@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using Engine.AI;
+using SDL;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -73,7 +74,12 @@ class Program
                 .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
                 .Set(new Light(new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.15f, 0.15f, 0.2f), 0.3f));
 
-            var orbit = new OrbitCameraController(cameraEntity, new Vector3(0.0f, 0.5f, 0.0f));
+            ICameraController[] cameraControllers =
+            [
+                new OrbitCameraController(cameraEntity, new Vector3(0.0f, 0.5f, 0.0f)),
+                new FreeFlyCameraController(cameraEntity)
+            ];
+            var activeControllerIndex = 0;
 
             var texturePath = GenerateCheckerboardTexture("Content/checkerboard.png", 256);
 
@@ -159,8 +165,15 @@ class Program
                     camera.AspectRatio = (float)lastWidth / lastHeight;
                 }
 
-                // Update orbit camera from mouse input.
-                orbit.Update(input, (float)timing.DeltaTime);
+                // Toggle camera controller with F.
+                if (input.IsKeyPressed(SDL_Keycode.SDLK_F))
+                {
+                    activeControllerIndex = (activeControllerIndex + 1) % cameraControllers.Length;
+                    Console.WriteLine($"Camera controller: {cameraControllers[activeControllerIndex].Name}");
+                }
+
+                // Update active camera controller from input.
+                cameraControllers[activeControllerIndex].Update(input, (float)timing.DeltaTime);
 
                 // Slowly rotate the model so we can see it in 3D.
                 ref var modelTransform = ref model.Ensure<Transform>();
