@@ -1,0 +1,26 @@
+# Build outputs
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# NuGet
+*.nupkg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# dotnet
+*.dll
+*.exe
+*.pdb
+*.cache
+*.json
+!*.csproj
+!*.sln
+!launchSettings.json
