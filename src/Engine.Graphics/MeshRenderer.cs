@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Flecs.NET.Core;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using Engine.Core;
@@ -20,6 +22,13 @@ public sealed unsafe class MeshRenderer : IDisposable
     private readonly Swapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
     private readonly ScreenshotCapture _screenshot;
+    private readonly UniformBuffer _frameConstantsBuffer;
+    private DescriptorPool _frameDescriptorPool;
+    private DescriptorSet _frameDescriptorSet;
+    private DescriptorPool _textureDescriptorPool;
+    private readonly Dictionary<string, Texture> _textures = new();
+    private readonly Dictionary<Texture, DescriptorSet> _textureDescriptorSets = new();
+    private Texture? _defaultTexture;
     private readonly Dictionary<Entity, MeshBuffers> _buffers = new();
     private CommandPool _commandPool;
     private CommandBuffer[] _commandBuffers = null!;
@@ -28,18 +37,38 @@ public sealed unsafe class MeshRenderer : IDisposable
     private Silk.NET.Vulkan.Fence[] _inFlightFences = null!;
     private int _currentFrame;
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, Size = 96)]
     private struct PushConstants
     {
         public Matrix4x4 Mvp;
-        public Vector3 LightDirection;
-        public float Pad1;
-        public Vector3 LightColor;
-        public float Pad2;
-        public Vector3 AmbientColor;
-        public float Pad3;
+        public Vector3 MaterialAlbedo;
+        public float MaterialRoughness;
+        public float MaterialMetallic;
+        public uint UseTexture;
+        public uint TextureIndex;
+        public uint Pad0;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Size = 48)]
+    private struct GpuLight
+    {
+        public Vector3 Direction;
+        public float Intensity;
+        public Vector3 Color;
+        public float Padding;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Size = 224)]
+    private struct FrameConstants
+    {
         public Vector3 CameraPosition;
-        public float Pad4;
+        public uint LightCount;
+        public Vector3 AmbientColor;
+        public float AmbientPadding;
+        public GpuLight Light0;
+        public GpuLight Light1;
+        public GpuLight Light2;
+        public GpuLight Light3;
     }
 
     private sealed class MeshBuffers : IDisposable
@@ -67,6 +96,11 @@ public sealed unsafe class MeshRenderer : IDisposable
         _screenshot = new ScreenshotCapture(context, swapchain);
 
         _pipeline = new VulkanPipeline(context, swapchain);
+        _frameConstantsBuffer = new UniformBuffer(context, (ulong)sizeof(FrameConstants));
+        CreateFrameDescriptorPool();
+        CreateFrameDescriptorSet();
+        CreateTextureDescriptorPool();
+        CreateDefaultTexture();
         CreateCommandPool();
         CreateCommandBuffers();
         CreateSyncObjects();
@@ -135,6 +169,120 @@ public sealed unsafe class MeshRenderer : IDisposable
         }
     }
 
+    private void CreateFrameDescriptorPool()
+    {
+        var poolSize = new DescriptorPoolSize
+        {
+            Type = DescriptorType.UniformBuffer,
+            DescriptorCount = 1
+        };
+
+        var createInfo = new DescriptorPoolCreateInfo
+        {
+            SType = StructureType.DescriptorPoolCreateInfo,
+            MaxSets = 1,
+            PoolSizeCount = 1,
+            PPoolSizes = &poolSize
+        };
+
+        DescriptorPool descriptorPool;
+        var result = _context.Vk.CreateDescriptorPool(_context.Device, &createInfo, null, &descriptorPool);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkCreateDescriptorPool failed: {result}");
+        _frameDescriptorPool = descriptorPool;
+    }
+
+    private void CreateFrameDescriptorSet()
+    {
+        var layout = _pipeline.FrameDescriptorSetLayout;
+        var allocInfo = new DescriptorSetAllocateInfo
+        {
+            SType = StructureType.DescriptorSetAllocateInfo,
+            DescriptorPool = _frameDescriptorPool,
+            DescriptorSetCount = 1,
+            PSetLayouts = &layout
+        };
+
+        DescriptorSet descriptorSet;
+        var result = _context.Vk.AllocateDescriptorSets(_context.Device, &allocInfo, &descriptorSet);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkAllocateDescriptorSets failed: {result}");
+        _frameDescriptorSet = descriptorSet;
+
+        var bufferInfo = new DescriptorBufferInfo
+        {
+            Buffer = _frameConstantsBuffer.Buffer,
+            Offset = 0,
+            Range = (ulong)sizeof(FrameConstants)
+        };
+
+        var write = new WriteDescriptorSet
+        {
+            SType = StructureType.WriteDescriptorSet,
+            DstSet = _frameDescriptorSet,
+            DstBinding = 0,
+            DstArrayElement = 0,
+            DescriptorType = DescriptorType.UniformBuffer,
+            DescriptorCount = 1,
+            PBufferInfo = &bufferInfo
+        };
+
+        _context.Vk.UpdateDescriptorSets(_context.Device, 1, &write, 0, null);
+    }
+
+    private void CreateTextureDescriptorPool()
+    {
+        var poolSize = new DescriptorPoolSize
+        {
+            Type = DescriptorType.CombinedImageSampler,
+            DescriptorCount = 16
+        };
+
+        var createInfo = new DescriptorPoolCreateInfo
+        {
+            SType = StructureType.DescriptorPoolCreateInfo,
+            MaxSets = 16,
+            PoolSizeCount = 1,
+            PPoolSizes = &poolSize
+        };
+
+        DescriptorPool descriptorPool;
+        var result = _context.Vk.CreateDescriptorPool(_context.Device, &createInfo, null, &descriptorPool);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkCreateDescriptorPool (texture) failed: {result}");
+        _textureDescriptorPool = descriptorPool;
+    }
+
+    private void CreateDefaultTexture()
+    {
+        var whitePixel = new byte[] { 255, 255, 255, 255 };
+        _defaultTexture = CreateTextureFromBytes("__default__", whitePixel, 1, 1);
+    }
+
+    private Texture CreateTextureFromBytes(string key, byte[] rgbaPixels, uint width, uint height)
+    {
+        var path = $"/tmp/cortex_texture_{key}.png";
+        System.IO.File.WriteAllBytes(path, EncodePng(rgbaPixels, width, height));
+        var texture = new Texture(_context, path);
+        try
+        {
+            System.IO.File.Delete(path);
+        }
+        catch
+        {
+            // Ignore cleanup failure.
+        }
+        return texture;
+    }
+
+    private static byte[] EncodePng(byte[] rgbaPixels, uint width, uint height)
+    {
+        using var image = SixLabors.ImageSharp.Image.LoadPixelData<Rgba32>(rgbaPixels, (int)width, (int)height);
+        using var stream = new System.IO.MemoryStream();
+        image.SaveAsPng(stream);
+        return stream.ToArray();
+    }
+
     public void RequestScreenshot(string outputPath) => _screenshot.Request(outputPath);
 
     public bool IsScreenshotRequested => _screenshot.IsRequested;
@@ -184,6 +332,8 @@ public sealed unsafe class MeshRenderer : IDisposable
 
         _context.Vk.CmdBeginRenderPass(cmd, &renderPassInfo, SubpassContents.Inline);
         _context.Vk.CmdBindPipeline(cmd, PipelineBindPoint.Graphics, _pipeline.Handle);
+        var frameDescriptorSet = _frameDescriptorSet;
+        _context.Vk.CmdBindDescriptorSets(cmd, PipelineBindPoint.Graphics, _pipeline.Layout, 0, 1, &frameDescriptorSet, 0, null);
 
         var viewport = new Viewport(0, 0, _swapchain.Extent.Width, _swapchain.Extent.Height, 0, 1);
         var scissor = new Rect2D(new Offset2D(0, 0), _swapchain.Extent);
@@ -194,6 +344,14 @@ public sealed unsafe class MeshRenderer : IDisposable
         var view = camera.GetViewMatrix();
         var proj = camera.GetProjectionMatrix();
         var drawCmd = cmd;
+
+        var frameConstants = BuildFrameConstants(world, camera);
+        var frameConstantsBytes = new byte[sizeof(FrameConstants)];
+        fixed (byte* p = frameConstantsBytes)
+        {
+            *(FrameConstants*)p = frameConstants;
+        }
+        _frameConstantsBuffer.Update(frameConstantsBytes);
 
         world.Each((Entity e, ref Mesh mesh, ref Transform transform) =>
         {
@@ -208,14 +366,20 @@ public sealed unsafe class MeshRenderer : IDisposable
             buffers.VertexBuffer.Update(bytes);
 
             var mvp = Matrix4x4.Transpose(Matrix4x4.Multiply(view, proj));
+            var texture = GetTexture(material);
+            var textureDescriptorSet = GetTextureDescriptorSet(texture);
+            var textureSet = textureDescriptorSet;
+            _context.Vk.CmdBindDescriptorSets(drawCmd, PipelineBindPoint.Graphics, _pipeline.Layout, 1, 1, &textureSet, 0, null);
 
             var push = new PushConstants
             {
                 Mvp = mvp,
-                LightDirection = new Vector3(0.5f, -1.0f, -0.5f),
-                LightColor = new Vector3(1.0f, 0.95f, 0.8f),
-                AmbientColor = new Vector3(0.15f, 0.15f, 0.2f),
-                CameraPosition = camera.Position
+                MaterialAlbedo = material.Albedo,
+                MaterialRoughness = material.Roughness,
+                MaterialMetallic = material.Metallic,
+                UseTexture = material.HasTexture ? 1u : 0u,
+                TextureIndex = 0,
+                Pad0 = 0
             };
 
             var pushSize = (uint)sizeof(PushConstants);
@@ -335,6 +499,117 @@ public sealed unsafe class MeshRenderer : IDisposable
         return bytes;
     }
 
+    private Texture GetTexture(Material material)
+    {
+        if (!material.HasTexture)
+            return _defaultTexture!;
+
+        if (_textures.TryGetValue(material.TexturePath!, out var texture))
+            return texture;
+
+        if (!System.IO.File.Exists(material.TexturePath!))
+            return _defaultTexture!;
+
+        texture = new Texture(_context, material.TexturePath!);
+        _textures[material.TexturePath!] = texture;
+        return texture;
+    }
+
+    private DescriptorSet GetTextureDescriptorSet(Texture texture)
+    {
+        if (_textureDescriptorSets.TryGetValue(texture, out var descriptorSet))
+            return descriptorSet;
+
+        var layout = _pipeline.TextureDescriptorSetLayout;
+        var allocInfo = new DescriptorSetAllocateInfo
+        {
+            SType = StructureType.DescriptorSetAllocateInfo,
+            DescriptorPool = _textureDescriptorPool,
+            DescriptorSetCount = 1,
+            PSetLayouts = &layout
+        };
+
+        DescriptorSet set;
+        var result = _context.Vk.AllocateDescriptorSets(_context.Device, &allocInfo, &set);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkAllocateDescriptorSets (texture) failed: {result}");
+
+        var imageInfo = new DescriptorImageInfo
+        {
+            ImageLayout = ImageLayout.ShaderReadOnlyOptimal,
+            ImageView = texture.View,
+            Sampler = texture.Sampler
+        };
+
+        var write = new WriteDescriptorSet
+        {
+            SType = StructureType.WriteDescriptorSet,
+            DstSet = set,
+            DstBinding = 0,
+            DstArrayElement = 0,
+            DescriptorType = DescriptorType.CombinedImageSampler,
+            DescriptorCount = 1,
+            PImageInfo = &imageInfo
+        };
+
+        _context.Vk.UpdateDescriptorSets(_context.Device, 1, &write, 0, null);
+        _textureDescriptorSets[texture] = set;
+        return set;
+    }
+
+    private FrameConstants BuildFrameConstants(World world, Camera camera)
+    {
+        var frameConstants = new FrameConstants
+        {
+            CameraPosition = camera.Position,
+            LightCount = 0,
+            AmbientColor = new Vector3(0.4f, 0.4f, 0.45f),
+            AmbientPadding = 0
+        };
+
+        world.Each((Entity e, ref Light light) =>
+        {
+            if (frameConstants.LightCount >= 4)
+                return;
+
+            var index = (int)frameConstants.LightCount;
+            frameConstants.LightCount++;
+            SetLight(ref frameConstants, index, new GpuLight
+            {
+                Direction = light.Direction,
+                Intensity = light.Intensity,
+                Color = light.Color,
+                Padding = 0
+            });
+        });
+
+        // Fallback: if no light components exist, add a default directional light.
+        if (frameConstants.LightCount == 0)
+        {
+            frameConstants.LightCount = 1;
+            SetLight(ref frameConstants, 0, new GpuLight
+            {
+                Direction = new Vector3(0.5f, -1.0f, -0.5f),
+                Intensity = 1.0f,
+                Color = new Vector3(1.0f, 0.95f, 0.8f),
+                Padding = 0
+            });
+        }
+
+        return frameConstants;
+    }
+
+    private static void SetLight(ref FrameConstants frameConstants, int index, GpuLight light)
+    {
+        switch (index)
+        {
+            case 0: frameConstants.Light0 = light; break;
+            case 1: frameConstants.Light1 = light; break;
+            case 2: frameConstants.Light2 = light; break;
+            case 3: frameConstants.Light3 = light; break;
+        }
+    }
+
     private Camera GetCamera(World world)
     {
         var camera = new Camera(
@@ -374,6 +649,16 @@ public sealed unsafe class MeshRenderer : IDisposable
         }
 
         _context.Vk.DestroyCommandPool(_context.Device, _commandPool, null);
+        _context.Vk.DestroyDescriptorPool(_context.Device, _textureDescriptorPool, null);
+        _context.Vk.DestroyDescriptorPool(_context.Device, _frameDescriptorPool, null);
+
+        foreach (var texture in _textures.Values)
+            texture.Dispose();
+        _textures.Clear();
+
+        _defaultTexture?.Dispose();
+
+        _frameConstantsBuffer.Dispose();
 
         _pipeline.Dispose();
     }

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "cortex-engine": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "/home/emil/Desktop/Cortex_Engine/src/CortexEngine.App/CortexEngine.App.csproj",
+        "--",
+        "--mcp-stdio"
+      ],
+      "env": {
+        "DOTNET_ROOT": "/home/emil/.dotnet",
+        "PATH": "/home/emil/.dotnet:/usr/bin:/bin"
+      }
+    }
+  }
+}

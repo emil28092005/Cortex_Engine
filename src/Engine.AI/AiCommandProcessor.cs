@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Engine.AI.Commands;
@@ -55,6 +56,8 @@ public sealed class AiCommandProcessor
                 DeleteEntityCommand c => DeleteEntity(c),
                 ListEntitiesCommand => ListEntities(),
                 CaptureScreenshotCommand c => CaptureScreenshot(c),
+                GetWorldStateCommand => GetWorldState(),
+                SetMaterialCommand c => SetMaterial(c),
                 _ => AiCommandResult.Error($"Unknown command type: {command.Type}")
             };
         }
@@ -131,5 +134,129 @@ public sealed class AiCommandProcessor
         var path = command.OutputPath ?? $"screenshot_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}.png";
         _requestScreenshot(path);
         return AiCommandResult.Ok($"Screenshot requested: {path}");
+    }
+
+    private AiCommandResult SetMaterial(SetMaterialCommand command)
+    {
+        var entity = _world.Lookup(command.Name);
+        if ((ulong)entity.Id == 0)
+            return AiCommandResult.Error($"Entity '{command.Name}' not found.");
+
+        ref var material = ref entity.Ensure<Material>();
+
+        if (command.Albedo.HasValue)
+            material.Albedo = command.Albedo.Value;
+        if (command.Roughness.HasValue)
+            material.Roughness = command.Roughness.Value;
+        if (command.Metallic.HasValue)
+            material.Metallic = command.Metallic.Value;
+        if (command.TexturePath is not null)
+            material.TexturePath = command.TexturePath;
+
+        return AiCommandResult.Ok($"Updated material for entity '{command.Name}'.");
+    }
+
+    private AiCommandResult GetWorldState()
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false }))
+        {
+            writer.WriteStartArray();
+
+            _world.Each((Entity e, ref Transform _) =>
+            {
+                var name = e.Name();
+                if (string.IsNullOrEmpty(name))
+                    return;
+
+                writer.WriteStartObject();
+                writer.WriteString("name", name);
+                writer.WriteNumber("id", (ulong)e.Id);
+
+                writer.WriteStartObject("components");
+
+                if (e.Has<Transform>())
+                {
+                    ref var transform = ref e.Ensure<Transform>();
+                    writer.WriteStartObject("Transform");
+                    WriteVector3(writer, "position", transform.Position);
+                    WriteQuaternion(writer, "rotation", transform.Rotation);
+                    WriteVector3(writer, "scale", transform.Scale);
+                    writer.WriteEndObject();
+                }
+
+                if (e.Has<Camera>())
+                {
+                    ref var camera = ref e.Ensure<Camera>();
+                    writer.WriteStartObject("Camera");
+                    writer.WriteNumber("fieldOfView", camera.FieldOfView);
+                    writer.WriteNumber("aspectRatio", camera.AspectRatio);
+                    writer.WriteNumber("nearPlane", camera.NearPlane);
+                    writer.WriteNumber("farPlane", camera.FarPlane);
+                    WriteVector3(writer, "position", camera.Position);
+                    WriteVector3(writer, "target", camera.Target);
+                    WriteVector3(writer, "up", camera.Up);
+                    writer.WriteEndObject();
+                }
+
+                if (e.Has<Material>())
+                {
+                    ref var material = ref e.Ensure<Material>();
+                    writer.WriteStartObject("Material");
+                    WriteVector3(writer, "albedo", material.Albedo);
+                    writer.WriteNumber("roughness", material.Roughness);
+                    writer.WriteNumber("metallic", material.Metallic);
+                    if (material.HasTexture)
+                        writer.WriteString("texturePath", material.TexturePath);
+                    writer.WriteEndObject();
+                }
+
+                if (e.Has<Mesh>())
+                {
+                    ref var mesh = ref e.Ensure<Mesh>();
+                    writer.WriteStartObject("Mesh");
+                    writer.WriteNumber("vertexCount", mesh.Vertices.Length);
+                    writer.WriteNumber("indexCount", mesh.Indices.Length);
+                    writer.WriteEndObject();
+                }
+
+                if (e.Has<Light>())
+                {
+                    ref var light = ref e.Ensure<Light>();
+                    writer.WriteStartObject("Light");
+                    WriteVector3(writer, "direction", light.Direction);
+                    WriteVector3(writer, "color", light.Color);
+                    writer.WriteNumber("intensity", light.Intensity);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            });
+
+            writer.WriteEndArray();
+        }
+
+        var json = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        return AiCommandResult.Ok(json);
+    }
+
+    private static void WriteVector3(Utf8JsonWriter writer, string propertyName, Vector3 value)
+    {
+        writer.WriteStartArray(propertyName);
+        writer.WriteNumberValue(value.X);
+        writer.WriteNumberValue(value.Y);
+        writer.WriteNumberValue(value.Z);
+        writer.WriteEndArray();
+    }
+
+    private static void WriteQuaternion(Utf8JsonWriter writer, string propertyName, Quaternion value)
+    {
+        writer.WriteStartArray(propertyName);
+        writer.WriteNumberValue(value.X);
+        writer.WriteNumberValue(value.Y);
+        writer.WriteNumberValue(value.Z);
+        writer.WriteNumberValue(value.W);
+        writer.WriteEndArray();
     }
 }

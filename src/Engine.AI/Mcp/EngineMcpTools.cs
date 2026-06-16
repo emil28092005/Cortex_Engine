@@ -77,6 +77,33 @@ public sealed class EngineMcpTools
         return EnqueueAndReturnMessage(cmd);
     }
 
+    [McpServerTool, Description("Dump the current ECS world state as JSON, including Transform, Camera, Material, Light, and Mesh component summaries.")]
+    public Task<string> GetWorldState()
+    {
+        var cmd = new GetWorldStateCommand();
+        return EnqueueAndReturnMessage(cmd);
+    }
+
+    [McpServerTool, Description("Update the material of an existing entity by name.")]
+    public Task<string> SetMaterial(
+        string name,
+        [Description("Optional albedo color as [r, g, b] (0-1)")] IReadOnlyList<double>? albedo = null,
+        [Description("Optional roughness value (0-1)")] float? roughness = null,
+        [Description("Optional metallic value (0-1)")] float? metallic = null,
+        [Description("Optional path to a PNG texture file")] string? texturePath = null)
+    {
+        var cmd = new SetMaterialCommand
+        {
+            Name = name,
+            Albedo = ToVector3(albedo),
+            Roughness = roughness,
+            Metallic = metallic,
+            TexturePath = texturePath
+        };
+
+        return EnqueueAndReturnMessage(cmd);
+    }
+
     private async Task<string> EnqueueAndReturnMessage(AiCommand command)
     {
         var result = await _queue.EnqueueAsync(command).ConfigureAwait(false);

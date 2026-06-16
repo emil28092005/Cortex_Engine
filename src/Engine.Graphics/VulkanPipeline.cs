@@ -15,6 +15,8 @@ public sealed unsafe class VulkanPipeline : IDisposable
 
     public Pipeline Handle { get; }
     public PipelineLayout Layout { get; }
+    public DescriptorSetLayout FrameDescriptorSetLayout { get; }
+    public DescriptorSetLayout TextureDescriptorSetLayout { get; }
     private readonly ShaderModule _vertexModule;
     private readonly ShaderModule _fragmentModule;
 
@@ -26,6 +28,8 @@ public sealed unsafe class VulkanPipeline : IDisposable
         _vertexModule = CreateShaderModule("vertex.spv");
         _fragmentModule = CreateShaderModule("fragment.spv");
 
+        FrameDescriptorSetLayout = CreateFrameDescriptorSetLayout();
+        TextureDescriptorSetLayout = CreateTextureDescriptorSetLayout();
         Layout = CreatePipelineLayout();
         Handle = CreateGraphicsPipeline();
     }
@@ -53,19 +57,69 @@ public sealed unsafe class VulkanPipeline : IDisposable
         }
     }
 
+    private DescriptorSetLayout CreateFrameDescriptorSetLayout()
+    {
+        var binding = new DescriptorSetLayoutBinding
+        {
+            Binding = 0,
+            DescriptorType = DescriptorType.UniformBuffer,
+            DescriptorCount = 1,
+            StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit
+        };
+
+        var createInfo = new DescriptorSetLayoutCreateInfo
+        {
+            SType = StructureType.DescriptorSetLayoutCreateInfo,
+            BindingCount = 1,
+            PBindings = &binding
+        };
+
+        DescriptorSetLayout layout;
+        var result = _context.Vk.CreateDescriptorSetLayout(_context.Device, &createInfo, null, &layout);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkCreateDescriptorSetLayout failed: {result}");
+        return layout;
+    }
+
+    private DescriptorSetLayout CreateTextureDescriptorSetLayout()
+    {
+        var binding = new DescriptorSetLayoutBinding
+        {
+            Binding = 0,
+            DescriptorType = DescriptorType.CombinedImageSampler,
+            DescriptorCount = 1,
+            StageFlags = ShaderStageFlags.FragmentBit
+        };
+
+        var createInfo = new DescriptorSetLayoutCreateInfo
+        {
+            SType = StructureType.DescriptorSetLayoutCreateInfo,
+            BindingCount = 1,
+            PBindings = &binding
+        };
+
+        DescriptorSetLayout layout;
+        var result = _context.Vk.CreateDescriptorSetLayout(_context.Device, &createInfo, null, &layout);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkCreateDescriptorSetLayout (texture) failed: {result}");
+        return layout;
+    }
+
     private PipelineLayout CreatePipelineLayout()
     {
         var pushConstantRange = new PushConstantRange
         {
             StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
             Offset = 0,
-            Size = (uint)(32 * sizeof(float))
+            Size = 96
         };
 
+        var setLayouts = stackalloc DescriptorSetLayout[] { FrameDescriptorSetLayout, TextureDescriptorSetLayout };
         var createInfo = new PipelineLayoutCreateInfo
         {
             SType = StructureType.PipelineLayoutCreateInfo,
-            SetLayoutCount = 0,
+            SetLayoutCount = 2,
+            PSetLayouts = setLayouts,
             PushConstantRangeCount = 1,
             PPushConstantRanges = &pushConstantRange
         };
@@ -244,6 +298,8 @@ public sealed unsafe class VulkanPipeline : IDisposable
         _context.Vk.DeviceWaitIdle(_context.Device);
         _context.Vk.DestroyPipeline(_context.Device, Handle, null);
         _context.Vk.DestroyPipelineLayout(_context.Device, Layout, null);
+        _context.Vk.DestroyDescriptorSetLayout(_context.Device, FrameDescriptorSetLayout, null);
+        _context.Vk.DestroyDescriptorSetLayout(_context.Device, TextureDescriptorSetLayout, null);
         _context.Vk.DestroyShaderModule(_context.Device, _vertexModule, null);
         _context.Vk.DestroyShaderModule(_context.Device, _fragmentModule, null);
     }

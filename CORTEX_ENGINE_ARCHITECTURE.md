@@ -256,9 +256,13 @@ public struct MeshRef : IComponent
 
 public struct Camera : IComponent
 {
-    public float Fov;
-    public float Near;
-    public float Far;
+    public Vector3 Position;
+    public Vector3 Target;
+    public Vector3 Up;
+    public float FieldOfView;
+    public float AspectRatio;
+    public float NearPlane;
+    public float FarPlane;
 }
 
 public struct Material : IComponent
@@ -266,6 +270,14 @@ public struct Material : IComponent
     public Vector3 Albedo;
     public float Roughness;
     public float Metallic;
+    public string? TexturePath;
+}
+
+public struct Light : IComponent
+{
+    public Vector3 Direction;
+    public Vector3 Color;
+    public float Intensity;
 }
 
 public struct SemanticClass : IComponent
@@ -296,9 +308,11 @@ The renderer uses a simple forward-lit pipeline:
 
 - **Vertex format**: position, color, normal.
 - **Per-entity**: Mesh + Transform + optional Material.
-- **Per-frame constants** via push constants: MVP matrix, light direction/color, ambient color, camera position.
-- **Lighting model**: directional light with ambient + diffuse + Blinn-Phong specular.
-- **Material**: CPU-side tint; `Material.Albedo` multiplies vertex color, `Roughness` and `Metallic` reserved for future PBR extension.
+- **Per-frame constants** via a Vulkan uniform buffer (descriptor set 0): camera position, up to 4 directional lights, ambient color.
+- **Per-entity constants** via push constants: MVP matrix, material albedo/roughness/metallic, texture use flag.
+- **Lighting model**: multiple directional lights with ambient + diffuse + Blinn-Phong specular.
+- **Material**: `Material.Albedo` tints vertex color, `Roughness` and `Metallic` control specular falloff and intensity; an optional `TexturePath` enables albedo texture sampling.
+- **Textures**: PNG files are loaded into Vulkan images with a combined image sampler (descriptor set 1). UVs are derived from vertex position XZ for the floor plane; other meshes use world-space XZ as a simple mapping.
 
 ### 4.6 SystemSlotRegistry
 
@@ -447,13 +461,20 @@ The `AiGateway` is the only allowed path for the AI to modify the running engine
 
 ### 6.2 MCP Server (Dev / Release)
 
-In Debug and Release configurations, the engine hosts an in-process **Model Context Protocol (MCP)** HTTP server. AI clients (Claude Desktop, Cursor, VS Code Copilot) can connect to it and call tools:
+The engine can expose its AI commands through two MCP transports:
+
+1. **HTTP MCP server** (Debug/Release): an in-process ASP.NET Core server using `ModelContextProtocol.AspNetCore` with SSE on `http://localhost:<port>/`. Enable with `--mcp-port <port>`.
+2. **Stdio MCP server** (Debug/Release): a minimal JSON-RPC server that reads from stdin and writes to stdout. Enable with `--mcp-stdio`. This is the format expected by Claude Desktop and other stdio MCP clients.
+
+Available tools:
 
 - `spawn_model` — spawn a named entity from a model file.
 - `set_transform` — update entity position, rotation, scale.
+- `set_material` — update entity albedo, roughness, metallic, and texture path.
 - `delete_entity` — delete an entity by name.
 - `list_entities` — list all named entities with a `Transform`.
-- `capture_screenshot` — save a PNG of the current frame.
+- `get_world_state` — dump the ECS world as JSON (Transform, Camera, Material, Light, Mesh).
+- `capture_screenshot` — save a PNG of the current frame (HTTP/render mode only).
 
 Commands are queued and executed on the main engine thread so the Flecs world is never touched from a background thread.
 
@@ -509,7 +530,7 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   ├── Timing.cs                     # DeltaTime, fixed timestep
 │   │   ├── InputMapping.cs               # Keyboard, mouse, gamepad input
 │   │   ├── OrbitCameraController.cs      # Mouse orbit camera
-│   │   └── Components/                   # Transform, Camera, Material, Mesh
+│   │   └── Components/                   # Transform, Camera, Light, Material, Mesh
 │   │
 │   ├── Engine.Data/
 │   │   ├── GameObject.cs                 # Thin struct facade
@@ -518,11 +539,13 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   └── SystemSlotRegistry.cs         # Named system hot-swap registry
 │   │
 │   ├── Engine.Graphics/
-│   │   ├── VulkanContext.cs              # Device, instance, queues
-│   │   ├── Swapchain.cs                  # Swapchain management
+│   │   ├── VulkanContext.cs              # Device, instance, queues, command pool
+│   │   ├── Swapchain.cs                  # Swapchain + depth buffer
 │   │   ├── MeshRenderer.cs               # ECS mesh rendering
 │   │   ├── ScreenshotCapture.cs          # Vulkan readback → PNG
-│   │   ├── VulkanPipeline.cs             # Graphics pipeline
+│   │   ├── VulkanPipeline.cs             # Graphics pipeline + descriptor layouts
+│   │   ├── UniformBuffer.cs              # Per-frame uniform buffer
+│   │   ├── Texture.cs                    # Vulkan texture (image, view, sampler)
 │   │   ├── VertexBuffer.cs               # Vertex buffer helpers
 │   │   ├── IndexBuffer.cs                # Index buffer helpers
 │   │   └── Loaders/                      # ObjLoader, GltfLoader
@@ -538,8 +561,10 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   ├── AiCommandProcessor.cs         # Parses and executes JSON commands
 │   │   ├── AiCommandQueue.cs             # Thread-safe command queue
 │   │   ├── Mcp/
-│   │   │   ├── EngineMcpTools.cs         # MCP tool definitions
+│   │   │   ├── EngineMcpTools.cs         # MCP HTTP tool definitions
 │   │   │   └── McpEngineServerHost.cs    # In-process MCP HTTP server
+│   │   ├── Stdio/
+│   │   │   └── McpStdioServer.cs         # Minimal stdio MCP server
 │   │   ├── Commands/                     # AI command DTOs
 │   │   └── Serialization/                # JSON converters for Vector3/Quaternion
 │   │
@@ -676,7 +701,7 @@ Stack:
 - ModelContextProtocol for AI tool integration
 
 Rules:
-1. All state lives in ECS components (Transform, Camera, Mesh, Material).
+1. All state lives in ECS components (Transform, Camera, Light, Mesh, Material).
 2. All AI mutations go through Engine.AI (AiCommandProcessor / MCP tools).
 3. All Dev-Mode AI scripts must be AOT-compatible and avoid unsafe, Reflection.Emit, Assembly.Load, File I/O.
 4. All systems are registered in SystemSlotRegistry and tagged with [Slot("name")].
@@ -691,10 +716,86 @@ Current file context: [insert path here]
 
 ## 12. NEXT DECISION POINTS
 
-1. Which **Step 1/2/3** should be implemented first? (Recommended: Step 1 for visible window)
-2. Should `Hexa.NET.ImGui` be pinned to a specific version immediately?
-3. Should `Engine.Broker` HTTP server be included in MVP or deferred?
-4. Should Jolt Physics be added in Step 3 or kept for a later milestone?
+1. Add ImGui editor UI (`Hexa.NET.ImGui`) for scene hierarchy and inspector.
+2. Add physics integration (`JoltPhysicsSharp`) with rigid bodies and colliders.
+3. Implement semantic segmentation render pass for AI vision.
+4. Add audio module (`NAudio` or `OpenAL` bindings).
+5. Add networking / multiplayer foundation.
+
+---
+
+## 13. RUNTIME NOTES & CRITICAL CONTEXT
+
+### 13.1 Building & Running
+
+```bash
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$DOTNET_ROOT:$PATH"
+export DISPLAY=:0
+dotnet build CORTEX_ENGINE.sln -c Debug
+dotnet run --project src/CortexEngine.App/CortexEngine.App.csproj
+```
+
+- `RuntimeIdentifier=linux-x64` is required in Debug to use the bundled native `libSDL3.so` from `ppy.SDL3-CS` (system `libSDL3.so.3.4.2` is ABI-incompatible).
+- AOT builds: `dotnet build CORTEX_ENGINE.sln -c ReleaseAOT`.
+
+### 13.2 CLI Arguments
+
+- `--mcp-port <port>` — start the HTTP MCP server on `http://localhost:<port>/` (SSE).
+- `--mcp-stdio` — run the headless stdio MCP server for Claude Desktop / other stdio clients.
+- Any other positional argument is treated as a model path (`.obj`, `.gltf`, `.glb`).
+
+### 13.3 Vulkan & Shader Pipeline
+
+- Pipeline layout uses **two descriptor sets**: set 0 = per-frame uniform buffer (camera + lights), set 1 = per-entity combined image sampler.
+- Push constants: 96 bytes (`mat4 mvp` + material albedo/roughness/metallic + texture flag + padding), stages `VertexBit | FragmentBit`.
+- Uniform buffer: std140 224 bytes (`cameraPosition`, `lightCount`, `ambientColor`, up to 4 `Light` structs).
+- Shaders are compiled with `glslangValidator`:
+  ```bash
+  /tmp/glslang/bin/glslangValidator -V src/Engine.Graphics/Shaders/vertex.vert -o src/Engine.Graphics/Shaders/vertex.spv
+  /tmp/glslang/bin/glslangValidator -V src/Engine.Graphics/Shaders/fragment.frag -o src/Engine.Graphics/Shaders/fragment.spv
+  ```
+
+### 13.4 SDL3 Input
+
+- `SDL3 2026.520.0` API: `SDL_Init` returns `SDLBool`, `SDL_PollEvent` returns `SDLBool`, `evt.type` is `uint`.
+- Keyboard: `evt.key.key`; Mouse: `evt.motion.x`, `evt.motion.y`, `evt.wheel.y`.
+- Orbit camera: right mouse drag rotates, mouse wheel zooms, `ESC` exits.
+
+### 13.5 MCP Client Config
+
+Sample Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "cortex-engine": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "/home/emil/Desktop/Cortex_Engine/src/CortexEngine.App/CortexEngine.App.csproj",
+        "--",
+        "--mcp-stdio"
+      ],
+      "env": {
+        "DOTNET_ROOT": "/home/emil/.dotnet",
+        "PATH": "/home/emil/.dotnet:/usr/bin:/bin"
+      }
+    }
+  }
+}
+```
+
+For the HTTP MCP server, use the `--mcp-port` argument and connect an SSE MCP client.
+
+### 13.6 Process Cleanup
+
+Background `dotnet run` processes may leave the apphost running. Kill them with:
+
+```bash
+ps -C CortexEngine.App -o pid= | xargs -r kill -9
+```
 
 ---
 

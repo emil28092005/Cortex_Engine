@@ -31,6 +31,7 @@ public sealed unsafe class VulkanContext : IDisposable
     public SurfaceKHR Surface { get; private set; }
     public uint GraphicsFamilyIndex { get; private set; }
     public uint PresentFamilyIndex { get; private set; }
+    public CommandPool CommandPool { get; private set; }
 
     public VulkanContext(Sdl3Window window, bool enableValidation = true)
     {
@@ -42,6 +43,23 @@ public sealed unsafe class VulkanContext : IDisposable
         CreateLogicalDevice();
         LoadDeviceExtensions();
         GetQueues();
+        CreateCommandPool();
+    }
+
+    private void CreateCommandPool()
+    {
+        var createInfo = new CommandPoolCreateInfo
+        {
+            SType = StructureType.CommandPoolCreateInfo,
+            QueueFamilyIndex = GraphicsFamilyIndex,
+            Flags = CommandPoolCreateFlags.ResetCommandBufferBit
+        };
+
+        CommandPool commandPool;
+        var result = Vk.CreateCommandPool(Device, &createInfo, null, &commandPool);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"vkCreateCommandPool failed: {result}");
+        CommandPool = commandPool;
     }
 
     private void CreateInstance(Sdl3Window window, bool enableValidation)
@@ -290,6 +308,8 @@ public sealed unsafe class VulkanContext : IDisposable
         _disposed = true;
 
         Vk.DeviceWaitIdle(Device);
+        if (CommandPool.Handle != 0)
+            Vk.DestroyCommandPool(Device, CommandPool, null);
         if (Device.Handle != 0)
             Vk.DestroyDevice(Device, null);
         if (Surface.Handle != 0)

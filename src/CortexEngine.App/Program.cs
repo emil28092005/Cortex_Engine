@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using Engine.AI;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 #if !RELEASE_AOT
 using Engine.AI.Mcp;
+using Microsoft.AspNetCore.Builder;
 #endif
 using Engine.Core;
 using Engine.Core.Components;
@@ -22,6 +26,12 @@ class Program
 
         try
         {
+            if (args.Contains("--mcp-stdio"))
+            {
+                RunMcpStdioServer();
+                return;
+            }
+
             using var world = World.Create();
             using var window = new Sdl3Window("Cortex Engine", 1280, 720);
             var timing = new Timing();
@@ -37,16 +47,35 @@ class Program
             var queue = new AiCommandQueue(processor);
 
             var cameraEntity = world.Entity("Camera")
+                .Set(new Transform(new Vector3(0.0f, 2.5f, -4.0f), Quaternion.Identity, Vector3.One))
                 .Set(new Camera(
-                    new Vector3(0.0f, 1.5f, -3.0f),
-                    Vector3.Zero,
+                    new Vector3(0.0f, 2.5f, -4.0f),
+                    new Vector3(0.0f, 0.5f, 0.0f),
                     Vector3.UnitY,
                     MathF.PI / 4.0f,
                     1280.0f / 720.0f,
                     0.1f,
                     100.0f));
 
-            var orbit = new OrbitCameraController(cameraEntity, Vector3.Zero);
+            world.Entity("MainLight")
+                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
+                .Set(new Light(new Vector3(0.5f, -1.0f, -0.5f), new Vector3(1.0f, 0.95f, 0.8f), 1.0f));
+
+            world.Entity("FillLight")
+                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
+                .Set(new Light(new Vector3(-0.8f, -0.6f, 0.3f), new Vector3(0.3f, 0.4f, 0.6f), 0.6f));
+
+            world.Entity("FrontLight")
+                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
+                .Set(new Light(new Vector3(0.0f, -0.3f, -1.0f), new Vector3(0.8f, 0.8f, 0.9f), 0.4f));
+
+            world.Entity("GroundLight")
+                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
+                .Set(new Light(new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.15f, 0.15f, 0.2f), 0.3f));
+
+            var orbit = new OrbitCameraController(cameraEntity, new Vector3(0.0f, 0.5f, 0.0f));
+
+            var texturePath = GenerateCheckerboardTexture("Content/checkerboard.png", 256);
 
             var model = world.Entity("Model")
                 .Set(new Transform(new Vector3(0.0f, 0.5f, 0.0f), Quaternion.Identity, new Vector3(0.5f)))
@@ -55,8 +84,8 @@ class Program
 
             var floor = world.Entity("Floor")
                 .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(CreateFloorMesh(20.0f, new Vector3(0.08f, 0.08f, 0.1f)))
-                .Set(new Material(new Vector3(0.08f, 0.08f, 0.1f), roughness: 0.9f, metallic: 0.0f));
+                .Set(CreateFloorMesh(20.0f, new Vector3(0.8f, 0.8f, 0.85f)))
+                .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.9f, metallic: 0.0f, texturePath: texturePath));
 
             var grid = world.Entity("Grid")
                 .Set(new Transform(new Vector3(0.0f, 0.01f, 0.0f), Quaternion.Identity, Vector3.One))
@@ -74,23 +103,36 @@ class Program
                 secondCube.Set(new Material(new Vector3(0.3f, 0.7f, 0.9f), roughness: 0.3f, metallic: 0.2f));
 
             Console.WriteLine(processor.Process("""{ "type": "list_entities" }""").Message);
+            Console.WriteLine(processor.Process("""{ "type": "get_world_state" }""").Message);
             Console.WriteLine(processor.Process("""{ "type": "capture_screenshot", "outputPath": "Screenshots/demo.png" }""").Message);
 
 #if !RELEASE_AOT
-            // Start the MCP server in the background so AI agents can connect via HTTP.
-            var mcpApp = McpEngineServerHost.Create(args, queue, port: mcpPort);
-            var mcpTask = mcpApp.RunAsync();
-            _ = mcpTask.ContinueWith(t =>
+            WebApplication? mcpApp = null;
+            Task? mcpTask = null;
+
+            if (mcpPort > 0)
             {
-                if (t.IsFaulted)
-                    Console.WriteLine($"MCP server error: {t.Exception?.GetBaseException().Message}");
-                else if (t.IsCanceled)
-                    Console.WriteLine("MCP server canceled.");
-                else
-                    Console.WriteLine("MCP server stopped.");
-            }, TaskScheduler.Default);
-            Console.WriteLine($"MCP server starting on http://localhost:{mcpPort}");
+                // Start the MCP server in the background so AI agents can connect via HTTP.
+                mcpApp = McpEngineServerHost.Create(args, queue, port: mcpPort);
+                mcpTask = mcpApp.RunAsync();
+                _ = mcpTask.ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        Console.WriteLine($"MCP server error: {t.Exception?.GetBaseException().Message}");
+                    else if (t.IsCanceled)
+                        Console.WriteLine("MCP server canceled.");
+                    else
+                        Console.WriteLine("MCP server stopped.");
+                }, TaskScheduler.Default);
+
+                Console.WriteLine($"MCP HTTP server listening on http://localhost:{mcpPort}/ (SSE)");
+            }
+            else
+            {
+                Console.WriteLine("MCP server disabled (--mcp-port 0).");
+            }
 #endif
+
 
             var frames = 0;
             var lastFpsTime = 0.0;
@@ -138,10 +180,10 @@ class Program
 
             Console.WriteLine("Shutting down...");
 #if !RELEASE_AOT
-            await mcpApp.StopAsync();
-            await mcpTask;
-#else
-            await Task.CompletedTask;
+            if (mcpApp != null)
+                await mcpApp.StopAsync();
+            if (mcpTask != null)
+                await mcpTask;
 #endif
         }
         catch (Exception ex)
@@ -257,5 +299,36 @@ class Program
         }
 
         throw new FileNotFoundException("No model file found. Pass a .obj/.gltf/.glb path as argument or place Content/cube.obj next to the executable.");
+    }
+
+    private static string GenerateCheckerboardTexture(string path, int size)
+    {
+        var tileSize = size / 8;
+        using var image = new Image<Rgba32>(size, size);
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var tileX = x / tileSize;
+                var tileY = y / tileSize;
+                var isDark = (tileX + tileY) % 2 == 0;
+                image[x, y] = isDark
+                    ? new Rgba32(60, 60, 70, 255)
+                    : new Rgba32(160, 160, 170, 255);
+            }
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        image.SaveAsPng(path);
+        return path;
+    }
+
+    private static void RunMcpStdioServer()
+    {
+        Console.WriteLine("Starting headless stdio MCP server...");
+        using var world = World.Create();
+        var processor = new AiCommandProcessor(world, LoadModel, _ => { });
+        var server = new Engine.AI.Stdio.McpStdioServer(processor);
+        server.Run();
     }
 }
