@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Numerics;
+using Engine.AI;
 using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
@@ -13,23 +14,22 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine Step 4 — Starting up...");
+        Console.WriteLine("Cortex Engine Step 5 — Starting up...");
 
         try
         {
             using var world = World.Create();
-            using var window = new Sdl3Window("Cortex Engine — Step 4", 1280, 720);
+            using var window = new Sdl3Window("Cortex Engine — Step 5", 1280, 720);
             var timing = new Timing();
             var input = new InputMapping();
             using var vulkan = new VulkanContext(window, enableValidation: false);
             using var swapchain = new Swapchain(vulkan);
             using var renderer = new MeshRenderer(vulkan, swapchain);
 
+            var ai = new AiCommandProcessor(world, LoadModel);
+
             var modelPath = FindModelPath(args);
-            var mesh = modelPath.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase)
-                || modelPath.EndsWith(".glb", StringComparison.OrdinalIgnoreCase)
-                    ? GltfLoader.Load(modelPath, new Vector3(0.7f, 0.6f, 0.5f))
-                    : ObjLoader.Load(modelPath, new Vector3(0.7f, 0.6f, 0.5f));
+            var mesh = LoadModel(modelPath);
 
             var model = world.Entity("Model")
                 .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, new Vector3(0.5f)))
@@ -44,6 +44,13 @@ class Program
                     1280.0f / 720.0f,
                     0.1f,
                     100.0f));
+
+            // Demo: AI agent commands.
+            Console.WriteLine("AI demo commands:");
+            Console.WriteLine(ai.Process("""{ "type": "list_entities" }""").Message);
+            Console.WriteLine(ai.Process("""{ "type": "spawn_model", "name": "SecondCube", "modelPath": "Content/cube.obj", "position": [0.8, 0, 0], "scale": [0.3, 0.3, 0.3] }""").Message);
+            Console.WriteLine(ai.Process("""{ "type": "list_entities" }""").Message);
+            Console.WriteLine(ai.Process("""{ "type": "set_transform", "name": "SecondCube", "position": [0.8, 0.5, 0], "rotation": [0, 0, 0, 1], "scale": [0.3, 0.3, 0.3] }""").Message);
 
             var frames = 0;
             var lastFpsTime = 0.0;
@@ -88,6 +95,14 @@ class Program
             Console.WriteLine($"Fatal error: {ex}");
             Environment.Exit(1);
         }
+    }
+
+    private static Mesh LoadModel(string path)
+    {
+        return path.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase)
+            || path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase)
+                ? GltfLoader.Load(path, new Vector3(0.7f, 0.6f, 0.5f))
+                : ObjLoader.Load(path, new Vector3(0.7f, 0.6f, 0.5f));
     }
 
     private static string FindModelPath(string[] args)
