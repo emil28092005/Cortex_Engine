@@ -30,6 +30,9 @@ public sealed unsafe class Swapchain : IDisposable
     public Extent2D Extent => _extent;
     public SwapchainKHR Handle => _swapchain;
     public uint ImageCount => (uint)_images.Length;
+    public Format SurfaceFormat => _surfaceFormat.Format;
+
+    public Image GetImage(uint index) => _images[index];
 
     public Swapchain(VulkanContext context)
     {

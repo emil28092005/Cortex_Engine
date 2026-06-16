@@ -15,6 +15,9 @@ obj/
 .DS_Store
 Thumbs.db
 
+# Generated screenshots
+Screenshots/
+
 # dotnet
 *.dll
 *.exe

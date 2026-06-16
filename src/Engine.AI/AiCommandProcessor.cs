@@ -16,13 +16,15 @@ public sealed class AiCommandProcessor
 {
     private readonly World _world;
     private readonly Func<string, Mesh> _modelLoader;
+    private readonly Action<string> _requestScreenshot;
 
     public JsonSerializerOptions JsonOptions { get; }
 
-    public AiCommandProcessor(World world, Func<string, Mesh> modelLoader)
+    public AiCommandProcessor(World world, Func<string, Mesh> modelLoader, Action<string> requestScreenshot)
     {
         _world = world;
         _modelLoader = modelLoader;
+        _requestScreenshot = requestScreenshot;
         JsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -52,6 +54,7 @@ public sealed class AiCommandProcessor
                 SetTransformCommand c => SetTransform(c),
                 DeleteEntityCommand c => DeleteEntity(c),
                 ListEntitiesCommand => ListEntities(),
+                CaptureScreenshotCommand c => CaptureScreenshot(c),
                 _ => AiCommandResult.Error($"Unknown command type: {command.Type}")
             };
         }
@@ -121,5 +124,12 @@ public sealed class AiCommandProcessor
 
         var json = JsonSerializer.Serialize(names, JsonOptions);
         return AiCommandResult.Ok(json);
+    }
+
+    private AiCommandResult CaptureScreenshot(CaptureScreenshotCommand command)
+    {
+        var path = command.OutputPath ?? $"screenshot_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}.png";
+        _requestScreenshot(path);
+        return AiCommandResult.Ok($"Screenshot requested: {path}");
     }
 }

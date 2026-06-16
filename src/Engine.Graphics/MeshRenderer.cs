@@ -18,6 +18,7 @@ public sealed unsafe class MeshRenderer : IDisposable
     private readonly VulkanContext _context;
     private readonly Swapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
+    private readonly ScreenshotCapture _screenshot;
     private readonly Dictionary<Entity, MeshBuffers> _buffers = new();
     private CommandPool _commandPool;
     private CommandBuffer[] _commandBuffers = null!;
@@ -48,6 +49,7 @@ public sealed unsafe class MeshRenderer : IDisposable
     {
         _context = context;
         _swapchain = swapchain;
+        _screenshot = new ScreenshotCapture(context, swapchain);
 
         _pipeline = new VulkanPipeline(context, swapchain);
         CreateCommandPool();
@@ -117,6 +119,10 @@ public sealed unsafe class MeshRenderer : IDisposable
             _inFlightFences[i] = fence;
         }
     }
+
+    public void RequestScreenshot(string outputPath) => _screenshot.Request(outputPath);
+
+    public bool IsScreenshotRequested => _screenshot.IsRequested;
 
     public void RenderWorld(World world)
     {
@@ -198,6 +204,10 @@ public sealed unsafe class MeshRenderer : IDisposable
         });
 
         _context.Vk.CmdEndRenderPass(cmd);
+
+        var swapchainImage = _swapchain.GetImage(imageIndex);
+        _screenshot.RecordReadback(cmd, swapchainImage, _swapchain.Extent.Width, _swapchain.Extent.Height, _swapchain.SurfaceFormat);
+
         _context.Vk.EndCommandBuffer(cmd);
 
         var waitSemaphore = _imageAvailableSemaphores[frame];
@@ -229,6 +239,14 @@ public sealed unsafe class MeshRenderer : IDisposable
         };
 
         _context.KhrSwapchain!.QueuePresent(_context.PresentQueue, &presentInfo);
+
+        // If a screenshot was requested, wait for the GPU to finish the readback and save the file.
+        if (_screenshot.IsRequested)
+        {
+            _context.Vk.WaitForFences(_context.Device, 1, &fence, true, ulong.MaxValue);
+            _screenshot.Save(_swapchain.Extent.Width, _swapchain.Extent.Height, _swapchain.SurfaceFormat);
+        }
+
         _currentFrame++;
     }
 
@@ -307,6 +325,8 @@ public sealed unsafe class MeshRenderer : IDisposable
     public void Dispose()
     {
         _context.Vk.DeviceWaitIdle(_context.Device);
+
+        _screenshot.Dispose();
 
         foreach (var buffers in _buffers.Values)
             buffers.Dispose();

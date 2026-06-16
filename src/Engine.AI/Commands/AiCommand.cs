@@ -11,6 +11,7 @@ namespace Engine.AI.Commands;
 [JsonDerivedType(typeof(SetTransformCommand), "set_transform")]
 [JsonDerivedType(typeof(DeleteEntityCommand), "delete_entity")]
 [JsonDerivedType(typeof(ListEntitiesCommand), "list_entities")]
+[JsonDerivedType(typeof(CaptureScreenshotCommand), "capture_screenshot")]
 public abstract record AiCommand
 {
     public string Type => GetType().Name.Replace("Command", "").ToLowerInvariant();

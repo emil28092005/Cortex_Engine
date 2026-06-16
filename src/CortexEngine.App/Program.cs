@@ -29,11 +29,11 @@ class Program
             using var swapchain = new Swapchain(vulkan);
             using var renderer = new MeshRenderer(vulkan, swapchain);
 
-            var processor = new AiCommandProcessor(world, LoadModel);
-            var queue = new AiCommandQueue(processor);
-
             var (modelPath, mcpPort) = ParseArgs(args);
             var mesh = LoadModel(modelPath);
+
+            var processor = new AiCommandProcessor(world, LoadModel, path => renderer.RequestScreenshot(path));
+            var queue = new AiCommandQueue(processor);
 
             var model = world.Entity("Model")
                 .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, new Vector3(0.5f)))
@@ -55,6 +55,7 @@ class Program
             Console.WriteLine(processor.Process("""{ "type": "spawn_model", "name": "SecondCube", "modelPath": "Content/cube.obj", "position": [0.8, 0, 0], "scale": [0.3, 0.3, 0.3] }""").Message);
             Console.WriteLine(processor.Process("""{ "type": "list_entities" }""").Message);
             Console.WriteLine(processor.Process("""{ "type": "set_transform", "name": "SecondCube", "position": [0.8, 0.5, 0], "rotation": [0, 0, 0, 1], "scale": [0.3, 0.3, 0.3] }""").Message);
+            Console.WriteLine(processor.Process("""{ "type": "capture_screenshot", "outputPath": "Screenshots/demo.png" }""").Message);
 
 #if !RELEASE_AOT
             // Start the MCP server in the background so AI agents can connect via HTTP.

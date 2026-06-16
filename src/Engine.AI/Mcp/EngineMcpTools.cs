@@ -70,6 +70,13 @@ public sealed class EngineMcpTools
         return EnqueueAndReturnMessage(cmd);
     }
 
+    [McpServerTool, Description("Capture a screenshot of the current rendered frame and save it to disk.")]
+    public Task<string> CaptureScreenshot([Description("Optional output file path (default: screenshot_<timestamp>.png)")] string? outputPath = null)
+    {
+        var cmd = new CaptureScreenshotCommand { OutputPath = outputPath };
+        return EnqueueAndReturnMessage(cmd);
+    }
+
     private async Task<string> EnqueueAndReturnMessage(AiCommand command)
     {
         var result = await _queue.EnqueueAsync(command).ConfigureAwait(false);

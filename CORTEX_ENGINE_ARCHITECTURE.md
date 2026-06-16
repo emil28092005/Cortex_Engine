@@ -11,11 +11,11 @@
 
 Cortex Engine is a 3D game engine built from scratch to provide a Unity-like development experience (GameObject/Component paradigm, Inspector, Hierarchy, Scene View) while being deeply integrated with Multimodal Large Language Models (MMLMs). The engine allows an AI to:
 
-- **See** the engine state via virtual cameras, semantic segmentation maps, and profiler screenshots.
+- **See** the engine state via rendered-frame screenshots, virtual cameras, semantic segmentation maps, and profiler screenshots.
 - **Read** the complete ECS world state through native JSON serialization.
 - **Modify** the running engine via declarative JSON commands and, in Development Mode, via hot-reloaded C# scripts.
 
-The architecture prioritizes **production maturity** over experimental technologies: Vulkan (via Silk.NET.Vulkan), Flecs.NET (C# bindings for the C-based Flecs ECS), SDL3-cs (ppy.SDL3-CS), and ImGui.NET/Hexa.NET.ImGui with a native Vulkan backend.
+The architecture prioritizes **production maturity** over experimental technologies: Vulkan (via Silk.NET.Vulkan), Flecs.NET (C# bindings for the C-based Flecs ECS), SDL3-cs (ppy.SDL3-CS), and Hexa.NET.ImGui with a native Vulkan backend.
 
 ---
 
@@ -112,12 +112,14 @@ All Roslyn and `AssemblyLoadContext` code is wrapped in `#if DEV_MODE`.
 
 ### 3.3 Graphics HAL
 
-**Vulkan via `Vortice.Vulkan`**
+**Vulkan via `Silk.NET.Vulkan`**
 
-- NuGet: `Vortice.Vulkan` 3.2.3
+- NuGet: `Silk.NET.Vulkan` 2.21.0
 - .NET 9/10 low-level bindings
-- Includes VulkanMemoryAllocator, SPIRV-Cross, shaderc
-- Mature, MIT licensed, listed on vulkan.org
+- Mature, used by Silk.NET ecosystem
+- MoltenVK provides macOS/iOS support
+
+**Note:** Initial prototype used Vortice.Vulkan, but its loader segfaulted on the Kubuntu development setup. Silk.NET.Vulkan is the verified working binding.
 
 **Why Vulkan over WebGPU:**
 
@@ -426,19 +428,30 @@ Non-critical captures can be spread across multiple frames to avoid stuttering.
 
 The `AiGateway` is the only allowed path for the AI to modify the running engine. It prevents memory corruption, invalid state, and unsafe code execution.
 
-### 6.2 Command Pattern (Works in Both Dev and Release)
+### 6.2 MCP Server (Dev / Release)
 
-The AI issues declarative JSON commands:
+In Debug and Release configurations, the engine hosts an in-process **Model Context Protocol (MCP)** HTTP server. AI clients (Claude Desktop, Cursor, VS Code Copilot) can connect to it and call tools:
+
+- `spawn_model` — spawn a named entity from a model file.
+- `set_transform` — update entity position, rotation, scale.
+- `delete_entity` — delete an entity by name.
+- `list_entities` — list all named entities with a `Transform`.
+- `capture_screenshot` — save a PNG of the current frame.
+
+Commands are queued and executed on the main engine thread so the Flecs world is never touched from a background thread.
+
+### 6.3 Command Pattern (Works in Both Dev and Release)
+
+The AI can also issue declarative JSON commands directly:
 
 ```json
 {
-  "command": "spawn",
-  "type": "enemy",
-  "at": [10, 0, 5],
-  "components": {
-    "Transform": { "position": [10, 0, 5], "rotation": [0, 0, 0, 1], "scale": [1, 1, 1] },
-    "SemanticClass": { "classId": 1 }
-  }
+  "type": "spawn_model",
+  "name": "Enemy",
+  "modelPath": "Models/enemy.obj",
+  "position": [10, 0, 5],
+  "rotation": [0, 0, 0, 1],
+  "scale": [1, 1, 1]
 }
 ```
 
@@ -447,10 +460,10 @@ Validation steps:
 1. JSON schema validation
 2. Type existence check via Flecs reflection
 3. Coordinate sanity check (e.g., no NaN, no extreme values)
-4. Safe-name check (no `..` in prefab paths)
-5. Queue operation via `world.Defer()` for execution at the next frame boundary
+4. Safe-name check (no `..` in model paths)
+5. Queue operation for execution at the next frame boundary
 
-### 6.3 Scripting Validation (Dev Mode Only)
+### 6.4 Scripting Validation (Dev Mode Only)
 
 Before Roslyn compilation:
 
@@ -460,9 +473,9 @@ Before Roslyn compilation:
 4. **Reference validation**: Ensure all referenced types exist in the engine API surface.
 5. **Sandboxed compilation**: Compile into isolated `AssemblyLoadContext`.
 
-### 6.4 Release Mode Limitation
+### 6.5 Release Mode Limitation
 
-In Release (NativeAOT), the AI cannot compile new C# code. It can only send JSON commands. This is a deliberate security and stability choice.
+In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI cannot compile new C# code. It can only send JSON commands via `AiCommandProcessor`. This is a deliberate security and stability choice.
 
 ---
 
@@ -488,10 +501,12 @@ In Release (NativeAOT), the AI cannot compile new C# code. It can only send JSON
 │   ├── Engine.Graphics/
 │   │   ├── VulkanContext.cs              # Device, instance, queues
 │   │   ├── Swapchain.cs                  # Swapchain management
-│   │   ├── RenderPassManager.cs          # Dynamic rendering helpers
-│   │   ├── SemanticRenderer.cs           # Flat-color segmentation pass
-│   │   ├── RttCamera.cs                  # Virtual camera + off-screen framebuffer
-│   │   └── TextureReadback.cs            # Image → staging buffer → JPEG
+│   │   ├── MeshRenderer.cs               # ECS mesh rendering
+│   │   ├── ScreenshotCapture.cs          # Vulkan readback → PNG
+│   │   ├── VulkanPipeline.cs             # Graphics pipeline
+│   │   ├── VertexBuffer.cs               # Vertex buffer helpers
+│   │   ├── IndexBuffer.cs                # Index buffer helpers
+│   │   └── Loaders/                      # ObjLoader, GltfLoader
 │   │
 │   ├── Engine.Diagnostics/
 │   │   ├── DiagnosticsManager.cs         # Orchestrator
@@ -500,12 +515,14 @@ In Release (NativeAOT), the AI cannot compile new C# code. It can only send JSON
 │   │   ├── Payload.cs                    # DiagnosticPayload class
 │   │   └── LogBuffer.cs                  # Circular console log buffer
 │   │
-│   ├── Engine.AiGateway/
-│   │   ├── AiGateway.cs                  # Command parser + dispatcher
-│   │   ├── CommandValidator.cs           # JSON command validation
-│   │   ├── RoslynCompilerService.cs      # Dev-Mode C# compilation
-│   │   ├── ScriptingSandbox.cs           # AssemblyLoadContext isolation
-│   │   └── TypeMigration.cs              # Component type migration helper
+│   ├── Engine.AI/
+│   │   ├── AiCommandProcessor.cs         # Parses and executes JSON commands
+│   │   ├── AiCommandQueue.cs             # Thread-safe command queue
+│   │   ├── Mcp/
+│   │   │   ├── EngineMcpTools.cs         # MCP tool definitions
+│   │   │   └── McpEngineServerHost.cs    # In-process MCP HTTP server
+│   │   ├── Commands/                     # AI command DTOs
+│   │   └── Serialization/                # JSON converters for Vector3/Quaternion
 │   │
 │   ├── Engine.Editor/
 │   │   ├── ImGuiController.cs           # Hexa.NET.ImGui initialization
@@ -595,13 +612,18 @@ In Release (NativeAOT), the AI cannot compile new C# code. It can only send JSON
 | Component | Package | Version | .NET | AOT | WASM | Mobile | Status |
 |-----------|---------|---------|------|-----|------|--------|--------|
 | SDL3 | `ppy.SDL3-CS` | 2026.520.0 | 9/10 | ✅ | ✅ | ✅ | Production |
-| Vulkan | `Vortice.Vulkan` | 3.2.3 | 9/10 | ✅ | ❌ | MoltenVK | Production |
+| Vulkan | `Silk.NET.Vulkan` | 2.21.0 | 9/10 | ✅ | ❌ | MoltenVK | Production |
 | ImGui | `Hexa.NET.ImGui` | latest | 9/10 | ✅ | ✅ | ✅ | Production |
-| ECS | `Flecs.NET.Release` | 4.0.3 | 8/9 | ✅* | ✅ | ✅ | Production |
+| ECS | `Flecs.NET.Release` | 4.0.4-build.546 | 8/9 | ✅* | ✅ | ✅ | Production |
+| Model loading | `SharpGLTF.Core` | 1.0.6 | 9/10 | ✅ | ✅ | ✅ | Production |
+| AI bridge | `ModelContextProtocol` | 1.4.0 | 8/9 | ❌† | ✅ | ✅ | Production |
+| Screenshot | `SixLabors.ImageSharp` | 3.1.11 | 9/10 | ✅ | ✅ | ✅ | Production |
 | Physics | `JoltPhysicsSharp` | 2.21.0 | 9/10 | ✅ | ❌ | ✅ | Production |
 | JPEG | `SixLabors.ImageSharp` | latest | 9/10 | ✅ | ✅ | ✅ | Production |
 
 \* Via `<FlecsStaticLink>true</FlecsStaticLink>`
+
+† MCP server is excluded from `ReleaseAOT` because it depends on ASP.NET Core. JSON-only AI commands still work in AOT via `AiCommandProcessor`.
 
 ---
 
@@ -628,10 +650,11 @@ You are coding for Cortex Engine, a C# (.NET 9) AI-Native multiplatform 3D game 
 Stack:
 - C# .NET 9 with dual-runtime: JIT (Debug) for Roslyn hot-reload, NativeAOT (ReleaseAOT) for JSON-only AI commands
 - SDL3-cs (ppy.SDL3-CS) for windowing and input
-- Vortice.Vulkan for graphics
+- Silk.NET.Vulkan for graphics
 - Flecs.NET for ECS
 - Hexa.NET.ImGui for editor UI
 - JoltPhysicsSharp for physics
+- ModelContextProtocol for AI tool integration
 
 Rules:
 1. All state lives in ECS components. GameObject is a struct facade.
