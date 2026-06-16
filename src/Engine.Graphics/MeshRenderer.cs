@@ -1,22 +1,24 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Flecs.NET.Core;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
+using Engine.Core;
 using Engine.Core.Components;
 
 namespace Engine.Graphics;
 
 /// <summary>
-/// Renders a colored triangle using a vertex buffer and a simple graphics pipeline.
-/// Uses Silk.NET.Vulkan and reads entity transforms from the ECS world.
+/// Renders indexed meshes attached to ECS entities.
+/// Uses Silk.NET.Vulkan and reads Mesh + Transform components from the ECS world.
 /// </summary>
-public sealed unsafe class TriangleRenderer : IDisposable
+public sealed unsafe class MeshRenderer : IDisposable
 {
     private readonly VulkanContext _context;
     private readonly Swapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
-    private readonly VertexBuffer _vertexBuffer;
+    private readonly Dictionary<Entity, MeshBuffers> _buffers = new();
     private CommandPool _commandPool;
     private CommandBuffer[] _commandBuffers = null!;
     private Silk.NET.Vulkan.Semaphore[] _imageAvailableSemaphores = null!;
@@ -24,35 +26,33 @@ public sealed unsafe class TriangleRenderer : IDisposable
     private Silk.NET.Vulkan.Fence[] _inFlightFences = null!;
     private int _currentFrame;
 
-    public TriangleRenderer(VulkanContext context, Swapchain swapchain)
+    private sealed class MeshBuffers : IDisposable
+    {
+        public VertexBuffer VertexBuffer;
+        public IndexBuffer IndexBuffer;
+
+        public MeshBuffers(VertexBuffer vertexBuffer, IndexBuffer indexBuffer)
+        {
+            VertexBuffer = vertexBuffer;
+            IndexBuffer = indexBuffer;
+        }
+
+        public void Dispose()
+        {
+            VertexBuffer.Dispose();
+            IndexBuffer.Dispose();
+        }
+    }
+
+    public MeshRenderer(VulkanContext context, Swapchain swapchain)
     {
         _context = context;
         _swapchain = swapchain;
 
         _pipeline = new VulkanPipeline(context, swapchain);
-        _vertexBuffer = CreateTriangleBuffer();
         CreateCommandPool();
         CreateCommandBuffers();
         CreateSyncObjects();
-    }
-
-    private VertexBuffer CreateTriangleBuffer()
-    {
-        var vertices = new[]
-        {
-             0.0f, -0.5f,  1.0f, 0.0f, 0.0f,
-             0.5f,  0.5f,  0.0f, 1.0f, 0.0f,
-            -0.5f,  0.5f,  0.0f, 0.0f, 1.0f
-        };
-
-        var bytes = new byte[vertices.Length * sizeof(float)];
-        fixed (byte* p = bytes)
-        fixed (float* v = vertices)
-        {
-            global::System.Buffer.MemoryCopy(v, p, bytes.Length, vertices.Length * sizeof(float));
-        }
-
-        return new VertexBuffer(_context, bytes);
     }
 
     private void CreateCommandPool()
@@ -160,16 +160,23 @@ public sealed unsafe class TriangleRenderer : IDisposable
         _context.Vk.CmdSetViewport(cmd, 0, 1, &viewport);
         _context.Vk.CmdSetScissor(cmd, 0, 1, &scissor);
 
-        var vertexBuffer = _vertexBuffer.Buffer;
-        var offset = 0ul;
-        _context.Vk.CmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
-
         var drawCmd = cmd;
-        world.Each((Entity e, ref Transform transform) =>
+        world.Each((Entity e, ref Mesh mesh, ref Transform transform) =>
         {
-            var bytes = BuildTriangleVertices(transform);
-            _vertexBuffer.Update(bytes);
-            _context.Vk.CmdDraw(drawCmd, 3, 1, 0, 0);
+            if (!_buffers.TryGetValue(e, out var buffers))
+            {
+                buffers = CreateMeshBuffers(mesh);
+                _buffers[e] = buffers;
+            }
+
+            var bytes = BuildMeshVertices(mesh, transform);
+            buffers.VertexBuffer.Update(bytes);
+
+            var vertexBuffer = buffers.VertexBuffer.Buffer;
+            var offset = 0ul;
+            _context.Vk.CmdBindVertexBuffers(drawCmd, 0, 1, &vertexBuffer, &offset);
+            _context.Vk.CmdBindIndexBuffer(drawCmd, buffers.IndexBuffer.Buffer, 0, IndexType.Uint32);
+            _context.Vk.CmdDrawIndexed(drawCmd, buffers.IndexBuffer.Count, 1, 0, 0, 0);
         });
 
         _context.Vk.CmdEndRenderPass(cmd);
@@ -207,34 +214,52 @@ public sealed unsafe class TriangleRenderer : IDisposable
         _currentFrame++;
     }
 
-    private byte[] BuildTriangleVertices(Transform transform)
+    private MeshBuffers CreateMeshBuffers(Mesh mesh)
+    {
+        var vertexBytes = new byte[mesh.Vertices.Length * 6 * sizeof(float)];
+        fixed (byte* p = vertexBytes)
+        {
+            var dst = (float*)p;
+            for (var i = 0; i < mesh.Vertices.Length; i++)
+            {
+                var v = mesh.Vertices[i];
+                dst[i * 6 + 0] = v.Position.X;
+                dst[i * 6 + 1] = v.Position.Y;
+                dst[i * 6 + 2] = v.Position.Z;
+                dst[i * 6 + 3] = v.Color.X;
+                dst[i * 6 + 4] = v.Color.Y;
+                dst[i * 6 + 5] = v.Color.Z;
+            }
+        }
+
+        var indexBytes = new byte[mesh.Indices.Length * sizeof(uint)];
+        fixed (byte* p = indexBytes)
+        fixed (uint* src = mesh.Indices)
+        {
+            global::System.Buffer.MemoryCopy(src, p, indexBytes.Length, mesh.Indices.Length * sizeof(uint));
+        }
+
+        return new MeshBuffers(
+            new VertexBuffer(_context, vertexBytes),
+            new IndexBuffer(_context, indexBytes, (uint)mesh.Indices.Length));
+    }
+
+    private byte[] BuildMeshVertices(Mesh mesh, Transform transform)
     {
         var matrix = transform.GetMatrix();
-        var positions = new Vector3[]
-        {
-            new Vector3(0.0f, -0.5f, 0.0f),
-            new Vector3(0.5f, 0.5f, 0.0f),
-            new Vector3(-0.5f, 0.5f, 0.0f)
-        };
-        var colors = new[]
-        {
-            new Vector3(1.0f, 0.0f, 0.0f),
-            new Vector3(0.0f, 1.0f, 0.0f),
-            new Vector3(0.0f, 0.0f, 1.0f)
-        };
-
-        var bytes = new byte[3 * 5 * sizeof(float)];
+        var bytes = new byte[mesh.Vertices.Length * 6 * sizeof(float)];
         fixed (byte* p = bytes)
         {
             var dst = (float*)p;
-            for (var i = 0; i < 3; i++)
+            for (var i = 0; i < mesh.Vertices.Length; i++)
             {
-                var transformed = Vector3.Transform(positions[i], matrix);
-                dst[i * 5 + 0] = transformed.X;
-                dst[i * 5 + 1] = transformed.Y;
-                dst[i * 5 + 2] = colors[i].X;
-                dst[i * 5 + 3] = colors[i].Y;
-                dst[i * 5 + 4] = colors[i].Z;
+                var transformed = Vector3.Transform(mesh.Vertices[i].Position, matrix);
+                dst[i * 6 + 0] = transformed.X;
+                dst[i * 6 + 1] = transformed.Y;
+                dst[i * 6 + 2] = transformed.Z;
+                dst[i * 6 + 3] = mesh.Vertices[i].Color.X;
+                dst[i * 6 + 4] = mesh.Vertices[i].Color.Y;
+                dst[i * 6 + 5] = mesh.Vertices[i].Color.Z;
             }
         }
         return bytes;
@@ -243,6 +268,10 @@ public sealed unsafe class TriangleRenderer : IDisposable
     public void Dispose()
     {
         _context.Vk.DeviceWaitIdle(_context.Device);
+
+        foreach (var buffers in _buffers.Values)
+            buffers.Dispose();
+        _buffers.Clear();
 
         for (var i = 0; i < 2; i++)
         {
@@ -253,7 +282,6 @@ public sealed unsafe class TriangleRenderer : IDisposable
 
         _context.Vk.DestroyCommandPool(_context.Device, _commandPool, null);
 
-        _vertexBuffer.Dispose();
         _pipeline.Dispose();
     }
 }

@@ -5,7 +5,7 @@ using Silk.NET.Vulkan;
 namespace Engine.Graphics;
 
 /// <summary>
-/// Simple graphics pipeline for a triangle with vec2 position + vec3 color.
+/// Simple graphics pipeline for indexed meshes with vec3 position + vec3 color.
 /// Uses Silk.NET.Vulkan.
 /// </summary>
 public sealed unsafe class VulkanPipeline : IDisposable
@@ -93,7 +93,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
         var bindingDescription = new VertexInputBindingDescription
         {
             Binding = 0,
-            Stride = (uint)(5 * sizeof(float)),
+            Stride = (uint)(6 * sizeof(float)),
             InputRate = VertexInputRate.Vertex
         };
 
@@ -103,7 +103,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
             {
                 Binding = 0,
                 Location = 0,
-                Format = Format.R32G32Sfloat,
+                Format = Format.R32G32B32Sfloat,
                 Offset = 0
             },
             new VertexInputAttributeDescription
@@ -111,7 +111,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
                 Binding = 0,
                 Location = 1,
                 Format = Format.R32G32B32Sfloat,
-                Offset = (uint)(2 * sizeof(float))
+                Offset = (uint)(3 * sizeof(float))
             }
         };
 
