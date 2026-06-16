@@ -5,7 +5,7 @@ using Silk.NET.Vulkan;
 namespace Engine.Graphics;
 
 /// <summary>
-/// Simple graphics pipeline for indexed meshes with vec3 position + vec3 color.
+/// Graphics pipeline for indexed meshes with push-constant MVP and depth testing.
 /// Uses Silk.NET.Vulkan.
 /// </summary>
 public sealed unsafe class VulkanPipeline : IDisposable
@@ -55,11 +55,19 @@ public sealed unsafe class VulkanPipeline : IDisposable
 
     private PipelineLayout CreatePipelineLayout()
     {
+        var pushConstantRange = new PushConstantRange
+        {
+            StageFlags = ShaderStageFlags.VertexBit,
+            Offset = 0,
+            Size = (uint)(16 * sizeof(float))
+        };
+
         var createInfo = new PipelineLayoutCreateInfo
         {
             SType = StructureType.PipelineLayoutCreateInfo,
             SetLayoutCount = 0,
-            PushConstantRangeCount = 0
+            PushConstantRangeCount = 1,
+            PPushConstantRanges = &pushConstantRange
         };
 
         PipelineLayout layout;
@@ -170,6 +178,18 @@ public sealed unsafe class VulkanPipeline : IDisposable
             PAttachments = &colorBlendAttachment
         };
 
+        var depthStencil = new PipelineDepthStencilStateCreateInfo
+        {
+            SType = StructureType.PipelineDepthStencilStateCreateInfo,
+            DepthTestEnable = true,
+            DepthWriteEnable = true,
+            DepthCompareOp = CompareOp.Less,
+            DepthBoundsTestEnable = false,
+            StencilTestEnable = false,
+            Back = new StencilOpState(),
+            Front = new StencilOpState()
+        };
+
         var dynamicStates = new[] { DynamicState.Viewport, DynamicState.Scissor };
         PipelineDynamicStateCreateInfo dynamicState;
         fixed (DynamicState* pDynamic = dynamicStates)
@@ -195,6 +215,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
                 PViewportState = &viewportState,
                 PRasterizationState = &rasterizer,
                 PMultisampleState = &multisampling,
+                PDepthStencilState = &depthStencil,
                 PColorBlendState = &colorBlending,
                 PDynamicState = &dynamicState,
                 Layout = Layout,

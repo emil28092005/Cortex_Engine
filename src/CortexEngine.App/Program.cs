@@ -35,6 +35,16 @@ class Program
                 .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, new Vector3(0.5f)))
                 .Set(mesh);
 
+            var camera = world.Entity("Camera")
+                .Set(new Camera(
+                    new Vector3(0.0f, 0.0f, -2.0f),
+                    Vector3.Zero,
+                    Vector3.UnitY,
+                    MathF.PI / 4.0f,
+                    1280.0f / 720.0f,
+                    0.1f,
+                    100.0f));
+
             var frames = 0;
             var lastFpsTime = 0.0;
             var lastWidth = window.Width;

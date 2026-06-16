@@ -141,16 +141,25 @@ public sealed unsafe class MeshRenderer : IDisposable
         };
         _context.Vk.BeginCommandBuffer(cmd, &beginInfo);
 
-        var clearColor = new ClearValue(new ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f));
+        var clearValues = new[]
+        {
+            new ClearValue(new ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f)),
+            new ClearValue { DepthStencil = new ClearDepthStencilValue(1.0f, 0) }
+        };
+
         var renderPassInfo = new RenderPassBeginInfo
         {
             SType = StructureType.RenderPassBeginInfo,
             RenderPass = _swapchain.RenderPass,
             Framebuffer = _swapchain.Framebuffers[imageIndex],
             RenderArea = new Rect2D(new Offset2D(0, 0), _swapchain.Extent),
-            ClearValueCount = 1,
-            PClearValues = &clearColor
+            ClearValueCount = (uint)clearValues.Length
         };
+
+        fixed (ClearValue* pClearValues = clearValues)
+        {
+            renderPassInfo.PClearValues = pClearValues;
+        }
 
         _context.Vk.CmdBeginRenderPass(cmd, &renderPassInfo, SubpassContents.Inline);
         _context.Vk.CmdBindPipeline(cmd, PipelineBindPoint.Graphics, _pipeline.Handle);
@@ -160,7 +169,11 @@ public sealed unsafe class MeshRenderer : IDisposable
         _context.Vk.CmdSetViewport(cmd, 0, 1, &viewport);
         _context.Vk.CmdSetScissor(cmd, 0, 1, &scissor);
 
+        var camera = GetCamera(world);
+        var view = camera.GetViewMatrix();
+        var proj = camera.GetProjectionMatrix();
         var drawCmd = cmd;
+
         world.Each((Entity e, ref Mesh mesh, ref Transform transform) =>
         {
             if (!_buffers.TryGetValue(e, out var buffers))
@@ -171,6 +184,11 @@ public sealed unsafe class MeshRenderer : IDisposable
 
             var bytes = BuildMeshVertices(mesh, transform);
             buffers.VertexBuffer.Update(bytes);
+
+            var model = transform.GetMatrix();
+            var mvp = Matrix4x4.Multiply(Matrix4x4.Multiply(model, view), proj);
+            var mvpT = Matrix4x4.Transpose(mvp);
+            _context.Vk.CmdPushConstants(drawCmd, _pipeline.Layout, ShaderStageFlags.VertexBit, 0, 64, &mvpT);
 
             var vertexBuffer = buffers.VertexBuffer.Buffer;
             var offset = 0ul;
@@ -263,6 +281,27 @@ public sealed unsafe class MeshRenderer : IDisposable
             }
         }
         return bytes;
+    }
+
+    private Camera GetCamera(World world)
+    {
+        var camera = new Camera(
+            new Vector3(0.0f, 0.0f, -2.0f),
+            Vector3.Zero,
+            Vector3.UnitY,
+            MathF.PI / 4.0f,
+            (float)_swapchain.Extent.Width / _swapchain.Extent.Height,
+            0.1f,
+            100.0f);
+
+        world.Each((Entity e, ref Camera cam) =>
+        {
+            camera = cam;
+        });
+
+        // Always keep the aspect ratio in sync with the swapchain.
+        camera.AspectRatio = (float)_swapchain.Extent.Width / _swapchain.Extent.Height;
+        return camera;
     }
 
     public void Dispose()
