@@ -1,21 +1,22 @@
 using System;
-using Vortice.Vulkan;
+using Silk.NET.Core.Native;
+using Silk.NET.Vulkan;
 
 namespace Engine.Graphics;
 
 /// <summary>
-/// A simple graphics pipeline for a single vertex/fragment shader pair.
-/// Assumes a triangle with vec2 position + vec3 color per vertex.
+/// Simple graphics pipeline for a triangle with vec2 position + vec3 color.
+/// Uses Silk.NET.Vulkan.
 /// </summary>
 public sealed unsafe class VulkanPipeline : IDisposable
 {
     private readonly VulkanContext _context;
     private readonly Swapchain _swapchain;
 
-    public VkPipeline Handle { get; }
-    public VkPipelineLayout Layout { get; }
-    private readonly VkShaderModule _vertexModule;
-    private readonly VkShaderModule _fragmentModule;
+    public Pipeline Handle { get; }
+    public PipelineLayout Layout { get; }
+    private readonly ShaderModule _vertexModule;
+    private readonly ShaderModule _fragmentModule;
 
     public VulkanPipeline(VulkanContext context, Swapchain swapchain)
     {
@@ -29,7 +30,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
         Handle = CreateGraphicsPipeline();
     }
 
-    private VkShaderModule CreateShaderModule(string resourceName)
+    private ShaderModule CreateShaderModule(string resourceName)
     {
         var code = ShaderLoader.Load(resourceName);
         if (code.Length % 4 != 0)
@@ -37,189 +38,185 @@ public sealed unsafe class VulkanPipeline : IDisposable
 
         fixed (byte* pCode = code)
         {
-            var createInfo = new VkShaderModuleCreateInfo
+            var createInfo = new ShaderModuleCreateInfo
             {
-                sType = VkStructureType.ShaderModuleCreateInfo,
-                codeSize = (nuint)code.Length,
-                pCode = (uint*)pCode
+                SType = StructureType.ShaderModuleCreateInfo,
+                CodeSize = (nuint)code.Length,
+                PCode = (uint*)pCode
             };
 
-            var result = _context.DeviceApi.vkCreateShaderModule(&createInfo, null, out var module);
-            if (result != VkResult.Success)
+            ShaderModule module;
+            var result = _context.Vk.CreateShaderModule(_context.Device, &createInfo, null, &module);
+            if (result != Result.Success)
                 throw new InvalidOperationException($"vkCreateShaderModule failed for {resourceName}: {result}");
             return module;
         }
     }
 
-    private VkPipelineLayout CreatePipelineLayout()
+    private PipelineLayout CreatePipelineLayout()
     {
-        var createInfo = new VkPipelineLayoutCreateInfo
+        var createInfo = new PipelineLayoutCreateInfo
         {
-            sType = VkStructureType.PipelineLayoutCreateInfo,
-            setLayoutCount = 0,
-            pushConstantRangeCount = 0
+            SType = StructureType.PipelineLayoutCreateInfo,
+            SetLayoutCount = 0,
+            PushConstantRangeCount = 0
         };
 
-        var result = _context.DeviceApi.vkCreatePipelineLayout(&createInfo, null, out var layout);
-        if (result != VkResult.Success)
+        PipelineLayout layout;
+        var result = _context.Vk.CreatePipelineLayout(_context.Device, &createInfo, null, &layout);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreatePipelineLayout failed: {result}");
         return layout;
     }
 
-    private VkPipeline CreateGraphicsPipeline()
+    private Pipeline CreateGraphicsPipeline()
     {
+        var entryName = SilkMarshal.StringToPtr("main", NativeStringEncoding.UTF8);
         var stages = new[]
         {
-            new VkPipelineShaderStageCreateInfo
+            new PipelineShaderStageCreateInfo
             {
-                sType = VkStructureType.PipelineShaderStageCreateInfo,
-                stage = VkShaderStageFlags.Vertex,
-                module = _vertexModule,
-                pName = VkStringInterop.ConvertToUnmanaged("main")
+                SType = StructureType.PipelineShaderStageCreateInfo,
+                Stage = ShaderStageFlags.VertexBit,
+                Module = _vertexModule,
+                PName = (byte*)entryName
             },
-            new VkPipelineShaderStageCreateInfo
+            new PipelineShaderStageCreateInfo
             {
-                sType = VkStructureType.PipelineShaderStageCreateInfo,
-                stage = VkShaderStageFlags.Fragment,
-                module = _fragmentModule,
-                pName = VkStringInterop.ConvertToUnmanaged("main")
+                SType = StructureType.PipelineShaderStageCreateInfo,
+                Stage = ShaderStageFlags.FragmentBit,
+                Module = _fragmentModule,
+                PName = (byte*)entryName
             }
         };
 
-        var bindingDescription = new VkVertexInputBindingDescription
+        var bindingDescription = new VertexInputBindingDescription
         {
-            binding = 0,
-            stride = (uint)(5 * sizeof(float)),
-            inputRate = VkVertexInputRate.Vertex
+            Binding = 0,
+            Stride = (uint)(5 * sizeof(float)),
+            InputRate = VertexInputRate.Vertex
         };
 
         var attributeDescriptions = new[]
         {
-            new VkVertexInputAttributeDescription
+            new VertexInputAttributeDescription
             {
-                binding = 0,
-                location = 0,
-                format = VkFormat.R32G32Sfloat,
-                offset = 0
+                Binding = 0,
+                Location = 0,
+                Format = Format.R32G32Sfloat,
+                Offset = 0
             },
-            new VkVertexInputAttributeDescription
+            new VertexInputAttributeDescription
             {
-                binding = 0,
-                location = 1,
-                format = VkFormat.R32G32B32Sfloat,
-                offset = (uint)(2 * sizeof(float))
+                Binding = 0,
+                Location = 1,
+                Format = Format.R32G32B32Sfloat,
+                Offset = (uint)(2 * sizeof(float))
             }
         };
 
-        VkPipelineVertexInputStateCreateInfo vertexInputInfo;
-        fixed (VkVertexInputAttributeDescription* pAttributes = attributeDescriptions)
+        PipelineVertexInputStateCreateInfo vertexInputInfo;
+        fixed (VertexInputAttributeDescription* pAttributes = attributeDescriptions)
         {
-            vertexInputInfo = new VkPipelineVertexInputStateCreateInfo
+            vertexInputInfo = new PipelineVertexInputStateCreateInfo
             {
-                sType = VkStructureType.PipelineVertexInputStateCreateInfo,
-                vertexBindingDescriptionCount = 1,
-                pVertexBindingDescriptions = &bindingDescription,
-                vertexAttributeDescriptionCount = (uint)attributeDescriptions.Length,
-                pVertexAttributeDescriptions = pAttributes
+                SType = StructureType.PipelineVertexInputStateCreateInfo,
+                VertexBindingDescriptionCount = 1,
+                PVertexBindingDescriptions = &bindingDescription,
+                VertexAttributeDescriptionCount = (uint)attributeDescriptions.Length,
+                PVertexAttributeDescriptions = pAttributes
             };
         }
 
-        var inputAssembly = new VkPipelineInputAssemblyStateCreateInfo
+        var inputAssembly = new PipelineInputAssemblyStateCreateInfo
         {
-            sType = VkStructureType.PipelineInputAssemblyStateCreateInfo,
-            topology = VkPrimitiveTopology.TriangleList,
-            primitiveRestartEnable = false
+            SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+            Topology = PrimitiveTopology.TriangleList,
+            PrimitiveRestartEnable = false
         };
 
-        var viewport = new VkViewport(0, 0, _swapchain.Extent.width, _swapchain.Extent.height, 0, 1);
-        var scissor = new VkRect2D(0, 0, _swapchain.Extent.width, _swapchain.Extent.height);
-
-        var viewportState = new VkPipelineViewportStateCreateInfo
+        var viewportState = new PipelineViewportStateCreateInfo
         {
-            sType = VkStructureType.PipelineViewportStateCreateInfo,
-            viewportCount = 1,
-            pViewports = &viewport,
-            scissorCount = 1,
-            pScissors = &scissor
+            SType = StructureType.PipelineViewportStateCreateInfo,
+            ViewportCount = 1,
+            ScissorCount = 1
         };
 
-        var rasterizer = new VkPipelineRasterizationStateCreateInfo
+        var rasterizer = new PipelineRasterizationStateCreateInfo
         {
-            sType = VkStructureType.PipelineRasterizationStateCreateInfo,
-            polygonMode = VkPolygonMode.Fill,
-            cullMode = VkCullModeFlags.None,
-            frontFace = VkFrontFace.Clockwise,
-            lineWidth = 1.0f
+            SType = StructureType.PipelineRasterizationStateCreateInfo,
+            PolygonMode = PolygonMode.Fill,
+            CullMode = CullModeFlags.None,
+            FrontFace = FrontFace.Clockwise,
+            LineWidth = 1.0f
         };
 
-        var multisampling = new VkPipelineMultisampleStateCreateInfo
+        var multisampling = new PipelineMultisampleStateCreateInfo
         {
-            sType = VkStructureType.PipelineMultisampleStateCreateInfo,
-            rasterizationSamples = VkSampleCountFlags.Count1,
-            sampleShadingEnable = false
+            SType = StructureType.PipelineMultisampleStateCreateInfo,
+            RasterizationSamples = SampleCountFlags.Count1Bit,
+            SampleShadingEnable = false
         };
 
-        var colorBlendAttachment = new VkPipelineColorBlendAttachmentState
+        var colorBlendAttachment = new PipelineColorBlendAttachmentState
         {
-            colorWriteMask = VkColorComponentFlags.R | VkColorComponentFlags.G | VkColorComponentFlags.B | VkColorComponentFlags.A
+            ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
         };
 
-        var colorBlending = new VkPipelineColorBlendStateCreateInfo
+        var colorBlending = new PipelineColorBlendStateCreateInfo
         {
-            sType = VkStructureType.PipelineColorBlendStateCreateInfo,
-            attachmentCount = 1,
-            pAttachments = &colorBlendAttachment
+            SType = StructureType.PipelineColorBlendStateCreateInfo,
+            AttachmentCount = 1,
+            PAttachments = &colorBlendAttachment
         };
 
-        var dynamicStates = new[] { VkDynamicState.Viewport, VkDynamicState.Scissor };
-        VkPipelineDynamicStateCreateInfo dynamicState;
-        fixed (VkDynamicState* pDynamic = dynamicStates)
+        var dynamicStates = new[] { DynamicState.Viewport, DynamicState.Scissor };
+        PipelineDynamicStateCreateInfo dynamicState;
+        fixed (DynamicState* pDynamic = dynamicStates)
         {
-            dynamicState = new VkPipelineDynamicStateCreateInfo
+            dynamicState = new PipelineDynamicStateCreateInfo
             {
-                sType = VkStructureType.PipelineDynamicStateCreateInfo,
-                dynamicStateCount = (uint)dynamicStates.Length,
-                pDynamicStates = pDynamic
+                SType = StructureType.PipelineDynamicStateCreateInfo,
+                DynamicStateCount = (uint)dynamicStates.Length,
+                PDynamicStates = pDynamic
             };
         }
 
-        VkPipeline pipeline;
-        fixed (VkPipelineShaderStageCreateInfo* pStages = stages)
+        Pipeline pipeline;
+        fixed (PipelineShaderStageCreateInfo* pStages = stages)
         {
-            var createInfo = new VkGraphicsPipelineCreateInfo
+            var createInfo = new GraphicsPipelineCreateInfo
             {
-                sType = VkStructureType.GraphicsPipelineCreateInfo,
-                stageCount = (uint)stages.Length,
-                pStages = pStages,
-                pVertexInputState = &vertexInputInfo,
-                pInputAssemblyState = &inputAssembly,
-                pViewportState = &viewportState,
-                pRasterizationState = &rasterizer,
-                pMultisampleState = &multisampling,
-                pColorBlendState = &colorBlending,
-                pDynamicState = &dynamicState,
-                layout = Layout,
-                renderPass = _swapchain.RenderPass,
-                subpass = 0
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                StageCount = (uint)stages.Length,
+                PStages = pStages,
+                PVertexInputState = &vertexInputInfo,
+                PInputAssemblyState = &inputAssembly,
+                PViewportState = &viewportState,
+                PRasterizationState = &rasterizer,
+                PMultisampleState = &multisampling,
+                PColorBlendState = &colorBlending,
+                PDynamicState = &dynamicState,
+                Layout = Layout,
+                RenderPass = _swapchain.RenderPass,
+                Subpass = 0
             };
 
-            var result = _context.DeviceApi.vkCreateGraphicsPipelines(VkPipelineCache.Null, 1, &createInfo, null, &pipeline);
-            if (result != VkResult.Success)
+            var result = _context.Vk.CreateGraphicsPipelines(_context.Device, default, 1, &createInfo, null, &pipeline);
+            if (result != Result.Success)
                 throw new InvalidOperationException($"vkCreateGraphicsPipelines failed: {result}");
         }
 
-        VkStringInterop.Free(stages[0].pName);
-        VkStringInterop.Free(stages[1].pName);
-
+        SilkMarshal.FreeString(entryName, NativeStringEncoding.UTF8);
         return pipeline;
     }
 
     public void Dispose()
     {
-        _context.DeviceApi.vkDeviceWaitIdle();
-        _context.DeviceApi.vkDestroyPipeline(Handle);
-        _context.DeviceApi.vkDestroyPipelineLayout(Layout);
-        _context.DeviceApi.vkDestroyShaderModule(_vertexModule);
-        _context.DeviceApi.vkDestroyShaderModule(_fragmentModule);
+        _context.Vk.DeviceWaitIdle(_context.Device);
+        _context.Vk.DestroyPipeline(_context.Device, Handle, null);
+        _context.Vk.DestroyPipelineLayout(_context.Device, Layout, null);
+        _context.Vk.DestroyShaderModule(_context.Device, _vertexModule, null);
+        _context.Vk.DestroyShaderModule(_context.Device, _fragmentModule, null);
     }
 }

@@ -12,15 +12,17 @@ class Program
 
         try
         {
-            using var window = new Sdl3Window("Cortex Engine — Step 1", 1280, 720);
+            using var window = new Sdl3Window("Cortex Engine — Step 2", 1280, 720);
             var timing = new Timing();
             var input = new InputMapping();
-            using var vulkan = new VulkanContext(window, enableValidation: true);
+            using var vulkan = new VulkanContext(window, enableValidation: false);
             using var swapchain = new Swapchain(vulkan);
             using var renderer = new TriangleRenderer(vulkan, swapchain);
 
             var frames = 0;
             var lastFpsTime = 0.0;
+            var lastWidth = window.Width;
+            var lastHeight = window.Height;
 
             while (!window.ShouldClose)
             {
@@ -29,6 +31,13 @@ class Program
                 input.BeginFrame();
                 // Note: SDL events are already polled in PumpEvents.
                 // In a real engine, the window would expose an event iterator.
+
+                if (window.Width != lastWidth || window.Height != lastHeight)
+                {
+                    lastWidth = window.Width;
+                    lastHeight = window.Height;
+                    swapchain.Recreate(lastWidth, lastHeight);
+                }
 
                 renderer.RenderFrame();
 

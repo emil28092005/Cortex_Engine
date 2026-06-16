@@ -1,28 +1,30 @@
 using System;
-using Vortice.Vulkan;
+using Silk.NET.Core;
+using Silk.NET.Vulkan;
+using Silk.NET.Vulkan.Extensions.KHR;
 
 namespace Engine.Graphics;
 
 /// <summary>
 /// Manages the Vulkan swapchain, image views, render pass, and framebuffers.
-/// Recreates itself automatically when the window is resized.
+/// Uses Silk.NET.Vulkan.
 /// </summary>
 public sealed unsafe class Swapchain : IDisposable
 {
     private readonly VulkanContext _context;
-    private VkRenderPass _renderPass;
-    private VkSwapchainKHR _swapchain;
-    private VkImage[] _images = null!;
-    private VkImageView[] _imageViews = null!;
-    private VkFramebuffer[] _framebuffers = null!;
-    private VkSurfaceFormatKHR _surfaceFormat;
-    private VkPresentModeKHR _presentMode;
-    private VkExtent2D _extent;
+    private RenderPass _renderPass;
+    private SwapchainKHR _swapchain;
+    private Image[] _images = null!;
+    private ImageView[] _imageViews = null!;
+    private Framebuffer[] _framebuffers = null!;
+    private SurfaceFormatKHR _surfaceFormat;
+    private PresentModeKHR _presentMode;
+    private Extent2D _extent;
 
-    public VkRenderPass RenderPass => _renderPass;
-    public VkFramebuffer[] Framebuffers => _framebuffers;
-    public VkExtent2D Extent => _extent;
-    public VkSwapchainKHR Handle => _swapchain;
+    public RenderPass RenderPass => _renderPass;
+    public Framebuffer[] Framebuffers => _framebuffers;
+    public Extent2D Extent => _extent;
+    public SwapchainKHR Handle => _swapchain;
     public uint ImageCount => (uint)_images.Length;
 
     public Swapchain(VulkanContext context)
@@ -35,7 +37,7 @@ public sealed unsafe class Swapchain : IDisposable
 
     public void Recreate(int width, int height)
     {
-        _context.DeviceApi.vkDeviceWaitIdle();
+        _context.Vk.DeviceWaitIdle(_context.Device);
         CleanupSwapchain();
 
         var capabilities = GetSurfaceCapabilities();
@@ -43,60 +45,63 @@ public sealed unsafe class Swapchain : IDisposable
         _presentMode = ChoosePresentMode();
         _extent = ChooseExtent(capabilities, (uint)width, (uint)height);
 
-        var imageCount = capabilities.minImageCount + 1;
-        if (capabilities.maxImageCount > 0 && imageCount > capabilities.maxImageCount)
-            imageCount = capabilities.maxImageCount;
+        var imageCount = capabilities.MinImageCount + 1;
+        if (capabilities.MaxImageCount > 0 && imageCount > capabilities.MaxImageCount)
+            imageCount = capabilities.MaxImageCount;
 
-        var createInfo = new VkSwapchainCreateInfoKHR
+        var createInfo = new SwapchainCreateInfoKHR
         {
-            sType = VkStructureType.SwapchainCreateInfoKHR,
-            surface = _context.Surface,
-            minImageCount = imageCount,
-            imageFormat = _surfaceFormat.format,
-            imageColorSpace = _surfaceFormat.colorSpace,
-            imageExtent = _extent,
-            imageArrayLayers = 1,
-            imageUsage = VkImageUsageFlags.ColorAttachment,
-            imageSharingMode = VkSharingMode.Exclusive,
-            preTransform = capabilities.currentTransform,
-            compositeAlpha = VkCompositeAlphaFlagsKHR.Opaque,
-            presentMode = _presentMode,
-            clipped = true,
-            oldSwapchain = _swapchain
+            SType = StructureType.SwapchainCreateInfoKhr,
+            Surface = _context.Surface,
+            MinImageCount = imageCount,
+            ImageFormat = _surfaceFormat.Format,
+            ImageColorSpace = _surfaceFormat.ColorSpace,
+            ImageExtent = _extent,
+            ImageArrayLayers = 1,
+            ImageUsage = ImageUsageFlags.ColorAttachmentBit,
+            ImageSharingMode = SharingMode.Exclusive,
+            PreTransform = capabilities.CurrentTransform,
+            CompositeAlpha = CompositeAlphaFlagsKHR.OpaqueBitKhr,
+            PresentMode = _presentMode,
+            Clipped = true,
+            OldSwapchain = _swapchain
         };
 
-        var result = _context.DeviceApi.vkCreateSwapchainKHR(&createInfo, null, out _swapchain);
-        if (result != VkResult.Success)
+        SwapchainKHR swapchain;
+        var result = _context.KhrSwapchain!.CreateSwapchain(_context.Device, &createInfo, null, &swapchain);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreateSwapchainKHR failed: {result}");
+        _swapchain = swapchain;
 
         _images = GetSwapchainImages();
-        _imageViews = new VkImageView[_images.Length];
-        _framebuffers = new VkFramebuffer[_images.Length];
+        _imageViews = new ImageView[_images.Length];
+        _framebuffers = new Framebuffer[_images.Length];
 
         for (var i = 0; i < _images.Length; i++)
         {
-            _imageViews[i] = CreateImageView(_images[i], _surfaceFormat.format);
+            _imageViews[i] = CreateImageView(_images[i], _surfaceFormat.Format);
             _framebuffers[i] = CreateFramebuffer(_imageViews[i]);
         }
     }
 
-    private VkSurfaceCapabilitiesKHR GetSurfaceCapabilities()
+    private SurfaceCapabilitiesKHR GetSurfaceCapabilities()
     {
-        var result = _context.InstanceApi.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_context.PhysicalDevice, _context.Surface, out var capabilities);
-        if (result != VkResult.Success)
+        SurfaceCapabilitiesKHR capabilities;
+        var result = _context.KhrSurface!.GetPhysicalDeviceSurfaceCapabilities(_context.PhysicalDevice, _context.Surface, &capabilities);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: {result}");
         return capabilities;
     }
 
-    private VkImage[] GetSwapchainImages()
+    private Image[] GetSwapchainImages()
     {
         uint count = 0;
-        _context.DeviceApi.vkGetSwapchainImagesKHR(_swapchain, &count, null);
-        var images = new VkImage[count];
-        fixed (VkImage* p = images)
+        _context.KhrSwapchain!.GetSwapchainImages(_context.Device, _swapchain, &count, null);
+        var images = new Image[count];
+        fixed (Image* p = images)
         {
-            var result = _context.DeviceApi.vkGetSwapchainImagesKHR(_swapchain, &count, p);
-            if (result != VkResult.Success)
+            var result = _context.KhrSwapchain!.GetSwapchainImages(_context.Device, _swapchain, &count, p);
+            if (result != Result.Success)
                 throw new InvalidOperationException($"vkGetSwapchainImagesKHR failed: {result}");
         }
         return images;
@@ -104,167 +109,169 @@ public sealed unsafe class Swapchain : IDisposable
 
     private void CreateRenderPass()
     {
-        var colorAttachment = new VkAttachmentDescription
+        var colorAttachment = new AttachmentDescription
         {
-            format = _surfaceFormat.format != VkFormat.Undefined ? _surfaceFormat.format : VkFormat.B8G8R8A8Unorm,
-            samples = VkSampleCountFlags.Count1,
-            loadOp = VkAttachmentLoadOp.Clear,
-            storeOp = VkAttachmentStoreOp.Store,
-            stencilLoadOp = VkAttachmentLoadOp.DontCare,
-            stencilStoreOp = VkAttachmentStoreOp.DontCare,
-            initialLayout = VkImageLayout.Undefined,
-            finalLayout = VkImageLayout.PresentSrcKHR
+            Format = _surfaceFormat.Format != Format.Undefined ? _surfaceFormat.Format : Format.B8G8R8A8Unorm,
+            Samples = SampleCountFlags.Count1Bit,
+            LoadOp = AttachmentLoadOp.Clear,
+            StoreOp = AttachmentStoreOp.Store,
+            StencilLoadOp = AttachmentLoadOp.DontCare,
+            StencilStoreOp = AttachmentStoreOp.DontCare,
+            InitialLayout = ImageLayout.Undefined,
+            FinalLayout = ImageLayout.PresentSrcKhr
         };
 
-        var colorAttachmentRef = new VkAttachmentReference
+        var colorAttachmentRef = new AttachmentReference
         {
-            attachment = 0,
-            layout = VkImageLayout.ColorAttachmentOptimal
+            Attachment = 0,
+            Layout = ImageLayout.ColorAttachmentOptimal
         };
 
-        var subpass = new VkSubpassDescription
+        var subpass = new SubpassDescription
         {
-            pipelineBindPoint = VkPipelineBindPoint.Graphics,
-            colorAttachmentCount = 1,
-            pColorAttachments = &colorAttachmentRef
+            PipelineBindPoint = PipelineBindPoint.Graphics,
+            ColorAttachmentCount = 1,
+            PColorAttachments = &colorAttachmentRef
         };
 
-        var dependency = new VkSubpassDependency
+        var dependency = new SubpassDependency
         {
-            srcSubpass = Vulkan.VK_SUBPASS_EXTERNAL,
-            dstSubpass = 0,
-            srcStageMask = VkPipelineStageFlags.ColorAttachmentOutput,
-            dstStageMask = VkPipelineStageFlags.ColorAttachmentOutput,
-            srcAccessMask = VkAccessFlags.None,
-            dstAccessMask = VkAccessFlags.ColorAttachmentWrite
+            SrcSubpass = ~0u,
+            DstSubpass = 0,
+            SrcStageMask = PipelineStageFlags.ColorAttachmentOutputBit,
+            DstStageMask = PipelineStageFlags.ColorAttachmentOutputBit,
+            SrcAccessMask = AccessFlags.None,
+            DstAccessMask = AccessFlags.ColorAttachmentWriteBit
         };
 
-        var createInfo = new VkRenderPassCreateInfo
+        var createInfo = new RenderPassCreateInfo
         {
-            sType = VkStructureType.RenderPassCreateInfo,
-            attachmentCount = 1,
-            pAttachments = &colorAttachment,
-            subpassCount = 1,
-            pSubpasses = &subpass,
-            dependencyCount = 1,
-            pDependencies = &dependency
+            SType = StructureType.RenderPassCreateInfo,
+            AttachmentCount = 1,
+            PAttachments = &colorAttachment,
+            SubpassCount = 1,
+            PSubpasses = &subpass,
+            DependencyCount = 1,
+            PDependencies = &dependency
         };
 
-        var result = _context.DeviceApi.vkCreateRenderPass(&createInfo, null, out _renderPass);
-        if (result != VkResult.Success)
+        RenderPass renderPass;
+        var result = _context.Vk.CreateRenderPass(_context.Device, &createInfo, null, &renderPass);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreateRenderPass failed: {result}");
+        _renderPass = renderPass;
     }
 
-    private VkImageView CreateImageView(VkImage image, VkFormat format)
+    private ImageView CreateImageView(Image image, Format format)
     {
-        var createInfo = new VkImageViewCreateInfo
+        var createInfo = new ImageViewCreateInfo
         {
-            sType = VkStructureType.ImageViewCreateInfo,
-            image = image,
-            viewType = VkImageViewType.Image2D,
-            format = format,
-            components = new VkComponentMapping(VkComponentSwizzle.R, VkComponentSwizzle.G, VkComponentSwizzle.B, VkComponentSwizzle.A),
-            subresourceRange = new VkImageSubresourceRange(VkImageAspectFlags.Color, 0, 1, 0, 1)
+            SType = StructureType.ImageViewCreateInfo,
+            Image = image,
+            ViewType = ImageViewType.Type2D,
+            Format = format,
+            Components = new ComponentMapping(ComponentSwizzle.R, ComponentSwizzle.G, ComponentSwizzle.B, ComponentSwizzle.A),
+            SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1)
         };
 
-        var result = _context.DeviceApi.vkCreateImageView(&createInfo, null, out var imageView);
-        if (result != VkResult.Success)
+        ImageView imageView;
+        var result = _context.Vk.CreateImageView(_context.Device, &createInfo, null, &imageView);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreateImageView failed: {result}");
-
         return imageView;
     }
 
-    private VkFramebuffer CreateFramebuffer(VkImageView imageView)
+    private Framebuffer CreateFramebuffer(ImageView imageView)
     {
-        var createInfo = new VkFramebufferCreateInfo
+        var createInfo = new FramebufferCreateInfo
         {
-            sType = VkStructureType.FramebufferCreateInfo,
-            renderPass = _renderPass,
-            attachmentCount = 1,
-            pAttachments = &imageView,
-            width = _extent.width,
-            height = _extent.height,
-            layers = 1
+            SType = StructureType.FramebufferCreateInfo,
+            RenderPass = _renderPass,
+            AttachmentCount = 1,
+            PAttachments = &imageView,
+            Width = _extent.Width,
+            Height = _extent.Height,
+            Layers = 1
         };
 
-        var result = _context.DeviceApi.vkCreateFramebuffer(&createInfo, null, out var framebuffer);
-        if (result != VkResult.Success)
+        Framebuffer framebuffer;
+        var result = _context.Vk.CreateFramebuffer(_context.Device, &createInfo, null, &framebuffer);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreateFramebuffer failed: {result}");
-
         return framebuffer;
     }
 
-    private VkSurfaceFormatKHR ChooseSurfaceFormat()
+    private SurfaceFormatKHR ChooseSurfaceFormat()
     {
         var formats = GetSurfaceFormats();
         foreach (var format in formats)
         {
-            if (format.format == VkFormat.B8G8R8A8Unorm && format.colorSpace == VkColorSpaceKHR.SrgbNonLinear)
+            if (format.Format == Format.B8G8R8A8Unorm && format.ColorSpace == ColorSpaceKHR.SpaceSrgbNonlinearKhr)
                 return format;
         }
         return formats[0];
     }
 
-    private VkSurfaceFormatKHR[] GetSurfaceFormats()
+    private SurfaceFormatKHR[] GetSurfaceFormats()
     {
         uint count = 0;
-        _context.InstanceApi.vkGetPhysicalDeviceSurfaceFormatsKHR(_context.PhysicalDevice, _context.Surface, &count, null);
-        var formats = new VkSurfaceFormatKHR[count];
-        fixed (VkSurfaceFormatKHR* p = formats)
+        _context.KhrSurface!.GetPhysicalDeviceSurfaceFormats(_context.PhysicalDevice, _context.Surface, &count, null);
+        var formats = new SurfaceFormatKHR[count];
+        fixed (SurfaceFormatKHR* p = formats)
         {
-            var result = _context.InstanceApi.vkGetPhysicalDeviceSurfaceFormatsKHR(_context.PhysicalDevice, _context.Surface, &count, p);
-            if (result != VkResult.Success)
+            var result = _context.KhrSurface!.GetPhysicalDeviceSurfaceFormats(_context.PhysicalDevice, _context.Surface, &count, p);
+            if (result != Result.Success)
                 throw new InvalidOperationException($"vkGetPhysicalDeviceSurfaceFormatsKHR failed: {result}");
         }
         return formats;
     }
 
-    private VkPresentModeKHR ChoosePresentMode()
+    private PresentModeKHR ChoosePresentMode()
     {
         var modes = GetSurfacePresentModes();
-        if (Array.Exists(modes, m => m == VkPresentModeKHR.Mailbox))
-            return VkPresentModeKHR.Mailbox;
-        return VkPresentModeKHR.Fifo;
+        if (Array.Exists(modes, m => m == PresentModeKHR.MailboxKhr))
+            return PresentModeKHR.MailboxKhr;
+        return PresentModeKHR.FifoKhr;
     }
 
-    private VkPresentModeKHR[] GetSurfacePresentModes()
+    private PresentModeKHR[] GetSurfacePresentModes()
     {
         uint count = 0;
-        _context.InstanceApi.vkGetPhysicalDeviceSurfacePresentModesKHR(_context.PhysicalDevice, _context.Surface, &count, null);
-        var modes = new VkPresentModeKHR[count];
-        fixed (VkPresentModeKHR* p = modes)
+        _context.KhrSurface!.GetPhysicalDeviceSurfacePresentModes(_context.PhysicalDevice, _context.Surface, &count, null);
+        var modes = new PresentModeKHR[count];
+        fixed (PresentModeKHR* p = modes)
         {
-            var result = _context.InstanceApi.vkGetPhysicalDeviceSurfacePresentModesKHR(_context.PhysicalDevice, _context.Surface, &count, p);
-            if (result != VkResult.Success)
+            var result = _context.KhrSurface!.GetPhysicalDeviceSurfacePresentModes(_context.PhysicalDevice, _context.Surface, &count, p);
+            if (result != Result.Success)
                 throw new InvalidOperationException($"vkGetPhysicalDeviceSurfacePresentModesKHR failed: {result}");
         }
         return modes;
     }
 
-    private VkExtent2D ChooseExtent(VkSurfaceCapabilitiesKHR capabilities, uint width, uint height)
+    private Extent2D ChooseExtent(SurfaceCapabilitiesKHR capabilities, uint width, uint height)
     {
-        if (capabilities.currentExtent.width != uint.MaxValue)
-            return capabilities.currentExtent;
+        if (capabilities.CurrentExtent.Width != uint.MaxValue)
+            return capabilities.CurrentExtent;
 
-        var extent = new VkExtent2D
+        var extent = new Extent2D
         {
-            width = Math.Clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-            height = Math.Clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
+            Width = Math.Clamp(width, capabilities.MinImageExtent.Width, capabilities.MaxImageExtent.Width),
+            Height = Math.Clamp(height, capabilities.MinImageExtent.Height, capabilities.MaxImageExtent.Height)
         };
         return extent;
     }
 
     private void CleanupSwapchain()
     {
-        if (_context.Device == VkDevice.Null)
+        if (_context.Device.Handle == 0)
             return;
 
         if (_framebuffers != null)
         {
             foreach (var fb in _framebuffers)
             {
-                if (fb != VkFramebuffer.Null)
-                    _context.DeviceApi.vkDestroyFramebuffer(fb);
+                if (fb.Handle != 0)
+                    _context.Vk.DestroyFramebuffer(_context.Device, fb, null);
             }
         }
 
@@ -272,21 +279,21 @@ public sealed unsafe class Swapchain : IDisposable
         {
             foreach (var view in _imageViews)
             {
-                if (view != VkImageView.Null)
-                    _context.DeviceApi.vkDestroyImageView(view);
+                if (view.Handle != 0)
+                    _context.Vk.DestroyImageView(_context.Device, view, null);
             }
         }
 
-        if (_swapchain != VkSwapchainKHR.Null)
-            _context.DeviceApi.vkDestroySwapchainKHR(_swapchain);
+        if (_swapchain.Handle != 0)
+            _context.KhrSwapchain!.DestroySwapchain(_context.Device, _swapchain, null);
     }
 
     public void Dispose()
     {
-        _context.DeviceApi.vkDeviceWaitIdle();
+        _context.Vk.DeviceWaitIdle(_context.Device);
         CleanupSwapchain();
 
-        if (_renderPass != VkRenderPass.Null)
-            _context.DeviceApi.vkDestroyRenderPass(_renderPass);
+        if (_renderPass.Handle != 0)
+            _context.Vk.DestroyRenderPass(_context.Device, _renderPass, null);
     }
 }

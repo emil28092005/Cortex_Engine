@@ -1,16 +1,18 @@
 using System;
-using Vortice.Vulkan;
+using Silk.NET.Core;
+using Silk.NET.Vulkan;
 
 namespace Engine.Graphics;
 
 /// <summary>
-/// Interleaved vertex: vec2 position + vec3 color.
+/// Interleaved vertex buffer: vec2 position + vec3 color.
+/// Uses Silk.NET.Vulkan.
 /// </summary>
 public sealed unsafe class VertexBuffer : IDisposable
 {
     private readonly VulkanContext _context;
-    public VkBuffer Buffer { get; }
-    public VkDeviceMemory Memory { get; }
+    public Silk.NET.Vulkan.Buffer Buffer { get; }
+    public DeviceMemory Memory { get; }
     public ulong Size { get; }
 
     public VertexBuffer(VulkanContext context, ReadOnlySpan<byte> data)
@@ -18,62 +20,66 @@ public sealed unsafe class VertexBuffer : IDisposable
         _context = context;
         Size = (ulong)data.Length;
 
-        Buffer = CreateBuffer(Size, VkBufferUsageFlags.VertexBuffer);
+        Buffer = CreateBuffer(Size, BufferUsageFlags.VertexBufferBit);
         var memoryRequirements = GetMemoryRequirements(Buffer);
-        Memory = AllocateMemory(memoryRequirements, VkMemoryPropertyFlags.HostVisible | VkMemoryPropertyFlags.HostCoherent);
+        Memory = AllocateMemory(memoryRequirements, MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit);
 
-        var result = _context.DeviceApi.vkBindBufferMemory(Buffer, Memory, 0);
-        if (result != VkResult.Success)
+        var result = _context.Vk.BindBufferMemory(_context.Device, Buffer, Memory, 0);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkBindBufferMemory failed: {result}");
 
         CopyData(data);
     }
 
-    private VkBuffer CreateBuffer(ulong size, VkBufferUsageFlags usage)
+    private Silk.NET.Vulkan.Buffer CreateBuffer(ulong size, BufferUsageFlags usage)
     {
-        var createInfo = new VkBufferCreateInfo
+        var createInfo = new BufferCreateInfo
         {
-            sType = VkStructureType.BufferCreateInfo,
-            size = size,
-            usage = usage,
-            sharingMode = VkSharingMode.Exclusive
+            SType = StructureType.BufferCreateInfo,
+            Size = size,
+            Usage = usage,
+            SharingMode = SharingMode.Exclusive
         };
 
-        var result = _context.DeviceApi.vkCreateBuffer(&createInfo, null, out var buffer);
-        if (result != VkResult.Success)
+        Silk.NET.Vulkan.Buffer buffer;
+        var result = _context.Vk.CreateBuffer(_context.Device, &createInfo, null, &buffer);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreateBuffer failed: {result}");
         return buffer;
     }
 
-    private VkMemoryRequirements GetMemoryRequirements(VkBuffer buffer)
+    private MemoryRequirements GetMemoryRequirements(Silk.NET.Vulkan.Buffer buffer)
     {
-        _context.DeviceApi.vkGetBufferMemoryRequirements(buffer, out var requirements);
+        MemoryRequirements requirements;
+        _context.Vk.GetBufferMemoryRequirements(_context.Device, buffer, &requirements);
         return requirements;
     }
 
-    private VkDeviceMemory AllocateMemory(VkMemoryRequirements requirements, VkMemoryPropertyFlags properties)
+    private DeviceMemory AllocateMemory(MemoryRequirements requirements, MemoryPropertyFlags properties)
     {
-        var memoryTypeIndex = FindMemoryType(requirements.memoryTypeBits, properties);
-        var allocateInfo = new VkMemoryAllocateInfo
+        var memoryTypeIndex = FindMemoryType(requirements.MemoryTypeBits, properties);
+        var allocateInfo = new MemoryAllocateInfo
         {
-            sType = VkStructureType.MemoryAllocateInfo,
-            allocationSize = requirements.size,
-            memoryTypeIndex = memoryTypeIndex
+            SType = StructureType.MemoryAllocateInfo,
+            AllocationSize = requirements.Size,
+            MemoryTypeIndex = memoryTypeIndex
         };
 
-        var result = _context.DeviceApi.vkAllocateMemory(&allocateInfo, null, out var memory);
-        if (result != VkResult.Success)
+        DeviceMemory memory;
+        var result = _context.Vk.AllocateMemory(_context.Device, &allocateInfo, null, &memory);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkAllocateMemory failed: {result}");
         return memory;
     }
 
-    private uint FindMemoryType(uint typeFilter, VkMemoryPropertyFlags properties)
+    private uint FindMemoryType(uint typeFilter, MemoryPropertyFlags properties)
     {
-        _context.InstanceApi.vkGetPhysicalDeviceMemoryProperties(_context.PhysicalDevice, out var memoryProperties);
-        for (var i = 0; i < memoryProperties.memoryTypeCount; i++)
+        PhysicalDeviceMemoryProperties memoryProperties;
+        _context.Vk.GetPhysicalDeviceMemoryProperties(_context.PhysicalDevice, &memoryProperties);
+        for (var i = 0; i < memoryProperties.MemoryTypeCount; i++)
         {
             if ((typeFilter & (1u << i)) != 0 &&
-                (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+                (memoryProperties.MemoryTypes[i].PropertyFlags & properties) == properties)
             {
                 return (uint)i;
             }
@@ -84,22 +90,22 @@ public sealed unsafe class VertexBuffer : IDisposable
     private void CopyData(ReadOnlySpan<byte> data)
     {
         void* mappedData;
-        var result = _context.DeviceApi.vkMapMemory(Memory, 0, Size, VkMemoryMapFlags.None, &mappedData);
-        if (result != VkResult.Success)
+        var result = _context.Vk.MapMemory(_context.Device, Memory, 0, Size, MemoryMapFlags.None, &mappedData);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkMapMemory failed: {result}");
 
         fixed (byte* src = data)
         {
-            System.Buffer.MemoryCopy(src, mappedData, (long)Size, data.Length);
+            global::System.Buffer.MemoryCopy(src, mappedData, (long)Size, data.Length);
         }
 
-        _context.DeviceApi.vkUnmapMemory(Memory);
+        _context.Vk.UnmapMemory(_context.Device, Memory);
     }
 
     public void Dispose()
     {
-        _context.DeviceApi.vkDeviceWaitIdle();
-        _context.DeviceApi.vkDestroyBuffer(Buffer);
-        _context.DeviceApi.vkFreeMemory(Memory);
+        _context.Vk.DeviceWaitIdle(_context.Device);
+        _context.Vk.DestroyBuffer(_context.Device, Buffer, null);
+        _context.Vk.FreeMemory(_context.Device, Memory, null);
     }
 }

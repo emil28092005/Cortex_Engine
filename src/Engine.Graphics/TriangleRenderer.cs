@@ -1,10 +1,12 @@
 using System;
-using Vortice.Vulkan;
+using Silk.NET.Core;
+using Silk.NET.Vulkan;
 
 namespace Engine.Graphics;
 
 /// <summary>
 /// Renders a colored triangle using a vertex buffer and a simple graphics pipeline.
+/// Uses Silk.NET.Vulkan.
 /// </summary>
 public sealed unsafe class TriangleRenderer : IDisposable
 {
@@ -12,11 +14,11 @@ public sealed unsafe class TriangleRenderer : IDisposable
     private readonly Swapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
     private readonly VertexBuffer _vertexBuffer;
-    private VkCommandPool _commandPool;
-    private VkCommandBuffer[] _commandBuffers = null!;
-    private VkSemaphore[] _imageAvailableSemaphores = null!;
-    private VkSemaphore[] _renderFinishedSemaphores = null!;
-    private VkFence[] _inFlightFences = null!;
+    private CommandPool _commandPool;
+    private CommandBuffer[] _commandBuffers = null!;
+    private Silk.NET.Vulkan.Semaphore[] _imageAvailableSemaphores = null!;
+    private Silk.NET.Vulkan.Semaphore[] _renderFinishedSemaphores = null!;
+    private Silk.NET.Vulkan.Fence[] _inFlightFences = null!;
     private int _currentFrame;
 
     public TriangleRenderer(VulkanContext context, Swapchain swapchain)
@@ -26,7 +28,6 @@ public sealed unsafe class TriangleRenderer : IDisposable
 
         _pipeline = new VulkanPipeline(context, swapchain);
         _vertexBuffer = CreateTriangleBuffer();
-
         CreateCommandPool();
         CreateCommandBuffers();
         CreateSyncObjects();
@@ -36,7 +37,6 @@ public sealed unsafe class TriangleRenderer : IDisposable
     {
         var vertices = new[]
         {
-            // Position (vec2) + Color (vec3)
              0.0f, -0.5f,  1.0f, 0.0f, 0.0f,
              0.5f,  0.5f,  0.0f, 1.0f, 0.0f,
             -0.5f,  0.5f,  0.0f, 0.0f, 1.0f
@@ -46,7 +46,7 @@ public sealed unsafe class TriangleRenderer : IDisposable
         fixed (byte* p = bytes)
         fixed (float* v = vertices)
         {
-            Buffer.MemoryCopy(v, p, bytes.Length, vertices.Length * sizeof(float));
+            global::System.Buffer.MemoryCopy(v, p, bytes.Length, vertices.Length * sizeof(float));
         }
 
         return new VertexBuffer(_context, bytes);
@@ -54,55 +54,64 @@ public sealed unsafe class TriangleRenderer : IDisposable
 
     private void CreateCommandPool()
     {
-        var createInfo = new VkCommandPoolCreateInfo
+        var createInfo = new CommandPoolCreateInfo
         {
-            sType = VkStructureType.CommandPoolCreateInfo,
-            queueFamilyIndex = _context.GraphicsFamilyIndex,
-            flags = VkCommandPoolCreateFlags.ResetCommandBuffer
+            SType = StructureType.CommandPoolCreateInfo,
+            QueueFamilyIndex = _context.GraphicsFamilyIndex,
+            Flags = CommandPoolCreateFlags.ResetCommandBufferBit
         };
 
-        var result = _context.DeviceApi.vkCreateCommandPool(&createInfo, null, out _commandPool);
-        if (result != VkResult.Success)
+        CommandPool commandPool;
+        var result = _context.Vk.CreateCommandPool(_context.Device, &createInfo, null, &commandPool);
+        if (result != Result.Success)
             throw new InvalidOperationException($"vkCreateCommandPool failed: {result}");
+        _commandPool = commandPool;
     }
 
     private void CreateCommandBuffers()
     {
-        _commandBuffers = new VkCommandBuffer[2];
+        _commandBuffers = new CommandBuffer[2];
         for (var i = 0; i < _commandBuffers.Length; i++)
         {
-            var allocInfo = new VkCommandBufferAllocateInfo
+            var allocInfo = new CommandBufferAllocateInfo
             {
-                sType = VkStructureType.CommandBufferAllocateInfo,
-                commandPool = _commandPool,
-                level = VkCommandBufferLevel.Primary,
-                commandBufferCount = 1
+                SType = StructureType.CommandBufferAllocateInfo,
+                CommandPool = _commandPool,
+                Level = CommandBufferLevel.Primary,
+                CommandBufferCount = 1
             };
 
-            var result = _context.DeviceApi.vkAllocateCommandBuffer(&allocInfo, out _commandBuffers[i]);
-            if (result != VkResult.Success)
+            CommandBuffer cmd;
+            var result = _context.Vk.AllocateCommandBuffers(_context.Device, &allocInfo, &cmd);
+            if (result != Result.Success)
                 throw new InvalidOperationException($"vkAllocateCommandBuffers failed: {result}");
+            _commandBuffers[i] = cmd;
         }
     }
 
     private void CreateSyncObjects()
     {
-        _imageAvailableSemaphores = new VkSemaphore[2];
-        _renderFinishedSemaphores = new VkSemaphore[2];
-        _inFlightFences = new VkFence[2];
+        _imageAvailableSemaphores = new Silk.NET.Vulkan.Semaphore[2];
+        _renderFinishedSemaphores = new Silk.NET.Vulkan.Semaphore[2];
+        _inFlightFences = new Silk.NET.Vulkan.Fence[2];
 
-        var semaphoreInfo = new VkSemaphoreCreateInfo { sType = VkStructureType.SemaphoreCreateInfo };
-        var fenceInfo = new VkFenceCreateInfo
+        var semaphoreInfo = new SemaphoreCreateInfo { SType = StructureType.SemaphoreCreateInfo };
+        var fenceInfo = new FenceCreateInfo
         {
-            sType = VkStructureType.FenceCreateInfo,
-            flags = VkFenceCreateFlags.Signaled
+            SType = StructureType.FenceCreateInfo,
+            Flags = FenceCreateFlags.SignaledBit
         };
 
         for (var i = 0; i < 2; i++)
         {
-            _context.DeviceApi.vkCreateSemaphore(&semaphoreInfo, null, out _imageAvailableSemaphores[i]);
-            _context.DeviceApi.vkCreateSemaphore(&semaphoreInfo, null, out _renderFinishedSemaphores[i]);
-            _context.DeviceApi.vkCreateFence(&fenceInfo, null, out _inFlightFences[i]);
+            Silk.NET.Vulkan.Semaphore imageAvailable, renderFinished;
+            Silk.NET.Vulkan.Fence fence;
+            _context.Vk.CreateSemaphore(_context.Device, &semaphoreInfo, null, &imageAvailable);
+            _context.Vk.CreateSemaphore(_context.Device, &semaphoreInfo, null, &renderFinished);
+            _context.Vk.CreateFence(_context.Device, &fenceInfo, null, &fence);
+            _imageAvailableSemaphores[i] = imageAvailable;
+            _renderFinishedSemaphores[i] = renderFinished;
+            _inFlightFences[i] = fence;
         }
     }
 
@@ -110,106 +119,96 @@ public sealed unsafe class TriangleRenderer : IDisposable
     {
         var frame = _currentFrame % 2;
 
-        _context.DeviceApi.vkWaitForFences(_inFlightFences[frame], true, ulong.MaxValue);
-        _context.DeviceApi.vkResetFences(_inFlightFences[frame]);
+        var fence = _inFlightFences[frame];
+        _context.Vk.WaitForFences(_context.Device, 1, &fence, true, ulong.MaxValue);
+        _context.Vk.ResetFences(_context.Device, 1, &fence);
 
-        var result = _context.DeviceApi.vkAcquireNextImageKHR(
-            _swapchain.Handle,
-            ulong.MaxValue,
-            _imageAvailableSemaphores[frame],
-            VkFence.Null,
-            out var imageIndex);
-
-        if (result == VkResult.ErrorOutOfDateKHR)
+        uint imageIndex;
+        var result = _context.KhrSwapchain!.AcquireNextImage(_context.Device, _swapchain.Handle, ulong.MaxValue, _imageAvailableSemaphores[frame], new Silk.NET.Vulkan.Fence(), &imageIndex);
+        if (result == Result.ErrorOutOfDateKhr)
             return;
 
         var cmd = _commandBuffers[frame];
-        _context.DeviceApi.vkResetCommandBuffer(cmd, VkCommandBufferResetFlags.None);
+        _context.Vk.ResetCommandBuffer(cmd, CommandBufferResetFlags.None);
 
-        var beginInfo = new VkCommandBufferBeginInfo
+        var beginInfo = new CommandBufferBeginInfo
         {
-            sType = VkStructureType.CommandBufferBeginInfo,
-            flags = VkCommandBufferUsageFlags.OneTimeSubmit
+            SType = StructureType.CommandBufferBeginInfo,
+            Flags = CommandBufferUsageFlags.OneTimeSubmitBit
         };
-        _context.DeviceApi.vkBeginCommandBuffer(cmd, &beginInfo);
+        _context.Vk.BeginCommandBuffer(cmd, &beginInfo);
 
-        var clearColor = new VkClearValue(0.0f, 0.0f, 0.0f, 1.0f);
-
-        var renderPassInfo = new VkRenderPassBeginInfo
+        var clearColor = new ClearValue(new ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f));
+        var renderPassInfo = new RenderPassBeginInfo
         {
-            sType = VkStructureType.RenderPassBeginInfo,
-            renderPass = _swapchain.RenderPass,
-            framebuffer = _swapchain.Framebuffers[imageIndex],
-            renderArea = new VkRect2D(0, 0, _swapchain.Extent.width, _swapchain.Extent.height),
-            clearValueCount = 1,
-            pClearValues = &clearColor
+            SType = StructureType.RenderPassBeginInfo,
+            RenderPass = _swapchain.RenderPass,
+            Framebuffer = _swapchain.Framebuffers[imageIndex],
+            RenderArea = new Rect2D(new Offset2D(0, 0), _swapchain.Extent),
+            ClearValueCount = 1,
+            PClearValues = &clearColor
         };
 
-        _context.DeviceApi.vkCmdBeginRenderPass(cmd, &renderPassInfo, VkSubpassContents.Inline);
+        _context.Vk.CmdBeginRenderPass(cmd, &renderPassInfo, SubpassContents.Inline);
+        _context.Vk.CmdBindPipeline(cmd, PipelineBindPoint.Graphics, _pipeline.Handle);
 
-        _context.DeviceApi.vkCmdBindPipeline(cmd, VkPipelineBindPoint.Graphics, _pipeline.Handle);
-
-        var viewport = new VkViewport(0, 0, _swapchain.Extent.width, _swapchain.Extent.height, 0, 1);
-        var scissor = new VkRect2D(0, 0, _swapchain.Extent.width, _swapchain.Extent.height);
-        _context.DeviceApi.vkCmdSetViewport(cmd, 0, viewport);
-        _context.DeviceApi.vkCmdSetScissor(cmd, 0, scissor);
+        var viewport = new Viewport(0, 0, _swapchain.Extent.Width, _swapchain.Extent.Height, 0, 1);
+        var scissor = new Rect2D(new Offset2D(0, 0), _swapchain.Extent);
+        _context.Vk.CmdSetViewport(cmd, 0, 1, &viewport);
+        _context.Vk.CmdSetScissor(cmd, 0, 1, &scissor);
 
         var vertexBuffer = _vertexBuffer.Buffer;
         var offset = 0ul;
-        _context.DeviceApi.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
-        _context.DeviceApi.vkCmdDraw(cmd, 3, 1, 0, 0);
+        _context.Vk.CmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+        _context.Vk.CmdDraw(cmd, 3, 1, 0, 0);
 
-        _context.DeviceApi.vkCmdEndRenderPass(cmd);
-        _context.DeviceApi.vkEndCommandBuffer(cmd);
+        _context.Vk.CmdEndRenderPass(cmd);
+        _context.Vk.EndCommandBuffer(cmd);
 
         var waitSemaphore = _imageAvailableSemaphores[frame];
         var signalSemaphore = _renderFinishedSemaphores[frame];
-        var stageMask = VkPipelineStageFlags.ColorAttachmentOutput;
-        var submitInfo = new VkSubmitInfo
+        var stageMask = PipelineStageFlags.ColorAttachmentOutputBit;
+        var submitInfo = new SubmitInfo
         {
-            sType = VkStructureType.SubmitInfo,
-            waitSemaphoreCount = 1,
-            pWaitSemaphores = &waitSemaphore,
-            pWaitDstStageMask = &stageMask,
-            commandBufferCount = 1,
-            pCommandBuffers = &cmd,
-            signalSemaphoreCount = 1,
-            pSignalSemaphores = &signalSemaphore
+            SType = StructureType.SubmitInfo,
+            WaitSemaphoreCount = 1,
+            PWaitSemaphores = &waitSemaphore,
+            PWaitDstStageMask = &stageMask,
+            CommandBufferCount = 1,
+            PCommandBuffers = &cmd,
+            SignalSemaphoreCount = 1,
+            PSignalSemaphores = &signalSemaphore
         };
 
-        _context.DeviceApi.vkQueueSubmit(_context.GraphicsQueue, 1, &submitInfo, _inFlightFences[frame]);
+        _context.Vk.QueueSubmit(_context.GraphicsQueue, 1, &submitInfo, _inFlightFences[frame]);
 
         var swapchain = _swapchain.Handle;
-        var presentInfo = new VkPresentInfoKHR
+        var presentInfo = new PresentInfoKHR
         {
-            sType = VkStructureType.PresentInfoKHR,
-            waitSemaphoreCount = 1,
-            pWaitSemaphores = &signalSemaphore,
-            swapchainCount = 1,
-            pSwapchains = &swapchain,
-            pImageIndices = &imageIndex
+            SType = StructureType.PresentInfoKhr,
+            WaitSemaphoreCount = 1,
+            PWaitSemaphores = &signalSemaphore,
+            SwapchainCount = 1,
+            PSwapchains = &swapchain,
+            PImageIndices = &imageIndex
         };
 
-        _context.DeviceApi.vkQueuePresentKHR(_context.PresentQueue, &presentInfo);
+        _context.KhrSwapchain!.QueuePresent(_context.PresentQueue, &presentInfo);
         _currentFrame++;
     }
 
     public void Dispose()
     {
-        _context.DeviceApi.vkDeviceWaitIdle();
+        _context.Vk.DeviceWaitIdle(_context.Device);
 
         for (var i = 0; i < 2; i++)
         {
-            if (_renderFinishedSemaphores[i] != VkSemaphore.Null)
-                _context.DeviceApi.vkDestroySemaphore(_renderFinishedSemaphores[i]);
-            if (_imageAvailableSemaphores[i] != VkSemaphore.Null)
-                _context.DeviceApi.vkDestroySemaphore(_imageAvailableSemaphores[i]);
-            if (_inFlightFences[i] != VkFence.Null)
-                _context.DeviceApi.vkDestroyFence(_inFlightFences[i]);
+            _context.Vk.DestroySemaphore(_context.Device, _renderFinishedSemaphores[i], null);
+            _context.Vk.DestroySemaphore(_context.Device, _imageAvailableSemaphores[i], null);
+            _context.Vk.DestroyFence(_context.Device, _inFlightFences[i], null);
         }
 
-        if (_commandPool != VkCommandPool.Null)
-            _context.DeviceApi.vkDestroyCommandPool(_commandPool);
+        _context.Vk.DestroyCommandPool(_context.Device, _commandPool, null);
 
         _vertexBuffer.Dispose();
         _pipeline.Dispose();
