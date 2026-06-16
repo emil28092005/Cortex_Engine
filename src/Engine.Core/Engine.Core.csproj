@@ -20,7 +20,7 @@
   <ItemGroup>
     <PackageReference Include="ppy.SDL3-CS" Version="2026.520.0" />
     <PackageReference Include="Flecs.NET.Debug" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Debug'" />
-    <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release'" />
+    <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release' OR '$(Configuration)' == 'ReleaseAOT'" />
   </ItemGroup>
 
 </Project>

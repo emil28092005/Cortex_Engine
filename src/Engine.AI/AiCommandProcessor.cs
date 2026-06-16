@@ -16,13 +16,14 @@ public sealed class AiCommandProcessor
 {
     private readonly World _world;
     private readonly Func<string, Mesh> _modelLoader;
-    private readonly JsonSerializerOptions _jsonOptions;
+
+    public JsonSerializerOptions JsonOptions { get; }
 
     public AiCommandProcessor(World world, Func<string, Mesh> modelLoader)
     {
         _world = world;
         _modelLoader = modelLoader;
-        _jsonOptions = new JsonSerializerOptions
+        JsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
             Converters =
@@ -41,7 +42,7 @@ public sealed class AiCommandProcessor
     {
         try
         {
-            var command = JsonSerializer.Deserialize<AiCommand>(json, _jsonOptions);
+            var command = JsonSerializer.Deserialize<AiCommand>(json, JsonOptions);
             if (command == null)
                 return AiCommandResult.Error("Failed to parse command.");
 
@@ -118,7 +119,7 @@ public sealed class AiCommandProcessor
                 names.Add(name);
         });
 
-        var json = JsonSerializer.Serialize(names, _jsonOptions);
+        var json = JsonSerializer.Serialize(names, JsonOptions);
         return AiCommandResult.Ok(json);
     }
 }

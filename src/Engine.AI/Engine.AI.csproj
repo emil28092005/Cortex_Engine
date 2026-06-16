@@ -7,8 +7,22 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'ReleaseAOT'">
+    <DefineConstants>RELEASE_AOT</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' != 'ReleaseAOT'">
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'ReleaseAOT'">
+    <Compile Remove="Mcp\*.cs" />
   </ItemGroup>
 
 </Project>
