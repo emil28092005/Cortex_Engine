@@ -9,7 +9,7 @@ namespace Engine.Graphics.Loaders;
 
 /// <summary>
 /// Minimal .obj loader.
-/// Supports vertices (v) and faces (f). Ignores normals/UVs for now.
+/// Supports vertices (v) and faces (f). Creates per-face normals for flat shading.
 /// Produces a colored Mesh component.
 /// </summary>
 public static class ObjLoader
@@ -19,6 +19,7 @@ public static class ObjLoader
         var color = defaultColor ?? new Vector3(0.7f, 0.7f, 0.7f);
 
         var positions = new List<Vector3>();
+        var vertices = new List<Vertex>();
         var indices = new List<uint>();
 
         foreach (var rawLine in File.ReadLines(path))
@@ -41,28 +42,36 @@ public static class ObjLoader
                     break;
 
                 case "f" when parts.Length >= 4:
-                    // Triangulate the face as a fan. Only the position index is used.
+                    // Triangulate the face as a fan.
                     var baseIndex = ParseFaceIndex(parts[1]);
                     for (var i = 2; i < parts.Length - 1; i++)
                     {
-                        indices.Add(baseIndex);
-                        indices.Add(ParseFaceIndex(parts[i]));
-                        indices.Add(ParseFaceIndex(parts[i + 1]));
+                        var i0 = baseIndex;
+                        var i1 = ParseFaceIndex(parts[i]);
+                        var i2 = ParseFaceIndex(parts[i + 1]);
+
+                        var v0 = positions[(int)i0];
+                        var v1 = positions[(int)i1];
+                        var v2 = positions[(int)i2];
+                        var normal = ComputeFaceNormal(v0, v1, v2);
+
+                        var vertexBase = (uint)vertices.Count;
+                        indices.Add(vertexBase);
+                        indices.Add(vertexBase + 1);
+                        indices.Add(vertexBase + 2);
+
+                        vertices.Add(new Vertex(v0, color, normal));
+                        vertices.Add(new Vertex(v1, color, normal));
+                        vertices.Add(new Vertex(v2, color, normal));
                     }
                     break;
             }
         }
 
-        if (positions.Count == 0)
+        if (vertices.Count == 0)
             throw new InvalidOperationException($"OBJ file has no vertices: {path}");
 
-        var vertices = new Vertex[positions.Count];
-        for (var i = 0; i < positions.Count; i++)
-        {
-            vertices[i] = new Vertex(positions[i], color);
-        }
-
-        return new Mesh(vertices, indices.ToArray());
+        return new Mesh(vertices.ToArray(), indices.ToArray());
     }
 
     private static uint ParseFaceIndex(string part)
@@ -72,5 +81,17 @@ public static class ObjLoader
         var indexStr = slashIndex == -1 ? part : part.Substring(0, slashIndex);
         var index = int.Parse(indexStr);
         return (uint)(index - 1); // OBJ indices are 1-based
+    }
+
+    private static Vector3 ComputeFaceNormal(Vector3 a, Vector3 b, Vector3 c)
+    {
+        var ab = b - a;
+        var ac = c - a;
+        var normal = Vector3.Cross(ab, ac);
+        if (normal.LengthSquared() > 0.00001f)
+            normal = Vector3.Normalize(normal);
+        else
+            normal = Vector3.UnitY;
+        return normal;
     }
 }

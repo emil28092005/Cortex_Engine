@@ -27,4 +27,25 @@ public record struct Transform
              * Matrix4x4.CreateFromQuaternion(Rotation)
              * Matrix4x4.CreateTranslation(Position);
     }
+
+    /// <summary>
+    /// Transform a normal vector from local to world space using the inverse-transpose of the model matrix.
+    /// </summary>
+    public Vector3 TransformNormal(Vector3 normal)
+    {
+        var matrix = GetMatrix();
+        if (!Matrix4x4.Invert(matrix, out var inverted))
+            return normal;
+
+        // Use the upper 3x3 of the transposed inverse matrix.
+        var nx = inverted.M11 * normal.X + inverted.M21 * normal.Y + inverted.M31 * normal.Z;
+        var ny = inverted.M12 * normal.X + inverted.M22 * normal.Y + inverted.M32 * normal.Z;
+        var nz = inverted.M13 * normal.X + inverted.M23 * normal.Y + inverted.M33 * normal.Z;
+
+        var result = new Vector3(nx, ny, nz);
+        if (result.LengthSquared() > 0.00001f)
+            result = Vector3.Normalize(result);
+
+        return result;
+    }
 }

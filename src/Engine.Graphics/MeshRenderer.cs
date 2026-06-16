@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Flecs.NET.Core;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
@@ -26,6 +27,18 @@ public sealed unsafe class MeshRenderer : IDisposable
     private Silk.NET.Vulkan.Semaphore[] _renderFinishedSemaphores = null!;
     private Silk.NET.Vulkan.Fence[] _inFlightFences = null!;
     private int _currentFrame;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PushConstants
+    {
+        public Matrix4x4 Mvp;
+        public Vector3 LightDirection;
+        public float Pad1;
+        public Vector3 LightColor;
+        public float Pad2;
+        public Vector3 AmbientColor;
+        public float Pad3;
+    }
 
     private sealed class MeshBuffers : IDisposable
     {
@@ -194,7 +207,17 @@ public sealed unsafe class MeshRenderer : IDisposable
             var model = transform.GetMatrix();
             var mvp = Matrix4x4.Multiply(Matrix4x4.Multiply(model, view), proj);
             var mvpT = Matrix4x4.Transpose(mvp);
-            _context.Vk.CmdPushConstants(drawCmd, _pipeline.Layout, ShaderStageFlags.VertexBit, 0, 64, &mvpT);
+
+            var push = new PushConstants
+            {
+                Mvp = mvpT,
+                LightDirection = new Vector3(0.5f, -1.0f, -0.5f),
+                LightColor = new Vector3(1.0f, 0.95f, 0.8f),
+                AmbientColor = new Vector3(0.15f, 0.15f, 0.2f)
+            };
+
+            var pushSize = (uint)sizeof(PushConstants);
+            _context.Vk.CmdPushConstants(drawCmd, _pipeline.Layout, ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit, 0, pushSize, &push);
 
             var vertexBuffer = buffers.VertexBuffer.Buffer;
             var offset = 0ul;
@@ -252,19 +275,22 @@ public sealed unsafe class MeshRenderer : IDisposable
 
     private MeshBuffers CreateMeshBuffers(Mesh mesh)
     {
-        var vertexBytes = new byte[mesh.Vertices.Length * 6 * sizeof(float)];
+        var vertexBytes = new byte[mesh.Vertices.Length * 9 * sizeof(float)];
         fixed (byte* p = vertexBytes)
         {
             var dst = (float*)p;
             for (var i = 0; i < mesh.Vertices.Length; i++)
             {
                 var v = mesh.Vertices[i];
-                dst[i * 6 + 0] = v.Position.X;
-                dst[i * 6 + 1] = v.Position.Y;
-                dst[i * 6 + 2] = v.Position.Z;
-                dst[i * 6 + 3] = v.Color.X;
-                dst[i * 6 + 4] = v.Color.Y;
-                dst[i * 6 + 5] = v.Color.Z;
+                dst[i * 9 + 0] = v.Position.X;
+                dst[i * 9 + 1] = v.Position.Y;
+                dst[i * 9 + 2] = v.Position.Z;
+                dst[i * 9 + 3] = v.Color.X;
+                dst[i * 9 + 4] = v.Color.Y;
+                dst[i * 9 + 5] = v.Color.Z;
+                dst[i * 9 + 6] = v.Normal.X;
+                dst[i * 9 + 7] = v.Normal.Y;
+                dst[i * 9 + 8] = v.Normal.Z;
             }
         }
 
@@ -283,19 +309,24 @@ public sealed unsafe class MeshRenderer : IDisposable
     private byte[] BuildMeshVertices(Mesh mesh, Transform transform)
     {
         var matrix = transform.GetMatrix();
-        var bytes = new byte[mesh.Vertices.Length * 6 * sizeof(float)];
+        var bytes = new byte[mesh.Vertices.Length * 9 * sizeof(float)];
         fixed (byte* p = bytes)
         {
             var dst = (float*)p;
             for (var i = 0; i < mesh.Vertices.Length; i++)
             {
-                var transformed = Vector3.Transform(mesh.Vertices[i].Position, matrix);
-                dst[i * 6 + 0] = transformed.X;
-                dst[i * 6 + 1] = transformed.Y;
-                dst[i * 6 + 2] = transformed.Z;
-                dst[i * 6 + 3] = mesh.Vertices[i].Color.X;
-                dst[i * 6 + 4] = mesh.Vertices[i].Color.Y;
-                dst[i * 6 + 5] = mesh.Vertices[i].Color.Z;
+                var v = mesh.Vertices[i];
+                var transformed = Vector3.Transform(v.Position, matrix);
+                var normal = transform.TransformNormal(v.Normal);
+                dst[i * 9 + 0] = transformed.X;
+                dst[i * 9 + 1] = transformed.Y;
+                dst[i * 9 + 2] = transformed.Z;
+                dst[i * 9 + 3] = v.Color.X;
+                dst[i * 9 + 4] = v.Color.Y;
+                dst[i * 9 + 5] = v.Color.Z;
+                dst[i * 9 + 6] = normal.X;
+                dst[i * 9 + 7] = normal.Y;
+                dst[i * 9 + 8] = normal.Z;
             }
         }
         return bytes;

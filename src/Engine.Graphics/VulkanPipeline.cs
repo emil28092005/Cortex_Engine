@@ -57,9 +57,9 @@ public sealed unsafe class VulkanPipeline : IDisposable
     {
         var pushConstantRange = new PushConstantRange
         {
-            StageFlags = ShaderStageFlags.VertexBit,
+            StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
             Offset = 0,
-            Size = (uint)(16 * sizeof(float))
+            Size = (uint)(28 * sizeof(float))
         };
 
         var createInfo = new PipelineLayoutCreateInfo
@@ -101,7 +101,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
         var bindingDescription = new VertexInputBindingDescription
         {
             Binding = 0,
-            Stride = (uint)(6 * sizeof(float)),
+            Stride = (uint)(9 * sizeof(float)),
             InputRate = VertexInputRate.Vertex
         };
 
@@ -120,6 +120,13 @@ public sealed unsafe class VulkanPipeline : IDisposable
                 Location = 1,
                 Format = Format.R32G32B32Sfloat,
                 Offset = (uint)(3 * sizeof(float))
+            },
+            new VertexInputAttributeDescription
+            {
+                Binding = 0,
+                Location = 2,
+                Format = Format.R32G32B32Sfloat,
+                Offset = (uint)(6 * sizeof(float))
             }
         };
 
