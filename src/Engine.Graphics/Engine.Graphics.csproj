@@ -20,6 +20,8 @@
   <ItemGroup>
     <PackageReference Include="Silk.NET.Vulkan" Version="2.21.0" />
     <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.21.0" />
+    <PackageReference Include="Flecs.NET.Debug" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release'" />
   </ItemGroup>
 
   <ItemGroup>

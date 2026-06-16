@@ -27,7 +27,7 @@ public sealed class InputMapping
 
     public void ProcessEvent(SDL_Event evt)
     {
-        switch ((SDL_EventType)evt.Type)
+        switch ((SDL_EventType)evt.type)
         {
             case SDL_EventType.SDL_EVENT_KEY_DOWN:
                 if (!_keysDown.Contains((SDL_Keycode)evt.key.key))

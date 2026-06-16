@@ -102,6 +102,14 @@ public sealed unsafe class VertexBuffer : IDisposable
         _context.Vk.UnmapMemory(_context.Device, Memory);
     }
 
+    public void Update(ReadOnlySpan<byte> data)
+    {
+        if ((ulong)data.Length != Size)
+            throw new ArgumentException($"Vertex buffer update size mismatch: {data.Length} != {Size}");
+
+        CopyData(data);
+    }
+
     public void Dispose()
     {
         _context.Vk.DeviceWaitIdle(_context.Device);

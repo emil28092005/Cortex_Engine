@@ -1,12 +1,15 @@
 using System;
+using System.Numerics;
+using Flecs.NET.Core;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
+using Engine.Core.Components;
 
 namespace Engine.Graphics;
 
 /// <summary>
 /// Renders a colored triangle using a vertex buffer and a simple graphics pipeline.
-/// Uses Silk.NET.Vulkan.
+/// Uses Silk.NET.Vulkan and reads entity transforms from the ECS world.
 /// </summary>
 public sealed unsafe class TriangleRenderer : IDisposable
 {
@@ -115,7 +118,7 @@ public sealed unsafe class TriangleRenderer : IDisposable
         }
     }
 
-    public void RenderFrame()
+    public void RenderWorld(World world)
     {
         var frame = _currentFrame % 2;
 
@@ -160,7 +163,14 @@ public sealed unsafe class TriangleRenderer : IDisposable
         var vertexBuffer = _vertexBuffer.Buffer;
         var offset = 0ul;
         _context.Vk.CmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
-        _context.Vk.CmdDraw(cmd, 3, 1, 0, 0);
+
+        var drawCmd = cmd;
+        world.Each((Entity e, ref Transform transform) =>
+        {
+            var bytes = BuildTriangleVertices(transform);
+            _vertexBuffer.Update(bytes);
+            _context.Vk.CmdDraw(drawCmd, 3, 1, 0, 0);
+        });
 
         _context.Vk.CmdEndRenderPass(cmd);
         _context.Vk.EndCommandBuffer(cmd);
@@ -195,6 +205,39 @@ public sealed unsafe class TriangleRenderer : IDisposable
 
         _context.KhrSwapchain!.QueuePresent(_context.PresentQueue, &presentInfo);
         _currentFrame++;
+    }
+
+    private byte[] BuildTriangleVertices(Transform transform)
+    {
+        var matrix = transform.GetMatrix();
+        var positions = new Vector3[]
+        {
+            new Vector3(0.0f, -0.5f, 0.0f),
+            new Vector3(0.5f, 0.5f, 0.0f),
+            new Vector3(-0.5f, 0.5f, 0.0f)
+        };
+        var colors = new[]
+        {
+            new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 0.0f, 1.0f)
+        };
+
+        var bytes = new byte[3 * 5 * sizeof(float)];
+        fixed (byte* p = bytes)
+        {
+            var dst = (float*)p;
+            for (var i = 0; i < 3; i++)
+            {
+                var transformed = Vector3.Transform(positions[i], matrix);
+                dst[i * 5 + 0] = transformed.X;
+                dst[i * 5 + 1] = transformed.Y;
+                dst[i * 5 + 2] = colors[i].X;
+                dst[i * 5 + 3] = colors[i].Y;
+                dst[i * 5 + 4] = colors[i].Z;
+            }
+        }
+        return bytes;
     }
 
     public void Dispose()

@@ -15,7 +15,7 @@ Cortex Engine is a 3D game engine built from scratch to provide a Unity-like dev
 - **Read** the complete ECS world state through native JSON serialization.
 - **Modify** the running engine via declarative JSON commands and, in Development Mode, via hot-reloaded C# scripts.
 
-The architecture prioritizes **production maturity** over experimental technologies: Vulkan (via Vortice.Vulkan), Flecs.NET (C# bindings for the C-based Flecs ECS), SDL3-cs (ppy.SDL3-CS), and ImGui.NET/Hexa.NET.ImGui with a native Vulkan backend.
+The architecture prioritizes **production maturity** over experimental technologies: Vulkan (via Silk.NET.Vulkan), Flecs.NET (C# bindings for the C-based Flecs ECS), SDL3-cs (ppy.SDL3-CS), and ImGui.NET/Hexa.NET.ImGui with a native Vulkan backend.
 
 ---
 
@@ -137,7 +137,7 @@ All Roslyn and `AssemblyLoadContext` code is wrapped in `#if DEV_MODE`.
 
 **Flecs.NET**
 
-- NuGet: `Flecs.NET.Release` 4.0.3
+- NuGet: `Flecs.NET.Debug` (Debug) / `Flecs.NET.Release` (Release) 4.0.4-build.546
 - High-level C# wrapper over the C-based Flecs ECS
 - Supports .NET Standard 2.1, .NET 5/6/7/8
 - NativeAOT-compatible via static linking: `<FlecsStaticLink>true</FlecsStaticLink>`
