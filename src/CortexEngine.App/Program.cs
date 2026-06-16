@@ -8,7 +8,7 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine Step 1 — Starting up...");
+        Console.WriteLine("Cortex Engine Step 2 — Starting up...");
 
         try
         {
@@ -17,7 +17,7 @@ class Program
             var input = new InputMapping();
             using var vulkan = new VulkanContext(window, enableValidation: true);
             using var swapchain = new Swapchain(vulkan);
-            using var renderer = new ClearRenderer(vulkan, swapchain);
+            using var renderer = new TriangleRenderer(vulkan, swapchain);
 
             var frames = 0;
             var lastFpsTime = 0.0;
@@ -30,13 +30,7 @@ class Program
                 // Note: SDL events are already polled in PumpEvents.
                 // In a real engine, the window would expose an event iterator.
 
-                // Animate clear color over time.
-                var t = (float)timing.TotalTime;
-                var r = MathF.Sin(t * 0.5f) * 0.5f + 0.5f;
-                var g = MathF.Sin(t * 0.7f + 2.0f) * 0.5f + 0.5f;
-                var b = MathF.Sin(t * 0.9f + 4.0f) * 0.5f + 0.5f;
-
-                renderer.RenderFrame(r, g, b);
+                renderer.RenderFrame();
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)

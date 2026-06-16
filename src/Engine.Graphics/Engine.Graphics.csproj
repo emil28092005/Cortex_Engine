@@ -22,6 +22,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Shaders\*.spv" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
   </ItemGroup>
 

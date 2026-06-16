@@ -12,9 +12,9 @@ public sealed unsafe class Swapchain : IDisposable
     private readonly VulkanContext _context;
     private VkRenderPass _renderPass;
     private VkSwapchainKHR _swapchain;
-    private VkImage[] _images;
-    private VkImageView[] _imageViews;
-    private VkFramebuffer[] _framebuffers;
+    private VkImage[] _images = null!;
+    private VkImageView[] _imageViews = null!;
+    private VkFramebuffer[] _framebuffers = null!;
     private VkSurfaceFormatKHR _surfaceFormat;
     private VkPresentModeKHR _presentMode;
     private VkExtent2D _extent;

@@ -24,3 +24,4 @@ Thumbs.db
 !*.csproj
 !*.sln
 !launchSettings.json
+.playwright-mcp/

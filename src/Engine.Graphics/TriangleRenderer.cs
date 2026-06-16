@@ -4,13 +4,14 @@ using Vortice.Vulkan;
 namespace Engine.Graphics;
 
 /// <summary>
-/// Minimal renderer that clears the swapchain image to a solid color.
-/// Serves as the foundational Step 1 rendering proof-of-concept.
+/// Renders a colored triangle using a vertex buffer and a simple graphics pipeline.
 /// </summary>
-public sealed unsafe class ClearRenderer : IDisposable
+public sealed unsafe class TriangleRenderer : IDisposable
 {
     private readonly VulkanContext _context;
     private readonly Swapchain _swapchain;
+    private readonly VulkanPipeline _pipeline;
+    private readonly VertexBuffer _vertexBuffer;
     private VkCommandPool _commandPool;
     private VkCommandBuffer[] _commandBuffers = null!;
     private VkSemaphore[] _imageAvailableSemaphores = null!;
@@ -18,13 +19,37 @@ public sealed unsafe class ClearRenderer : IDisposable
     private VkFence[] _inFlightFences = null!;
     private int _currentFrame;
 
-    public ClearRenderer(VulkanContext context, Swapchain swapchain)
+    public TriangleRenderer(VulkanContext context, Swapchain swapchain)
     {
         _context = context;
         _swapchain = swapchain;
+
+        _pipeline = new VulkanPipeline(context, swapchain);
+        _vertexBuffer = CreateTriangleBuffer();
+
         CreateCommandPool();
         CreateCommandBuffers();
         CreateSyncObjects();
+    }
+
+    private VertexBuffer CreateTriangleBuffer()
+    {
+        var vertices = new[]
+        {
+            // Position (vec2) + Color (vec3)
+             0.0f, -0.5f,  1.0f, 0.0f, 0.0f,
+             0.5f,  0.5f,  0.0f, 1.0f, 0.0f,
+            -0.5f,  0.5f,  0.0f, 0.0f, 1.0f
+        };
+
+        var bytes = new byte[vertices.Length * sizeof(float)];
+        fixed (byte* p = bytes)
+        fixed (float* v = vertices)
+        {
+            Buffer.MemoryCopy(v, p, bytes.Length, vertices.Length * sizeof(float));
+        }
+
+        return new VertexBuffer(_context, bytes);
     }
 
     private void CreateCommandPool()
@@ -81,7 +106,7 @@ public sealed unsafe class ClearRenderer : IDisposable
         }
     }
 
-    public void RenderFrame(float r, float g, float b)
+    public void RenderFrame()
     {
         var frame = _currentFrame % 2;
 
@@ -96,9 +121,7 @@ public sealed unsafe class ClearRenderer : IDisposable
             out var imageIndex);
 
         if (result == VkResult.ErrorOutOfDateKHR)
-        {
             return;
-        }
 
         var cmd = _commandBuffers[frame];
         _context.DeviceApi.vkResetCommandBuffer(cmd, VkCommandBufferResetFlags.None);
@@ -110,7 +133,7 @@ public sealed unsafe class ClearRenderer : IDisposable
         };
         _context.DeviceApi.vkBeginCommandBuffer(cmd, &beginInfo);
 
-        var clearColor = new VkClearValue(r, g, b, 1.0f);
+        var clearColor = new VkClearValue(0.0f, 0.0f, 0.0f, 1.0f);
 
         var renderPassInfo = new VkRenderPassBeginInfo
         {
@@ -123,6 +146,19 @@ public sealed unsafe class ClearRenderer : IDisposable
         };
 
         _context.DeviceApi.vkCmdBeginRenderPass(cmd, &renderPassInfo, VkSubpassContents.Inline);
+
+        _context.DeviceApi.vkCmdBindPipeline(cmd, VkPipelineBindPoint.Graphics, _pipeline.Handle);
+
+        var viewport = new VkViewport(0, 0, _swapchain.Extent.width, _swapchain.Extent.height, 0, 1);
+        var scissor = new VkRect2D(0, 0, _swapchain.Extent.width, _swapchain.Extent.height);
+        _context.DeviceApi.vkCmdSetViewport(cmd, 0, viewport);
+        _context.DeviceApi.vkCmdSetScissor(cmd, 0, scissor);
+
+        var vertexBuffer = _vertexBuffer.Buffer;
+        var offset = 0ul;
+        _context.DeviceApi.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &offset);
+        _context.DeviceApi.vkCmdDraw(cmd, 3, 1, 0, 0);
+
         _context.DeviceApi.vkCmdEndRenderPass(cmd);
         _context.DeviceApi.vkEndCommandBuffer(cmd);
 
@@ -154,12 +190,7 @@ public sealed unsafe class ClearRenderer : IDisposable
             pImageIndices = &imageIndex
         };
 
-        var presentResult = _context.DeviceApi.vkQueuePresentKHR(_context.PresentQueue, &presentInfo);
-        if (presentResult == VkResult.ErrorOutOfDateKHR || presentResult == VkResult.SuboptimalKHR)
-        {
-            // Recreate handled externally.
-        }
-
+        _context.DeviceApi.vkQueuePresentKHR(_context.PresentQueue, &presentInfo);
         _currentFrame++;
     }
 
@@ -179,5 +210,8 @@ public sealed unsafe class ClearRenderer : IDisposable
 
         if (_commandPool != VkCommandPool.Null)
             _context.DeviceApi.vkDestroyCommandPool(_commandPool);
+
+        _vertexBuffer.Dispose();
+        _pipeline.Dispose();
     }
 }
