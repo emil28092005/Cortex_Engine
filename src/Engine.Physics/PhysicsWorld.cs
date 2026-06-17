@@ -121,13 +121,16 @@ public sealed class PhysicsWorld : IDisposable
         _physicsSystem.Update(deltaTime, collisionSteps, _jobSystem);
     }
 
-    public void SyncTransforms(World world)
+    public void SyncTransforms(World world, Entity? skipEntity = null)
     {
         // Collect updates first to avoid calling entity.Set() during dictionary iteration
         var updates = new List<(Entity entity, Vector3 pos, Quaternion rot)>();
         foreach (var (entity, bodyId) in _entityToBody)
         {
             if ((ulong)entity.Id == 0)
+                continue;
+
+            if (skipEntity.HasValue && skipEntity.Value.Id == entity.Id)
                 continue;
 
             var pos = _bodyInterface.GetPosition(bodyId);
@@ -154,6 +157,8 @@ public sealed class PhysicsWorld : IDisposable
             return;
 
         _bodyInterface.SetPositionAndRotation(bodyId, transform.Position, transform.Rotation, Activation.Activate);
+        // Zero out velocity so the object doesn't accumulate momentum while being dragged
+        _bodyInterface.SetLinearAndAngularVelocity(bodyId, Vector3.Zero, Vector3.Zero);
     }
 
     private static Shape CreateShape(RigidBody rb)

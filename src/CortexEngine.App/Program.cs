@@ -50,6 +50,7 @@ class Program
 
             // ImGui editor layer
             var imGuiLayer = new ImGuiLayer();
+            var objectManipulator = new ObjectManipulator();
             if (!cameraTour)
             {
                 imGuiLayer.Initialize();
@@ -240,6 +241,13 @@ class Program
                     }
                 }
 
+                // Object manipulation (Unity-like drag)
+                if (!cameraTour)
+                {
+                    var cam = cameraEntity.Get<Camera>();
+                    objectManipulator.ProcessInput(world, cam, input);
+                }
+
                 // Physics: create bodies, step, sync transforms
                 if (!cameraTour)
                 {
@@ -258,8 +266,13 @@ class Program
                         e.Set(rb);
                     }
 
+                    // Sync dragged object to physics before stepping
+                    objectManipulator.SyncToPhysics(physicsWorld);
+
                     physicsWorld.Update((float)timing.DeltaTime);
-                    physicsWorld.SyncTransforms(world);
+
+                    // Sync all transforms EXCEPT the dragged object
+                    physicsWorld.SyncTransforms(world, objectManipulator.IsDragging ? objectManipulator.GetDraggedEntity() : null);
                 }
 
                 // Capture a demo screenshot after the scene warms up (non-tour mode only).
@@ -271,6 +284,10 @@ class Program
 
                 // Feed frame data to ImGui before rendering.
                 imGuiLayer.SetFrameData(world, timing, currentFps);
+
+                // Sync selection between manipulator and ImGui
+                if (objectManipulator.IsDragging && !string.IsNullOrEmpty(objectManipulator.SelectedEntityName))
+                    imGuiLayer.SetSelectedEntity(objectManipulator.SelectedEntityName);
 
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();

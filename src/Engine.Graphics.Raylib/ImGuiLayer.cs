@@ -27,6 +27,16 @@ public sealed class ImGuiLayer : IDisposable
     private int _fps;
 
     /// <summary>
+    /// Set the selected entity name from external (e.g. ObjectManipulator).
+    /// </summary>
+    public void SetSelectedEntity(string name) { _selectedEntity = name; }
+
+    /// <summary>
+    /// Get the currently selected entity name.
+    /// </summary>
+    public string GetSelectedEntity() => _selectedEntity;
+
+    /// <summary>
     /// Set per-frame data before calling RenderImGuiUI.
     /// </summary>
     public void SetFrameData(World world, Timing timing, int fps)
