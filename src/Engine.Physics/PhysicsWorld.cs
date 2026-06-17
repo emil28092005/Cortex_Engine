@@ -22,7 +22,10 @@ public sealed class PhysicsWorld : IDisposable
 
     private readonly PhysicsSystem _physicsSystem;
     private readonly BodyInterface _bodyInterface;
-    private readonly JobSystem _jobSystem;
+    private readonly JobSystemThreadPool _jobSystem;
+    private readonly BroadPhaseLayerInterfaceTable _broadPhaseLayerInterface;
+    private readonly ObjectLayerPairFilterTable _objectLayerPairFilter;
+    private readonly ObjectVsBroadPhaseLayerFilterTable _objectVsBroadPhaseLayerFilter;
     private readonly Dictionary<Entity, BodyID> _entityToBody = new();
     private readonly Dictionary<BodyID, Entity> _bodyToEntity = new();
     private readonly List<Body> _bodies = new();
@@ -38,23 +41,23 @@ public sealed class PhysicsWorld : IDisposable
     {
         Foundation.Init(false);
 
-        var broadPhaseLayerInterface = new BroadPhaseLayerInterfaceTable(2, 2);
-        broadPhaseLayerInterface.MapObjectToBroadPhaseLayer(Layers.NonMoving, new BroadPhaseLayer(0));
-        broadPhaseLayerInterface.MapObjectToBroadPhaseLayer(Layers.Moving, new BroadPhaseLayer(1));
+        _broadPhaseLayerInterface = new BroadPhaseLayerInterfaceTable(2, 2);
+        _broadPhaseLayerInterface.MapObjectToBroadPhaseLayer(Layers.NonMoving, new BroadPhaseLayer(0));
+        _broadPhaseLayerInterface.MapObjectToBroadPhaseLayer(Layers.Moving, new BroadPhaseLayer(1));
 
-        var objectLayerPairFilter = new ObjectLayerPairFilterTable(2);
+        _objectLayerPairFilter = new ObjectLayerPairFilterTable(2);
 
-        var objectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterTable(
-            broadPhaseLayerInterface, 2, objectLayerPairFilter, 2);
+        _objectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterTable(
+            _broadPhaseLayerInterface, 2, _objectLayerPairFilter, 2);
 
         var settings = new PhysicsSystemSettings
         {
             MaxBodies = MaxBodies,
             MaxBodyPairs = MaxBodyPairs,
             MaxContactConstraints = MaxContactConstraints,
-            BroadPhaseLayerInterface = broadPhaseLayerInterface,
-            ObjectLayerPairFilter = objectLayerPairFilter,
-            ObjectVsBroadPhaseLayerFilter = objectVsBroadPhaseLayerFilter,
+            BroadPhaseLayerInterface = _broadPhaseLayerInterface,
+            ObjectLayerPairFilter = _objectLayerPairFilter,
+            ObjectVsBroadPhaseLayerFilter = _objectVsBroadPhaseLayerFilter,
         };
 
         _physicsSystem = new PhysicsSystem(settings);
@@ -115,6 +118,8 @@ public sealed class PhysicsWorld : IDisposable
 
     public void SyncTransforms(World world)
     {
+        // Collect updates first to avoid calling entity.Set() during dictionary iteration
+        var updates = new List<(Entity entity, Vector3 pos, Quaternion rot)>();
         foreach (var (entity, bodyId) in _entityToBody)
         {
             if ((ulong)entity.Id == 0)
@@ -122,7 +127,12 @@ public sealed class PhysicsWorld : IDisposable
 
             var pos = _bodyInterface.GetPosition(bodyId);
             var rot = _bodyInterface.GetRotation(bodyId);
+            updates.Add((entity, pos, rot));
+        }
 
+        // Apply updates outside the iteration
+        foreach (var (entity, pos, rot) in updates)
+        {
             if (entity.Has<Transform>())
             {
                 var t = entity.Get<Transform>();
@@ -172,6 +182,9 @@ public sealed class PhysicsWorld : IDisposable
 
         _jobSystem.Dispose();
         _physicsSystem.Dispose();
+        _objectVsBroadPhaseLayerFilter.Dispose();
+        _objectLayerPairFilter.Dispose();
+        _broadPhaseLayerInterface.Dispose();
         Foundation.Shutdown();
     }
 }

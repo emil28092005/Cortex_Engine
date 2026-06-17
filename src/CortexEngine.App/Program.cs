@@ -243,15 +243,20 @@ class Program
                 // Physics: create bodies, step, sync transforms
                 if (!cameraTour)
                 {
+                    var toInit = new List<(Entity, RigidBody, Transform)>();
                     world.Each((Entity e, ref RigidBody rb, ref Transform t) =>
                     {
                         if (!rb.IsInitialized)
-                        {
-                            physicsWorld.CreateBody(e, rb, t);
-                            rb.IsInitialized = true;
-                            e.Set(rb);
-                        }
+                            toInit.Add((e, rb, t));
                     });
+
+                    foreach (var (e, rbData, t) in toInit)
+                    {
+                        physicsWorld.CreateBody(e, rbData, t);
+                        var rb = rbData;
+                        rb.IsInitialized = true;
+                        e.Set(rb);
+                    }
 
                     physicsWorld.Update((float)timing.DeltaTime);
                     physicsWorld.SyncTransforms(world);
