@@ -195,13 +195,16 @@ public sealed class OpenTKRenderer : IRenderer
 
     private void SetUniformMat4(int loc, OTKMatrix mat)
     {
-        // OpenTK Matrix4 is row-major in memory; OpenGL expects column-major with transpose=false.
-        // Use transpose=true so OpenGL transposes our row-major data into column-major.
-        _matrixBuf[0] = mat.M11; _matrixBuf[1] = mat.M12; _matrixBuf[2] = mat.M13; _matrixBuf[3] = mat.M14;
-        _matrixBuf[4] = mat.M21; _matrixBuf[5] = mat.M22; _matrixBuf[6] = mat.M23; _matrixBuf[7] = mat.M24;
-        _matrixBuf[8] = mat.M31; _matrixBuf[9] = mat.M32; _matrixBuf[10] = mat.M33; _matrixBuf[11] = mat.M34;
-        _matrixBuf[12] = mat.M41; _matrixBuf[13] = mat.M42; _matrixBuf[14] = mat.M43; _matrixBuf[15] = mat.M44;
-        GL.UniformMatrix4(loc, 1, true, _matrixBuf);
+        // OpenTK Matrix4 fields: M11,M12,M13,M14, M21..M24, M31..M34, M41..M44
+        // These are stored in the struct as row-major (M11=row1col1).
+        // BUT OpenTK's Matrix4 in memory is actually column-major per its design
+        // (M11,M21,M31,M41 is the first column in memory).
+        // So we copy field-by-field and pass with transpose=false.
+        _matrixBuf[0] = mat.M11; _matrixBuf[1] = mat.M21; _matrixBuf[2] = mat.M31; _matrixBuf[3] = mat.M41;
+        _matrixBuf[4] = mat.M12; _matrixBuf[5] = mat.M22; _matrixBuf[6] = mat.M32; _matrixBuf[7] = mat.M42;
+        _matrixBuf[8] = mat.M13; _matrixBuf[9] = mat.M23; _matrixBuf[10] = mat.M33; _matrixBuf[11] = mat.M43;
+        _matrixBuf[12] = mat.M14; _matrixBuf[13] = mat.M24; _matrixBuf[14] = mat.M34; _matrixBuf[15] = mat.M44;
+        GL.UniformMatrix4(loc, 1, false, _matrixBuf);
     }
 
     private GLMesh GetOrUploadMesh(Entity e, EngineMesh mesh)

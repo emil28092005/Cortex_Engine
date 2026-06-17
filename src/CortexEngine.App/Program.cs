@@ -45,7 +45,7 @@ class Program
             RaylibBackendRegistrar.EnsureRegistered();
             VulkanBackendRegistrar.EnsureRegistered();
             OpenTKBackendRegistrar.EnsureRegistered();
-            using var renderContext = RenderBackendFactory.Create("opentk", 1280, 720, enableValidation: false);
+            using var renderContext = RenderBackendFactory.Create("raylib", 1280, 720, enableValidation: false);
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
@@ -298,6 +298,7 @@ class Program
                 // Swap buffers for OpenGL backend
                 if (renderContext is OpenTKRenderContext otkCtx)
                     otkCtx.SwapBuffers();
+                // Raylib handles swap internally in EndDrawing
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
