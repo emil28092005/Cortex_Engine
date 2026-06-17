@@ -130,7 +130,7 @@ public sealed class OpenGLRenderer : IRenderer
                 unsafe
                 {
                     fixed (float* p = _matrixBuffer)
-                        _gl.UniformMatrix4(shadowMvpLoc, 1, false, p);
+                        _gl.UniformMatrix4(shadowMvpLoc, 1, true, p);
                 }
                 DrawMeshImmediate(glMesh);
             });
@@ -141,6 +141,8 @@ public sealed class OpenGLRenderer : IRenderer
 
         // === PASS 2: Main render ===
         _gl.Viewport(0, 0, (uint)_screenWidth, (uint)_screenHeight);
+        _gl.Enable(GLEnum.DepthTest);
+        _gl.Disable(GLEnum.CullFace);
         _gl.ClearColor(0.098f, 0.118f, 0.157f, 1);
         _gl.Clear((uint)(GLEnum.ColorBufferBit | GLEnum.DepthBufferBit));
         _gl.UseProgram(_program);
@@ -168,7 +170,7 @@ public sealed class OpenGLRenderer : IRenderer
             unsafe
             {
                 fixed (float* p = _matrixBuffer)
-                    _gl.UniformMatrix4(_uLightViewProj, 1, false, p);
+                    _gl.UniformMatrix4(_uLightViewProj, 1, true, p);
             }
             _gl.ActiveTexture(GLEnum.Texture1);
             _gl.BindTexture(GLEnum.Texture2D, _shadowTexture);
@@ -185,9 +187,9 @@ public sealed class OpenGLRenderer : IRenderer
             var mvp = proj * view * model;
 
             CopyMatrixToBuffer(mvp);
-            unsafe { fixed (float* pmvp = _matrixBuffer) _gl.UniformMatrix4(_uMVP, 1, false, pmvp); }
+            unsafe { fixed (float* pmvp = _matrixBuffer) _gl.UniformMatrix4(_uMVP, 1, true, pmvp); }
             CopyMatrixToBuffer(model);
-            unsafe { fixed (float* pmodel = _matrixBuffer) _gl.UniformMatrix4(_uModel, 1, false, pmodel); }
+            unsafe { fixed (float* pmodel = _matrixBuffer) _gl.UniformMatrix4(_uModel, 1, true, pmodel); }
             _gl.Uniform4(_uMaterialColor, material.Albedo.X, material.Albedo.Y, material.Albedo.Z, 1.0f);
             _gl.Uniform1(_uRoughness, material.Roughness);
             _gl.Uniform1(_uMetallic, material.Metallic);
