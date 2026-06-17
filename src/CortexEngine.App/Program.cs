@@ -13,6 +13,7 @@ using Engine.Graphics;
 using Engine.Graphics.Loaders;
 using Engine.Graphics.RaylibBackend;
 using Engine.Graphics.Vulkan;
+using Engine.Physics;
 using Flecs.NET.Core;
 
 namespace CortexEngine.App;
@@ -38,6 +39,7 @@ class Program
 
             using var world = World.Create();
             var timing = new Timing();
+            using var physicsWorld = new PhysicsWorld();
 
             RaylibBackendRegistrar.EnsureRegistered();
             VulkanBackendRegistrar.EnsureRegistered();
@@ -238,15 +240,21 @@ class Program
                     }
                 }
 
-                // Slowly rotate the model so we can see it in 3D, unless the camera tour or test scene is active.
-                if (!cameraTour && !testScene)
+                // Physics: create bodies, step, sync transforms
+                if (!cameraTour)
                 {
-                    var modelEntity = world.Lookup("CubeCenter");
-                    if (modelEntity.Id != 0)
+                    world.Each((Entity e, ref RigidBody rb, ref Transform t) =>
                     {
-                        ref var modelTransform = ref modelEntity.Ensure<Transform>();
-                        modelTransform.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, (float)timing.TotalTime * 0.5f);
-                    }
+                        if (!rb.IsInitialized)
+                        {
+                            physicsWorld.CreateBody(e, rb, t);
+                            rb.IsInitialized = true;
+                            e.Set(rb);
+                        }
+                    });
+
+                    physicsWorld.Update((float)timing.DeltaTime);
+                    physicsWorld.SyncTransforms(world);
                 }
 
                 // Capture a demo screenshot after the scene warms up (non-tour mode only).
@@ -295,14 +303,12 @@ class Program
 
         var cubes = new (string name, Vector3 pos, Vector3 color, float scale, float rough, float metal)[]
         {
-            ("CubeCenter", new Vector3(0, 0.5f, 0), new Vector3(0.9f, 0.6f, 0.3f), 0.5f, 0.3f, 0.1f),
-            ("CubeRed", new Vector3(2, 0.5f, 0), new Vector3(0.85f, 0.15f, 0.15f), 0.5f, 0.4f, 0.2f),
-            ("CubeGreen", new Vector3(-2, 0.5f, 0), new Vector3(0.2f, 0.8f, 0.3f), 0.5f, 0.5f, 0.0f),
-            ("CubeBlue", new Vector3(0, 0.5f, 3), new Vector3(0.2f, 0.4f, 0.9f), 0.6f, 0.2f, 0.3f),
-            ("CubeYellow", new Vector3(0, 0.5f, -3), new Vector3(0.95f, 0.85f, 0.2f), 0.5f, 0.6f, 0.0f),
-            ("CubeOrange", new Vector3(-3, 0.5f, 3), new Vector3(0.95f, 0.5f, 0.1f), 0.45f, 0.5f, 0.1f),
-            ("CubeWide", new Vector3(-1.5f, 0.5f, -1.5f), new Vector3(0.5f, 0.5f, 0.6f), 0.8f, 0.8f, 0.0f),
-            ("CubeSmallGold", new Vector3(5, 0.3f, -2), new Vector3(1.0f, 0.8f, 0.3f), 0.3f, 0.15f, 1.0f),
+            ("CubeCenter", new Vector3(0, 5f, 0), new Vector3(0.9f, 0.6f, 0.3f), 0.5f, 0.3f, 0.1f),
+            ("CubeRed", new Vector3(0.3f, 7f, 0.3f), new Vector3(0.85f, 0.15f, 0.15f), 0.5f, 0.4f, 0.2f),
+            ("CubeGreen", new Vector3(-0.3f, 9f, -0.3f), new Vector3(0.2f, 0.8f, 0.3f), 0.5f, 0.5f, 0.0f),
+            ("CubeBlue", new Vector3(0.1f, 11f, 0.1f), new Vector3(0.2f, 0.4f, 0.9f), 0.6f, 0.2f, 0.3f),
+            ("CubeYellow", new Vector3(-0.2f, 13f, 0.2f), new Vector3(0.95f, 0.85f, 0.2f), 0.5f, 0.6f, 0.0f),
+            ("CubeOrange", new Vector3(0.15f, 15f, -0.1f), new Vector3(0.95f, 0.5f, 0.1f), 0.45f, 0.5f, 0.1f),
         };
 
         foreach (var (name, pos, color, scale, rough, metal) in cubes)
@@ -310,18 +316,15 @@ class Program
             world.Entity(name)
                 .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
                 .Set(mesh)
-                .Set(new Material(color, roughness: rough, metallic: metal));
+                .Set(new Material(color, roughness: rough, metallic: metal))
+                .Set(RigidBody.DynamicBox(new Vector3(scale), mass: scale * 2f));
         }
 
         var spheres = new (string name, Vector3 pos, Vector3 color, float scale, float rough, float metal)[]
         {
-            ("SphereGold",   new Vector3(-5, 0.5f, -2), new Vector3(1.0f, 0.85f, 0.4f),  1.0f, 0.1f, 1.0f),
-            ("SphereChrome", new Vector3(-6, 0.5f, 0),  new Vector3(0.9f, 0.9f, 0.95f), 1.0f, 0.05f, 1.0f),
-            ("SphereRed",    new Vector3(-5, 0.5f, 2),  new Vector3(0.9f, 0.1f, 0.1f),  1.0f, 0.4f, 0.0f),
-            ("SphereBlue",   new Vector3(5, 0.5f, 2),   new Vector3(0.1f, 0.3f, 0.9f),  1.0f, 0.2f, 0.5f),
-            ("SphereGreen",  new Vector3(6, 0.5f, 0),   new Vector3(0.1f, 0.8f, 0.3f),  1.0f, 0.7f, 0.0f),
-            ("SphereWhite",  new Vector3(5, 0.5f, -4),  new Vector3(0.95f, 0.95f, 0.95f), 1.0f, 0.3f, 0.0f),
-            ("SphereRough",  new Vector3(3, 0.5f, 5),   new Vector3(0.6f, 0.4f, 0.2f),  1.0f, 0.9f, 0.0f),
+            ("SphereGold",   new Vector3(3, 6f, -2), new Vector3(1.0f, 0.85f, 0.4f),  1.0f, 0.1f, 1.0f),
+            ("SphereChrome", new Vector3(-3, 8f, 0),  new Vector3(0.9f, 0.9f, 0.95f), 1.0f, 0.05f, 1.0f),
+            ("SphereRed",    new Vector3(3, 10f, 2),  new Vector3(0.9f, 0.1f, 0.1f),  1.0f, 0.4f, 0.0f),
         };
 
         foreach (var (name, pos, color, scale, rough, metal) in spheres)
@@ -329,26 +332,25 @@ class Program
             world.Entity(name)
                 .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
                 .Set(sphere)
-                .Set(new Material(color, roughness: rough, metallic: metal));
+                .Set(new Material(color, roughness: rough, metallic: metal))
+                .Set(RigidBody.DynamicSphere(scale * 0.5f, mass: scale));
         }
 
-        // Torus knot with checker texture
         world.Entity("TorusKnot")
-            .Set(new Transform(new Vector3(0, 2.0f, 0), Quaternion.Identity, new Vector3(1.5f)))
+            .Set(new Transform(new Vector3(0, 0.5f, -6), Quaternion.Identity, new Vector3(1.5f)))
             .Set(torusKnot)
             .Set(new Material(new Vector3(0.9f, 0.9f, 0.9f), roughness: 0.25f, metallic: 0.6f, texturePath: "Content/checker.png"));
 
-        // Textured cube
         world.Entity("CubeTextured")
             .Set(new Transform(new Vector3(-4, 0.5f, -3), Quaternion.Identity, new Vector3(0.7f)))
             .Set(mesh)
             .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.4f, metallic: 0.0f, texturePath: "Content/checker.png"));
 
-        // Floor plane for shadow visibility
         world.Entity("Floor")
             .Set(new Transform(new Vector3(0, -0.02f, 0), Quaternion.Identity, new Vector3(20, 1, 20)))
             .Set(mesh)
-            .Set(new Material(new Vector3(0.45f, 0.45f, 0.5f), roughness: 0.8f, metallic: 0.0f));
+            .Set(new Material(new Vector3(0.45f, 0.45f, 0.5f), roughness: 0.8f, metallic: 0.0f))
+            .Set(RigidBody.StaticPlane(20f));
 
         world.Entity("Grid")
             .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))

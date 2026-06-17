@@ -723,7 +723,8 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 - [ ] **Vulkan backend reintegration** — see §3.3 checklist. Compiles but untested.
     Kept architecturally compatible via `IWindow` / `IRenderContext` / `IRenderer`.
     Deferred because Raylib covers all current needs with far less complexity.
-- [ ] Physics (JoltPhysicsSharp)
+- [x] Physics (JoltPhysicsSharp 2.21.0) — Engine.Physics project, PhysicsWorld wrapper,
+  RigidBody ECS component, dynamic boxes/spheres with gravity, static floor, transform sync
 - [ ] AI hot-reload of C# scripts (Roslyn — conflicts with NativeAOT)
 - [ ] Semantic segmentation maps for MMLM vision input
 

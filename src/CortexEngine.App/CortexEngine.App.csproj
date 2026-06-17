@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Engine.Graphics.Raylib\Engine.Graphics.Raylib.csproj" />
     <ProjectReference Include="..\Engine.Graphics.Vulkan\Engine.Graphics.Vulkan.csproj" />
     <ProjectReference Include="..\Engine.AI\Engine.AI.csproj" />
+    <ProjectReference Include="..\Engine.Physics\Engine.Physics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
