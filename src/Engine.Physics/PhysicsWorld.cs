@@ -46,6 +46,11 @@ public sealed class PhysicsWorld : IDisposable
         _broadPhaseLayerInterface.MapObjectToBroadPhaseLayer(Layers.Moving, new BroadPhaseLayer(1));
 
         _objectLayerPairFilter = new ObjectLayerPairFilterTable(2);
+        // Explicitly enable all collision pairs
+        _objectLayerPairFilter.EnableCollision(Layers.NonMoving, Layers.NonMoving);
+        _objectLayerPairFilter.EnableCollision(Layers.NonMoving, Layers.Moving);
+        _objectLayerPairFilter.EnableCollision(Layers.Moving, Layers.NonMoving);
+        _objectLayerPairFilter.EnableCollision(Layers.Moving, Layers.Moving);
 
         _objectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterTable(
             _broadPhaseLayerInterface, 2, _objectLayerPairFilter, 2);

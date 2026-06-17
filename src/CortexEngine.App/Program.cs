@@ -322,7 +322,7 @@ class Program
                 .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
                 .Set(mesh)
                 .Set(new Material(color, roughness: rough, metallic: metal))
-                .Set(RigidBody.DynamicBox(new Vector3(scale), mass: scale * 2f));
+                .Set(RigidBody.DynamicBox(new Vector3(scale * 0.5f), mass: scale * 2f));
         }
 
         var spheres = new (string name, Vector3 pos, Vector3 color, float scale, float rough, float metal)[]
@@ -352,7 +352,7 @@ class Program
             .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.4f, metallic: 0.0f, texturePath: "Content/checker.png"));
 
         world.Entity("Floor")
-            .Set(new Transform(new Vector3(0, -0.02f, 0), Quaternion.Identity, new Vector3(20, 1, 20)))
+            .Set(new Transform(new Vector3(0, -0.5f, 0), Quaternion.Identity, new Vector3(20, 0.5f, 20)))
             .Set(mesh)
             .Set(new Material(new Vector3(0.45f, 0.45f, 0.5f), roughness: 0.8f, metallic: 0.0f))
             .Set(RigidBody.StaticPlane(20f));
