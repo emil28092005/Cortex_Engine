@@ -444,7 +444,43 @@ float CalculateShadow(vec3 worldPos){
     return s/9.0;
 }
 void main(){
-    finalColor=vec4(0.5,0.3,0.1,1.0);
+    vec3 normal=normalize(vNormal);
+    vec3 albedo=pow(vColor.rgb*materialColor.rgb,vec3(2.2));
+    vec3 viewDir=normalize(viewPos-vWorldPos);
+    float rough=clamp(roughness,0.05,1.0);
+    float metal=clamp(metallic,0.0,1.0);
+    vec3 skyColor=ambientColor;
+    vec3 groundColor=ambientColor*0.2;
+    float hemisphere=0.5+0.5*normal.y;
+    vec3 result=albedo*mix(groundColor,skyColor,hemisphere)*0.4;
+    float shadow=1.0;
+    if(lightCount>0&&lightTypes[0]==0) shadow=CalculateShadow(vWorldPos);
+    vec3 F0=mix(vec3(0.04),albedo,metal);
+    float shininess=mix(8.0,256.0,1.0-rough);
+    for(int i=0;i<lightCount;i++){
+        vec3 L; float atten=1.0;
+        if(lightTypes[i]==1){
+            vec3 toLight=lightPositions[i]-vWorldPos;
+            float dist=length(toLight);
+            L=toLight/max(dist,0.001);
+            atten=Attenuation(dist,lightRanges[i]);
+        } else { L=normalize(-lightDirs[i]); }
+        float lightShadow=(i==0&&lightTypes[0]==0)?shadow:1.0;
+        vec3 H=normalize(L+viewDir);
+        float NdotL=max(dot(normal,L),0.0);
+        float NdotH=max(dot(normal,H),0.0);
+        float HdotV=max(dot(H,viewDir),0.0);
+        float spec=pow(NdotH,shininess);
+        vec3 fresnel=F0+(1.0-F0)*pow(1.0-HdotV,5.0);
+        vec3 specColor=mix(fresnel,albedo*fresnel,metal);
+        vec3 diffuse=albedo*lightColors[i]*NdotL*lightIntensities[i]*atten*1.5*lightShadow;
+        vec3 specular=specColor*spec*lightIntensities[i]*atten*lightShadow;
+        diffuse*=(1.0-fresnel*(1.0-metal*0.5));
+        result+=diffuse+specular;
+    }
+    result=ACESFilm(result*1.2);
+    result=pow(result,vec3(1.0/2.2));
+    finalColor=vec4(result,1.0);
 }";
 
     private readonly record struct GLMesh(uint Vao, int IndexCount);

@@ -45,7 +45,7 @@ class Program
             RaylibBackendRegistrar.EnsureRegistered();
             VulkanBackendRegistrar.EnsureRegistered();
             OpenGLBackendRegistrar.EnsureRegistered();
-            using var renderContext = RenderBackendFactory.Create("opengl", 1280, 720, enableValidation: false);
+            using var renderContext = RenderBackendFactory.Create("raylib", 1280, 720, enableValidation: false);
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
