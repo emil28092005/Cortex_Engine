@@ -1,16 +1,12 @@
+using System;
+using System.Collections.Generic;
 using Engine.Core;
-using Engine.Core.Components;
 using Silk.NET.Input;
+using Silk.NET.Windowing;
 using SilkWindow = Silk.NET.Windowing.IWindow;
-using SilkKey = Silk.NET.Input.Key;
-using SilkMouseButton = Silk.NET.Input.MouseButton;
-using EngineKey = Engine.Core.Key;
 
 namespace Engine.Graphics.OpenGL;
 
-/// <summary>
-/// Silk.NET windowing-backed implementation of IWindow.
-/// </summary>
 public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
 {
     private readonly SilkWindow _silkWindow;
@@ -23,7 +19,6 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
     public bool ShouldClose => _shouldClose || _silkWindow.IsClosing;
     IInputState Engine.Core.IWindow.Input => _input;
     public nint Handle => 0;
-
     public SilkWindow SilkView => _silkWindow;
 
     public OpenGLWindow(string title, int width, int height)
@@ -34,7 +29,7 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
         options.VSync = true;
         options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(3, 3));
 
-        _silkWindow = Silk.NET.Windowing.Window.Create(options);
+        _silkWindow = Window.Create(options);
         _silkWindow.Closing += () => _shouldClose = true;
     }
 
@@ -44,13 +39,8 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
         _input.Initialize(inputContext);
     }
 
-    public void PumpEvents()
-    {
-        _silkWindow.DoEvents();
-    }
-
+    public void PumpEvents() => _silkWindow.DoEvents();
     public void Close() => _shouldClose = true;
-
     public string[] GetRequiredVulkanExtensions() => Array.Empty<string>();
 
     public void Dispose()
@@ -61,4 +51,3 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
         _silkWindow.Dispose();
     }
 }
-

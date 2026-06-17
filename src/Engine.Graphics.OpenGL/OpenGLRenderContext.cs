@@ -5,9 +5,6 @@ using SilkWindow = Silk.NET.Windowing.IWindow;
 
 namespace Engine.Graphics.OpenGL;
 
-/// <summary>
-/// OpenGL render context using Silk.NET — owns the window and GL context.
-/// </summary>
 public sealed class OpenGLRenderContext : IRenderContext
 {
     private readonly OpenGLWindow _window;
@@ -22,9 +19,6 @@ public sealed class OpenGLRenderContext : IRenderContext
         _window = new OpenGLWindow("Cortex Engine (OpenGL)", width, height);
     }
 
-    /// <summary>
-    /// Called after the Silk.NET window has loaded its OpenGL context.
-    /// </summary>
     public void OnLoad()
     {
         _gl = _window.SilkView.CreateOpenGL();
@@ -39,7 +33,7 @@ public sealed class OpenGLRenderContext : IRenderContext
 
     public void Resize(int width, int height)
     {
-        // Silk.NET handles resize internally
+        _renderer?.SetScreenSize(width, height);
     }
 
     public void Dispose()

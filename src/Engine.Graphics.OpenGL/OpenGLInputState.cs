@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Engine.Core;
 using Silk.NET.Input;
+using System.Numerics;
 
 namespace Engine.Graphics.OpenGL;
 
@@ -26,14 +27,14 @@ public sealed class OpenGLInputState : IInputState
         if (input.Keyboards.Count > 0)
         {
             _keyboard = input.Keyboards[0];
-            _keyboard.KeyDown += (key, _) =>
+            _keyboard.KeyDown += (kb, key, scancode) =>
             {
                 var k = SilkToKey(key);
                 if (k == Engine.Core.Key.Unknown) return;
                 if (!_keysDown.Contains(k)) _keysPressed.Add(k);
                 _keysDown.Add(k);
             };
-            _keyboard.KeyUp += (key, _) =>
+            _keyboard.KeyUp += (kb, key, scancode) =>
             {
                 var k = SilkToKey(key);
                 if (k == Engine.Core.Key.Unknown) return;
@@ -44,18 +45,20 @@ public sealed class OpenGLInputState : IInputState
         if (input.Mice.Count > 0)
         {
             _mouse = input.Mice[0];
-            _mouse.MouseMove += m => { MouseX = (int)m.Position.X; MouseY = (int)m.Position.Y; };
-            _mouse.MouseDown += btn => {
-                if (btn == SilkMouseButton.Left) _mouseLeft = true;
-                if (btn == SilkMouseButton.Right) _mouseRight = true;
-                if (btn == SilkMouseButton.Middle) _mouseMiddle = true;
+            _mouse.MouseMove += (m, pos) => { MouseX = (int)pos.X; MouseY = (int)pos.Y; };
+            _mouse.MouseDown += (m, btn) =>
+            {
+                if (btn == MouseButton.Left) _mouseLeft = true;
+                if (btn == MouseButton.Right) _mouseRight = true;
+                if (btn == MouseButton.Middle) _mouseMiddle = true;
             };
-            _mouse.MouseUp += btn => {
-                if (btn == SilkMouseButton.Left) _mouseLeft = false;
-                if (btn == SilkMouseButton.Right) _mouseRight = false;
-                if (btn == SilkMouseButton.Middle) _mouseMiddle = false;
+            _mouse.MouseUp += (m, btn) =>
+            {
+                if (btn == MouseButton.Left) _mouseLeft = false;
+                if (btn == MouseButton.Right) _mouseRight = false;
+                if (btn == MouseButton.Middle) _mouseMiddle = false;
             };
-            _mouse.Scroll += (_, y) => _mouseWheelDelta += (float)y;
+            _mouse.Scroll += (m, wheel) => _mouseWheelDelta += (float)wheel.Y;
         }
     }
 
