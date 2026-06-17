@@ -133,7 +133,10 @@ public sealed class RaylibRenderer : IRenderer
             Raylib.BeginMode3D(shadowCamera);
 
             // Grab light view/proj matrices AFTER BeginMode3D (like official example)
-            lightViewProj = Rlgl.GetMatrixModelview() * Rlgl.GetMatrixProjection();
+            // Raylib matrices are row-major, need to transpose for OpenGL (column-major)
+            var lv = Rlgl.GetMatrixModelview();
+            var lp = Rlgl.GetMatrixProjection();
+            lightViewProj = Matrix4x4.Transpose(lv * lp);
 
             // Draw all shadow casters with the simple shadow shader
             world.Each((Entity e, ref EngineMesh mesh, ref EngineTransform transform) =>
@@ -175,16 +178,11 @@ public sealed class RaylibRenderer : IRenderer
         if (hasDirectionalLight && _lightViewProjLoc >= 0)
         {
             Raylib.SetShaderValueMatrix(_shader, _lightViewProjLoc, lightViewProj);
-            // Bind shadow map on texture unit 1, tell shader sampler to use it
-            if (_shadowMapLoc >= 0)
-            {
-                Rlgl.ActiveTextureSlot(1);
-                Rlgl.EnableTexture(_shadowDepthTex);
-                Raylib.SetShaderValue(_shader, _shadowMapLoc, 1, ShaderUniformDataType.Int);
-            }
         }
 
         Rlgl.DisableBackfaceCulling();
+
+        var shadowTex = new Texture2D { Id = _shadowDepthTex, Width = ShadowMapSize, Height = ShadowMapSize, Mipmaps = 1, Format = PixelFormat.UncompressedR16 };
 
         world.Each((Entity e, ref EngineMesh mesh, ref EngineTransform transform) =>
         {
@@ -199,7 +197,23 @@ public sealed class RaylibRenderer : IRenderer
             {
                 var (axis, angle) = QuaternionToAxisAngle(rotation);
                 SetMaterialUniforms(material, model);
+
+                // Bind shadow map on Emission slot (texture unit 1) for each entity
+                if (hasDirectionalLight && _shadowMapLoc >= 0)
+                {
+                    unsafe { Raylib.SetMaterialTexture(ref model.Materials[0], MaterialMapIndex.Emission, shadowTex); }
+                }
+
                 Raylib.DrawModelEx(model, position, axis, angle * 180.0f / MathF.PI, scale, Color.White);
+
+                // Re-bind shadow map on unit 1 after DrawModelEx (it may have reset texture state)
+                if (hasDirectionalLight && _shadowMapLoc >= 0)
+                {
+                    Rlgl.ActiveTextureSlot(1);
+                    Rlgl.EnableTexture(_shadowDepthTex);
+                    Raylib.SetShaderValue(_shader, _shadowMapLoc, 1, ShaderUniformDataType.Int);
+                    Rlgl.ActiveTextureSlot(0);
+                }
             }
         });
 
