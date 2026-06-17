@@ -80,6 +80,7 @@ internal static unsafe class Vk
     public static PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
     public static PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
     public static PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
+    public static PFN_vkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
     public static PFN_vkCmdClearColorImage vkCmdClearColorImage;
     public static PFN_vkCmdPushConstants vkCmdPushConstants;
     public static PFN_vkCreateSampler vkCreateSampler;
@@ -186,6 +187,7 @@ internal static unsafe class Vk
         vkCmdPipelineBarrier = VulkanNative.LoadDeviceFunction<PFN_vkCmdPipelineBarrier>(device, "vkCmdPipelineBarrier");
         vkCmdCopyBuffer = VulkanNative.LoadDeviceFunction<PFN_vkCmdCopyBuffer>(device, "vkCmdCopyBuffer");
         vkCmdCopyBufferToImage = VulkanNative.LoadDeviceFunction<PFN_vkCmdCopyBufferToImage>(device, "vkCmdCopyBufferToImage");
+        vkCmdCopyImageToBuffer = VulkanNative.LoadDeviceFunction<PFN_vkCmdCopyImageToBuffer>(device, "vkCmdCopyImageToBuffer");
         vkCmdClearColorImage = VulkanNative.LoadDeviceFunction<PFN_vkCmdClearColorImage>(device, "vkCmdClearColorImage");
         vkCmdPushConstants = VulkanNative.LoadDeviceFunction<PFN_vkCmdPushConstants>(device, "vkCmdPushConstants");
         vkCreateSampler = VulkanNative.LoadDeviceFunction<PFN_vkCreateSampler>(device, "vkCreateSampler");
@@ -385,6 +387,8 @@ unsafe internal delegate void PFN_vkCmdPipelineBarrier(VkCommandBuffer commandBu
 unsafe internal delegate void PFN_vkCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint regionCount, VkBufferCopy* pRegions);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
 unsafe internal delegate void PFN_vkCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage, int dstImageLayout, uint regionCount, VkBufferImageCopy* pRegions);
+[UnmanagedFunctionPointer(CallingConvention.Winapi)]
+unsafe internal delegate void PFN_vkCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, int srcImageLayout, VkBuffer dstBuffer, uint regionCount, VkBufferImageCopy* pRegions);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
 unsafe internal delegate void PFN_vkCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, int imageLayout, VkClearColorValue* pColor, uint rangeCount, VkImageSubresourceRange* pRanges);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]

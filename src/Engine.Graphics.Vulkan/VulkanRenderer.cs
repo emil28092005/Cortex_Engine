@@ -33,9 +33,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
     private bool _screenshotRequested;
     private string _screenshotPath = "";
     private TaskCompletionSource<byte[]>? _screenshotTcs;
-    private byte[]? _screenshotData;
-    private int _screenshotWidth;
-    private int _screenshotHeight;
+
+    private VulkanBuffer? _screenshotStaging;
+    private uint _screenshotImageIndex;
+    private bool _screenshotPending;
 
     public bool IsScreenshotRequested => _screenshotRequested;
     public IScreenshotProvider ScreenshotProvider => this;
@@ -194,6 +195,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
         VkFence fence = _inFlightFences[_currentFrame];
         Vk.CheckResult(Vk.vkWaitForFences(_ctx.Device, 1, &fence, 1, ulong.MaxValue), "vkWaitForFences");
 
+        if (_screenshotPending && _screenshotStaging != null)
+        {
+            FinishScreenshot();
+        }
+
         uint imageIndex = 0;
         VkSemaphore imgAvailSem = _imageAvailableSemaphores[_currentFrame];
         var acquireResult = Vk.vkAcquireNextImageKHR(_ctx.Device, _swapchain.Swapchain, ulong.MaxValue,
@@ -265,23 +271,90 @@ internal sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
         }
 
         _currentFrame = (_currentFrame + 1) % MaxFramesInFlight;
+    }
 
-        if (_screenshotRequested)
+    private unsafe void FinishScreenshot()
+    {
+        try
         {
-            try
+            var width = _swapchain.Extent.width;
+            var height = _swapchain.Extent.height;
+
+            var dir = Path.GetDirectoryName(_screenshotPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var src = (byte*)_screenshotStaging!.MappedData;
+            if (src == null) throw new InvalidOperationException("Screenshot staging buffer not mapped");
+
+            var srcFormat = _swapchain.ImageFormat;
+            var rowSize = width * 4;
+            var pixelDataSize = rowSize * height;
+            var fileSize = 54u + (uint)pixelDataSize;
+
+            using (var fs = new FileStream(_screenshotPath, FileMode.Create))
+            using (var bw = new BinaryWriter(fs))
             {
-                var dir = Path.GetDirectoryName(_screenshotPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                File.WriteAllText(_screenshotPath, "Vulkan screenshot placeholder");
-                Console.WriteLine($"Screenshot saved: {_screenshotPath}");
+                bw.Write((byte)'B');
+                bw.Write((byte)'M');
+                bw.Write(fileSize);
+                bw.Write(0u);
+                bw.Write(54u);
+                bw.Write(40u);
+                bw.Write((uint)width);
+                bw.Write((uint)height);
+                bw.Write((ushort)1);
+                bw.Write((ushort)32);
+                bw.Write((uint)pixelDataSize);
+                bw.Write(0u);
+                bw.Write(0u);
+                bw.Write(0u);
+                bw.Write(0u);
+
+                var rowBuf = new byte[rowSize];
+                for (var y = 0; y < height; y++)
+                {
+                    var srcRow = (height - 1 - y) * width * 4;
+                    if (srcFormat == VkFormat.B8G8R8A8Srgb || srcFormat == VkFormat.B8G8R8A8Unorm)
+                    {
+                        for (var x = 0; x < width; x++)
+                        {
+                            rowBuf[x * 4 + 0] = src[srcRow + x * 4 + 0];
+                            rowBuf[x * 4 + 1] = src[srcRow + x * 4 + 1];
+                            rowBuf[x * 4 + 2] = src[srcRow + x * 4 + 2];
+                            rowBuf[x * 4 + 3] = src[srcRow + x * 4 + 3];
+                        }
+                    }
+                    else
+                    {
+                        for (var x = 0; x < width; x++)
+                        {
+                            rowBuf[x * 4 + 0] = src[srcRow + x * 4 + 2];
+                            rowBuf[x * 4 + 1] = src[srcRow + x * 4 + 1];
+                            rowBuf[x * 4 + 2] = src[srcRow + x * 4 + 0];
+                            rowBuf[x * 4 + 3] = src[srcRow + x * 4 + 3];
+                        }
+                    }
+                    bw.Write(rowBuf, 0, rowSize);
+                }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Screenshot save failed: {ex.Message}");
-            }
-            _screenshotRequested = false;
+
+            _screenshotStaging.Dispose();
+            _screenshotStaging = null;
+            _screenshotPending = false;
+
+            Console.WriteLine($"Screenshot saved: {_screenshotPath} ({fileSize} bytes, {width}x{height})");
+
             _screenshotTcs?.TrySetResult(Array.Empty<byte>());
+            _screenshotTcs = null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Screenshot capture failed: {ex}");
+            _screenshotStaging?.Dispose();
+            _screenshotStaging = null;
+            _screenshotPending = false;
+            _screenshotTcs?.TrySetException(ex);
             _screenshotTcs = null;
         }
     }
@@ -464,6 +537,95 @@ internal sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
         });
 
         Vk.vkCmdEndRenderPass(cmd);
+
+        if (_screenshotRequested)
+        {
+            var width = _swapchain.Extent.width;
+            var height = _swapchain.Extent.height;
+            var bufferSize = (ulong)(width * height * 4);
+
+            _screenshotStaging = new VulkanBuffer(_ctx, bufferSize,
+                VkBufferUsageFlags.TransferDst,
+                VkMemoryPropertyFlags.HostVisible | VkMemoryPropertyFlags.HostCoherent);
+            _screenshotImageIndex = imageIndex;
+            _screenshotPending = true;
+            _screenshotRequested = false;
+
+            var barrier = new VkImageMemoryBarrier
+            {
+                sType = VkStructureType.ImageMemoryBarrier,
+                pNext = null,
+                srcAccessMask = VkAccessFlags.ColorAttachmentWrite,
+                dstAccessMask = VkAccessFlags.TransferRead,
+                oldLayout = VkImageLayout.PresentSrcKHR,
+                newLayout = VkImageLayout.TransferSrcOptimal,
+                srcQueueFamilyIndex = ~0u,
+                dstQueueFamilyIndex = ~0u,
+                image = _swapchain.SwapchainImages[imageIndex],
+                subresourceRange = new VkImageSubresourceRange
+                {
+                    aspectMask = VkImageAspectFlags.Color,
+                    baseMipLevel = 0,
+                    levelCount = 1,
+                    baseArrayLayer = 0,
+                    layerCount = 1
+                }
+            };
+
+            Vk.vkCmdPipelineBarrier(cmd,
+                VkPipelineStageFlags.ColorAttachmentOutput,
+                VkPipelineStageFlags.Transfer,
+                0, 0, null, 0, null, 1, &barrier);
+
+            var region = new VkBufferImageCopy
+            {
+                bufferOffset = 0,
+                bufferRowLength = (uint)width,
+                bufferImageHeight = (uint)height,
+                imageSubresource = new VkImageSubresourceLayers
+                {
+                    aspectMask = VkImageAspectFlags.Color,
+                    mipLevel = 0,
+                    baseArrayLayer = 0,
+                    layerCount = 1
+                },
+                imageOffset = new VkOffset3D { x = 0, y = 0, z = 0 },
+                imageExtent = new VkExtent3D { width = width, height = height, depth = 1 }
+            };
+
+            var stagingBuf = _screenshotStaging.Buffer;
+            Vk.vkCmdCopyImageToBuffer(cmd,
+                _swapchain.SwapchainImages[imageIndex],
+                (int)VkImageLayout.TransferSrcOptimal,
+                stagingBuf, 1, &region);
+
+            var barrier2 = new VkImageMemoryBarrier
+            {
+                sType = VkStructureType.ImageMemoryBarrier,
+                pNext = null,
+                srcAccessMask = VkAccessFlags.TransferRead,
+                dstAccessMask = VkAccessFlags.MemoryRead,
+                oldLayout = VkImageLayout.TransferSrcOptimal,
+                newLayout = VkImageLayout.PresentSrcKHR,
+                srcQueueFamilyIndex = ~0u,
+                dstQueueFamilyIndex = ~0u,
+                image = _swapchain.SwapchainImages[imageIndex],
+                subresourceRange = new VkImageSubresourceRange
+                {
+                    aspectMask = VkImageAspectFlags.Color,
+                    baseMipLevel = 0,
+                    levelCount = 1,
+                    baseArrayLayer = 0,
+                    layerCount = 1
+                }
+            };
+
+            Vk.vkCmdPipelineBarrier(cmd,
+                VkPipelineStageFlags.Transfer,
+                VkPipelineStageFlags.BottomOfPipe,
+                0, 0, null, 0, null, 1, &barrier2);
+        }
+
         Vk.CheckResult(Vk.vkEndCommandBuffer(cmd), "vkEndCommandBuffer");
     }
 
