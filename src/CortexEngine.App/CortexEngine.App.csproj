@@ -22,11 +22,16 @@
   <ItemGroup>
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
     <ProjectReference Include="..\Engine.Graphics\Engine.Graphics.csproj" />
-    <ProjectReference Include="..\Engine.Graphics.Raylib\Engine.Graphics.Raylib.csproj" />
     <ProjectReference Include="..\Engine.Graphics.Vulkan\Engine.Graphics.Vulkan.csproj" />
     <ProjectReference Include="..\Engine.AI\Engine.AI.csproj" />
     <ProjectReference Include="..\Engine.Physics\Engine.Physics.csproj" />
-    <ProjectReference Include="..\Engine.Graphics.OpenTK\Engine.Graphics.OpenTK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\Engine.Graphics.Vulkan\Shaders\*.spv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Shaders\%(Filename)%(Extension)</Link>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

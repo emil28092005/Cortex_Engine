@@ -11,8 +11,6 @@ using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
 using Engine.Graphics.Loaders;
-using Engine.Graphics.OpenTK;
-using Engine.Graphics.RaylibBackend;
 using Engine.Graphics.Vulkan;
 using Engine.Physics;
 using Flecs.NET.Core;
@@ -23,7 +21,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-            Console.WriteLine("Cortex Engine — Materials, Grid, Lighting, FreeFly Camera...");
+        Console.WriteLine("Cortex Engine — Vulkan Backend, Pure P/Invoke...");
 
         try
         {
@@ -42,25 +40,11 @@ class Program
             var timing = new Timing();
             using var physicsWorld = new PhysicsWorld();
 
-            RaylibBackendRegistrar.EnsureRegistered();
             VulkanBackendRegistrar.EnsureRegistered();
-            OpenTKBackendRegistrar.EnsureRegistered();
-            using var renderContext = RenderBackendFactory.Create("raylib", 1280, 720, enableValidation: false);
+            using var renderContext = RenderBackendFactory.Create("vulkan", 1280, 720, enableValidation: true);
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
-
-            // ImGui editor layer (Raylib only)
-            ImGuiLayer? imGuiLayer = null;
-            var objectManipulator = new ObjectManipulator();
-            objectManipulator.SetImGuiAvailable(false);
-            if (!cameraTour && renderer is RaylibRenderer rlRenderer)
-            {
-                imGuiLayer = new ImGuiLayer();
-                imGuiLayer.Initialize();
-                rlRenderer.ImGuiLayer = imGuiLayer;
-                objectManipulator.SetImGuiAvailable(true);
-            }
 
             var (modelPath, mcpPort) = ParseArgs(args);
             var mesh = LoadModel(modelPath);
@@ -108,7 +92,6 @@ class Program
 
             if (mcpPort > 0)
             {
-                // Start the MCP server in the background so AI agents can connect via HTTP.
                 mcpApp = McpEngineServerHost.Create(args, queue, port: mcpPort);
                 mcpTask = mcpApp.RunAsync();
                 _ = mcpTask.ContinueWith(t =>
@@ -128,7 +111,6 @@ class Program
                 Console.WriteLine("MCP server disabled (--mcp-port 0).");
             }
 #endif
-
 
             var frames = 0;
             var lastFpsTime = 0.0;
@@ -177,7 +159,6 @@ class Program
                 window.PumpEvents();
                 input.BeginFrame();
 
-                // Drain any commands that arrived from the MCP server.
                 var processed = queue.ProcessPending();
                 if (processed > 0)
                     Console.WriteLine($"Processed {processed} AI command(s)");
@@ -191,7 +172,6 @@ class Program
                     camera.AspectRatio = (float)lastWidth / lastHeight;
                 }
 
-                // Toggle camera controller on F key press.
                 if (input.IsKeyPressed(Key.F))
                 {
                     activeControllerIndex = (activeControllerIndex + 1) % cameraControllers.Length;
@@ -199,7 +179,6 @@ class Program
                     Console.WriteLine($"Active camera controller: {cameraController.Name}");
                 }
 
-                // Update the active camera controller from input, unless the camera tour is driving the pose.
                 if (!cameraTour)
                     cameraController.Update(input, (float)timing.DeltaTime);
 
@@ -213,7 +192,6 @@ class Program
                         tourScreenshotPending = true;
                     }
 
-                    // Hold the pose for a few frames to let the GPU settle, then screenshot.
                     if (tourScreenshotPending)
                     {
                         tourSettleFrames++;
@@ -226,7 +204,6 @@ class Program
                         }
                     }
 
-                    // After the screenshot has been saved, advance to the next pose.
                     if (!tourScreenshotPending && !renderer.IsScreenshotRequested)
                     {
                         tourIndex++;
@@ -245,14 +222,6 @@ class Program
                     }
                 }
 
-                // Object manipulation (Unity-like drag)
-                if (!cameraTour)
-                {
-                    var cam = cameraEntity.Get<Camera>();
-                    objectManipulator.ProcessInput(world, cam, input);
-                }
-
-                // Physics: create bodies, step, sync transforms
                 if (!cameraTour)
                 {
                     var toInit = new List<(Entity, RigidBody, Transform)>();
@@ -270,35 +239,18 @@ class Program
                         e.Set(rb);
                     }
 
-                    // Sync dragged object to physics before stepping
-                    objectManipulator.SyncToPhysics(physicsWorld);
-
                     physicsWorld.Update((float)timing.DeltaTime);
-
-                    // Sync all transforms EXCEPT the dragged object
-                    physicsWorld.SyncTransforms(world, objectManipulator.IsDragging ? objectManipulator.GetDraggedEntity() : null);
+                    physicsWorld.SyncTransforms(world, null);
                 }
 
-                // Capture a demo screenshot after the scene warms up (non-tour mode only).
                 if (!demoScreenshotRequested && !cameraTour && frames >= 15)
                 {
                     renderer.RequestScreenshot("Screenshots/demo.png");
                     demoScreenshotRequested = true;
                 }
 
-                // Feed frame data to ImGui before rendering.
-                if (imGuiLayer != null)
-                    imGuiLayer.SetFrameData(world, timing, currentFps);
-
-            objectManipulator.SetImGuiAvailable(imGuiLayer != null);
-
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();
-
-                // Swap buffers for OpenGL backend
-                if (renderContext is OpenTKRenderContext otkCtx)
-                    otkCtx.SwapBuffers();
-                // Raylib handles swap internally in EndDrawing
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
@@ -311,7 +263,6 @@ class Program
             }
 
             Console.WriteLine("Shutting down...");
-            imGuiLayer?.Dispose();
 #if !RELEASE_AOT
             if (mcpApp != null)
                 await mcpApp.StopAsync();
@@ -369,12 +320,7 @@ class Program
         world.Entity("TorusKnot")
             .Set(new Transform(new Vector3(0, 0.5f, -6), Quaternion.Identity, new Vector3(1.5f)))
             .Set(torusKnot)
-            .Set(new Material(new Vector3(0.9f, 0.9f, 0.9f), roughness: 0.25f, metallic: 0.6f, texturePath: "Content/checker.png"));
-
-        world.Entity("CubeTextured")
-            .Set(new Transform(new Vector3(-4, 0.5f, -3), Quaternion.Identity, new Vector3(0.7f)))
-            .Set(mesh)
-            .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.4f, metallic: 0.0f, texturePath: "Content/checker.png"));
+            .Set(new Material(new Vector3(0.9f, 0.9f, 0.9f), roughness: 0.25f, metallic: 0.6f));
 
         world.Entity("Floor")
             .Set(new Transform(new Vector3(0, -0.5f, 0), Quaternion.Identity, new Vector3(20, 0.5f, 20)))
@@ -390,17 +336,16 @@ class Program
 
     private static void CreateCalibrationScene(World world, Mesh mesh)
     {
-        // Colored cubes at known world positions for visual analysis of perspective and camera movement.
         var positions = new (string name, Vector3 pos, Vector3 color)[]
         {
-            ("CubeOrigin", new Vector3(0.0f, 0.5f, 0.0f), new Vector3(1.0f, 1.0f, 1.0f)),      // white at origin
-            ("CubeRight", new Vector3(2.0f, 0.5f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f)),       // red +X
-            ("CubeLeft", new Vector3(-2.0f, 0.5f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f)),       // green -X
-            ("CubeFront", new Vector3(0.0f, 0.5f, 2.0f), new Vector3(0.0f, 0.0f, 1.0f)),       // blue +Z
-            ("CubeBack", new Vector3(0.0f, 0.5f, -2.0f), new Vector3(1.0f, 1.0f, 0.0f)),       // yellow -Z
-            ("CubeUp", new Vector3(0.0f, 2.5f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)),          // magenta +Y
-            ("CubeFar", new Vector3(0.0f, 0.5f, 8.0f), new Vector3(0.0f, 1.0f, 1.0f)),        // cyan far +Z
-            ("CubeFarLeft", new Vector3(-5.0f, 0.5f, 5.0f), new Vector3(0.5f, 0.5f, 1.0f))     // light blue far corner
+            ("CubeOrigin", new Vector3(0.0f, 0.5f, 0.0f), new Vector3(1.0f, 1.0f, 1.0f)),
+            ("CubeRight", new Vector3(2.0f, 0.5f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f)),
+            ("CubeLeft", new Vector3(-2.0f, 0.5f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f)),
+            ("CubeFront", new Vector3(0.0f, 0.5f, 2.0f), new Vector3(0.0f, 0.0f, 1.0f)),
+            ("CubeBack", new Vector3(0.0f, 0.5f, -2.0f), new Vector3(1.0f, 1.0f, 0.0f)),
+            ("CubeUp", new Vector3(0.0f, 2.5f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)),
+            ("CubeFar", new Vector3(0.0f, 0.5f, 8.0f), new Vector3(0.0f, 1.0f, 1.0f)),
+            ("CubeFarLeft", new Vector3(-5.0f, 0.5f, 5.0f), new Vector3(0.5f, 0.5f, 1.0f))
         };
 
         foreach (var (name, pos, color) in positions)
@@ -411,7 +356,6 @@ class Program
                 .Set(new Material(color, roughness: 0.5f, metallic: 0.1f));
         }
 
-        // A large reference grid at Y=0.
         world.Entity("Grid")
             .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
             .Set(ProceduralMesh.CreateGrid(20, 1.0f, new Vector3(0.5f, 0.5f, 0.55f)))
@@ -445,13 +389,12 @@ class Program
 
     private static string FindModelPath(string[] args)
     {
-        // Skip recognized flags so they are not treated as a model path.
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];
             if (arg == "--mcp-port")
             {
-                i++; // skip the value
+                i++;
                 continue;
             }
 
