@@ -241,12 +241,13 @@ internal sealed unsafe class VulkanContext : IDisposable
             var nameLen = Array.IndexOf(nameBytes, (byte)0);
             if (nameLen < 0) nameLen = 256;
             var devType = (VkPhysicalDeviceType)Marshal.ReadInt32((nint)propsBytes, 16);
-            Console.WriteLine($"[Vulkan] GPU {i}: {System.Text.Encoding.UTF8.GetString(nameBytes, 0, nameLen)} (type={devType})");
+            var gpuName = System.Text.Encoding.UTF8.GetString(nameBytes, 0, nameLen);
 
             if (best.Handle == 0 || (devType == VkPhysicalDeviceType.DiscreteGpu && bestType != VkPhysicalDeviceType.DiscreteGpu))
             {
                 best = devices[(int)i];
                 bestType = devType;
+                Console.WriteLine($"[Vulkan] Selected GPU: {gpuName} (type={devType})");
             }
         }
 
@@ -373,7 +374,6 @@ internal sealed unsafe class VulkanContext : IDisposable
             SurfaceColorSpace = formats[0].colorSpace;
         }
 
-        Console.WriteLine($"[Vulkan] Surface format: {SurfaceFormat}, color space: {SurfaceColorSpace}");
     }
 
     public uint FindMemoryType(uint memoryTypeBits, VkMemoryPropertyFlags desiredFlags)

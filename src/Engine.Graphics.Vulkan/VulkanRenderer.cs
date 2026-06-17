@@ -18,6 +18,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private bool _disposed;
     private bool _screenshotRequested;
     private string? _screenshotPath;
+    private float _totalTime;
 
     public bool IsScreenshotRequested => _screenshotRequested;
     public IScreenshotProvider ScreenshotProvider => this;
@@ -32,7 +33,8 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         _pipeline = new VulkanPipeline(ctx.Device, swapchain.Format, vertSpv, fragSpv);
 
-        _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex, swapchain.ImageCount);
+        _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
+            swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
 
         var vertices = new Vertex[]
         {
@@ -68,6 +70,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         if (acquireResult != VkResult.Success)
             throw new InvalidOperationException($"vkAcquireNextImageKHR failed: {acquireResult}");
+
+        _totalTime += 0.016f;
+
+        var vp = ComputeViewProjection();
+        _frameResources.UpdateUbo(_frameIndex, &vp, VulkanFrameResources.UboSize);
 
         var cmd = _frameResources.CommandBuffers[_frameIndex];
         Vk.vkResetCommandBuffer(cmd, 0);
@@ -132,9 +139,16 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         };
         Vk.vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+        var descSet = _frameResources.DescriptorSets[_frameIndex];
+        Vk.vkCmdBindDescriptorSets(cmd, VkPipelineBindPoint.Graphics, _pipeline.PipelineLayout,
+            0, 1, &descSet, 0, null);
+
         var bufferHandle = _vertexBuffer.Buffer;
         ulong offset = 0;
         Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &bufferHandle, &offset);
+
+        var angle = _totalTime;
+        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 4, &angle);
 
         Vk.vkCmdDraw(cmd, 3, 1, 0, 0);
 
@@ -205,6 +219,14 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         }
 
         _frameIndex = (_frameIndex + 1) % VulkanFrameResources.MaxFramesInFlight;
+    }
+
+    private Matrix4x4 ComputeViewProjection()
+    {
+        var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
+        var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
+        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -2), Vector3.Zero, Vector3.UnitY);
+        return view * proj;
     }
 
     private static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image,

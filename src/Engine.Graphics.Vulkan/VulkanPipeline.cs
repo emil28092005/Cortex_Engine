@@ -9,6 +9,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
     public VkPipeline Pipeline;
     public VkShaderModule VertModule;
     public VkShaderModule FragModule;
+    public VkDescriptorSetLayout DescriptorSetLayout;
 
     private readonly VkDevice _device;
     private bool _disposed;
@@ -18,6 +19,8 @@ internal sealed unsafe class VulkanPipeline : IDisposable
         _device = device;
         VertModule = CreateShaderModule(vertSpv);
         FragModule = CreateShaderModule(fragSpv);
+
+        CreateDescriptorSetLayout();
 
         fixed (byte* pName = "main\0"u8)
         {
@@ -137,11 +140,21 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 pDynamicStates = dynamicStates,
             };
 
+            var pushConstantRange = new VkPushConstantRange
+            {
+                stageFlags = VkShaderStageFlags.Vertex,
+                offset = 0,
+                size = 4,
+            };
+
+            var descLayout = DescriptorSetLayout;
             var layoutInfo = new VkPipelineLayoutCreateInfo
             {
                 sType = VkStructureType.PipelineLayoutCreateInfo,
-                setLayoutCount = 0,
-                pushConstantRangeCount = 0,
+                setLayoutCount = 1,
+                pSetLayouts = &descLayout,
+                pushConstantRangeCount = 1,
+                pPushConstantRanges = (nint)(&pushConstantRange),
             };
 
             fixed (VkPipelineLayout* layoutPtr = &PipelineLayout)
@@ -187,6 +200,30 @@ internal sealed unsafe class VulkanPipeline : IDisposable
         Console.WriteLine("[Vulkan] Graphics pipeline created (dynamic rendering)");
     }
 
+    private void CreateDescriptorSetLayout()
+    {
+        var binding = new VkDescriptorSetLayoutBinding
+        {
+            binding = 0,
+            descriptorType = VkDescriptorType.UniformBuffer,
+            descriptorCount = 1,
+            stageFlags = VkShaderStageFlags.Vertex,
+        };
+
+        var info = new VkDescriptorSetLayoutCreateInfo
+        {
+            sType = VkStructureType.DescriptorSetLayoutCreateInfo,
+            bindingCount = 1,
+            pBindings = &binding,
+        };
+
+        var descLayout = VkDescriptorSetLayout.Null;
+        var result = Vk.vkCreateDescriptorSetLayout(_device, &info, 0, &descLayout);
+        if (result != VkResult.Success)
+            throw new InvalidOperationException($"vkCreateDescriptorSetLayout failed: {result}");
+        DescriptorSetLayout = descLayout;
+    }
+
     private VkShaderModule CreateShaderModule(byte[] spv)
     {
         fixed (byte* pCode = spv)
@@ -213,6 +250,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
 
         if (Pipeline.Handle != 0) Vk.vkDestroyPipeline(_device, Pipeline, 0);
         if (PipelineLayout.Handle != 0) Vk.vkDestroyPipelineLayout(_device, PipelineLayout, 0);
+        if (DescriptorSetLayout.Handle != 0) Vk.vkDestroyDescriptorSetLayout(_device, DescriptorSetLayout, 0);
         if (FragModule.Handle != 0) Vk.vkDestroyShaderModule(_device, FragModule, 0);
         if (VertModule.Handle != 0) Vk.vkDestroyShaderModule(_device, VertModule, 0);
     }

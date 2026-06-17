@@ -6,7 +6,22 @@ layout(location = 2) in vec3 inNormal;
 
 layout(location = 0) out vec3 fragColor;
 
+layout(row_major, set = 0, binding = 0) uniform CameraUBO {
+    mat4 vp;
+};
+
+layout(push_constant) uniform PC {
+    float angle;
+} pc;
+
 void main() {
-    gl_Position = vec4(inPosition, 1.0);
+    float c = cos(pc.angle);
+    float s = sin(pc.angle);
+    vec3 rotated = vec3(
+        inPosition.x * c - inPosition.y * s,
+        inPosition.x * s + inPosition.y * c,
+        inPosition.z
+    );
+    gl_Position = vp * vec4(rotated, 1.0);
     fragColor = inColor;
 }

@@ -907,3 +907,82 @@ public unsafe struct VkDebugUtilsMessengerCallbackDataEXT
     public uint objectCount;
     public nint pObjects;
 }
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkPushConstantRange
+{
+    public VkShaderStageFlags stageFlags;
+    public uint offset;
+    public uint size;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorSetLayoutBinding
+{
+    public uint binding;
+    public VkDescriptorType descriptorType;
+    public uint descriptorCount;
+    public VkShaderStageFlags stageFlags;
+    public nint pImmutableSamplers;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorSetLayoutCreateInfo
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public uint flags;
+    public uint bindingCount;
+    public VkDescriptorSetLayoutBinding* pBindings;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorPoolSize
+{
+    public VkDescriptorType type;
+    public uint descriptorCount;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorPoolCreateInfo
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public VkDescriptorPoolCreateFlags flags;
+    public uint maxSets;
+    public uint poolSizeCount;
+    public VkDescriptorPoolSize* pPoolSizes;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorSetAllocateInfo
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public VkDescriptorPool descriptorPool;
+    public uint descriptorSetCount;
+    public VkDescriptorSetLayout* pSetLayouts;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorBufferInfo
+{
+    public VkBuffer buffer;
+    public ulong offset;
+    public ulong range;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkWriteDescriptorSet
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public VkDescriptorSet dstSet;
+    public uint dstBinding;
+    public uint dstArrayElement;
+    public uint descriptorCount;
+    public VkDescriptorType descriptorType;
+    public nint pImageInfo;
+    public VkDescriptorBufferInfo* pBufferInfo;
+    public nint pTexelBufferView;
+}
