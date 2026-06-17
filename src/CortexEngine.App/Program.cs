@@ -46,6 +46,15 @@ class Program
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
 
+            // ImGui editor layer
+            var imGuiLayer = new ImGuiLayer();
+            if (!cameraTour)
+            {
+                imGuiLayer.Initialize();
+                if (renderer is RaylibRenderer rlRenderer)
+                    rlRenderer.ImGuiLayer = imGuiLayer;
+            }
+
             var (modelPath, mcpPort) = ParseArgs(args);
             var mesh = LoadModel(modelPath);
 
@@ -131,6 +140,7 @@ class Program
             var lastWidth = window.Width;
             var lastHeight = window.Height;
             var demoScreenshotRequested = false;
+            var currentFps = 0;
 
             var tourPoses = testScene
                 ? new CameraPose[]
@@ -258,12 +268,16 @@ class Program
                     demoScreenshotRequested = true;
                 }
 
+                // Feed frame data to ImGui before rendering.
+                imGuiLayer.SetFrameData(world, timing, currentFps);
+
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
                 {
+                    currentFps = frames;
                     Console.WriteLine($"FPS: {frames}, Delta: {timing.DeltaTime * 1000.0:F2} ms");
                     frames = 0;
                     lastFpsTime = timing.TotalTime;
@@ -271,6 +285,7 @@ class Program
             }
 
             Console.WriteLine("Shutting down...");
+            imGuiLayer.Dispose();
 #if !RELEASE_AOT
             if (mcpApp != null)
                 await mcpApp.StopAsync();

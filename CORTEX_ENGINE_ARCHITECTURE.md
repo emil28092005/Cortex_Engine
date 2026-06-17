@@ -708,14 +708,14 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 
 - [x] Texture loading in RaylibRenderer (`SetMaterialUniforms` now loads/binds textures)
 - [x] Fix `demo.png` screenshot timing (moved to main loop with frame warm-up)
-- [ ] Unit tests (`tests/Engine.Tests/` — planned but never created)
+- [x] Unit tests — 60 tests covering ObjLoader, camera controllers, AiCommandProcessor, RenderBackendFactory, Timing, ProceduralMesh, MeshMath, Transform, Camera, Material, Mesh, Light
 - [x] `AGENTS.md` — created for opencode integration
 
 ### Medium-term
 
-- [ ] Dear ImGui integration (Hexa.NET.ImGui) for editor UI
-- [ ] Model loading from GLTF/OBJ with textures and materials
-- [ ] Scene serialization / deserialization
+- [x] Dear ImGui integration (rlImgui-cs + ImGui.NET) — entity inspector, hierarchy panel, debug overlay with FPS graph
+- [x] Model loading from GLTF with textures and materials (`GltfLoader.LoadWithMaterials` extracts PBR albedo, roughness, metallic, base color texture)
+- [x] Scene serialization / deserialization (`SceneSerializer` — save/load named entities with Transform, Material, Light, Camera to/from JSON)
 - [ ] Multi-light shadow mapping
 
 ### Long-term (backlog)

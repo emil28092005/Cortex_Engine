@@ -41,6 +41,11 @@ public sealed class RaylibRenderer : IRenderer
     private int _frameCount;
     private bool _disposed;
 
+    /// <summary>
+    /// ImGui editor layer. Accessible so the app can feed world/timing data.
+    /// </summary>
+    public ImGuiLayer? ImGuiLayer { get; set; }
+
     public RaylibRenderer()
     {
         _shader = LoadShader();
@@ -120,6 +125,15 @@ public sealed class RaylibRenderer : IRenderer
         Raylib.DrawGrid(20, 1.0f);
 
         Raylib.EndMode3D();
+
+        // ImGui renders on top of the 3D scene, before EndDrawing.
+        if (ImGuiLayer != null)
+        {
+            ImGuiLayer.Begin();
+            ImGuiLayer.RenderImGuiUI();
+            ImGuiLayer.End();
+        }
+
         Raylib.EndDrawing();
 
         // Defer the first screenshot by a few frames. Raylib may return a blank image
