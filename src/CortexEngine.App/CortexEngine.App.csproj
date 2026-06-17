@@ -26,7 +26,7 @@
     <ProjectReference Include="..\Engine.Graphics.Vulkan\Engine.Graphics.Vulkan.csproj" />
     <ProjectReference Include="..\Engine.AI\Engine.AI.csproj" />
     <ProjectReference Include="..\Engine.Physics\Engine.Physics.csproj" />
-    <ProjectReference Include="..\Engine.Graphics.OpenGL\Engine.Graphics.OpenGL.csproj" />
+    <ProjectReference Include="..\Engine.Graphics.OpenTK\Engine.Graphics.OpenTK.csproj" />
   </ItemGroup>
 
   <ItemGroup>

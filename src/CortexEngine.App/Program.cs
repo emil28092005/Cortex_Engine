@@ -11,7 +11,7 @@ using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
 using Engine.Graphics.Loaders;
-using Engine.Graphics.OpenGL;
+using Engine.Graphics.OpenTK;
 using Engine.Graphics.RaylibBackend;
 using Engine.Graphics.Vulkan;
 using Engine.Physics;
@@ -44,8 +44,8 @@ class Program
 
             RaylibBackendRegistrar.EnsureRegistered();
             VulkanBackendRegistrar.EnsureRegistered();
-            OpenGLBackendRegistrar.EnsureRegistered();
-            using var renderContext = RenderBackendFactory.Create("raylib", 1280, 720, enableValidation: false);
+            OpenTKBackendRegistrar.EnsureRegistered();
+            using var renderContext = RenderBackendFactory.Create("opentk", 1280, 720, enableValidation: false);
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
@@ -296,8 +296,8 @@ class Program
                 queue.CompletePendingScreenshots();
 
                 // Swap buffers for OpenGL backend
-                if (renderContext is OpenGLRenderContext glCtx2)
-                    glCtx2.SwapBuffers();
+                if (renderContext is OpenTKRenderContext otkCtx)
+                    otkCtx.SwapBuffers();
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)

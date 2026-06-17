@@ -8,12 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Silk.NET.OpenGL" Version="2.21.0" />
-    <PackageReference Include="Silk.NET.Windowing" Version="2.21.0" />
-    <PackageReference Include="Silk.NET.Input" Version="2.21.0" />
+    <PackageReference Include="OpenTK" Version="4.9.4" />
     <PackageReference Include="Flecs.NET.Debug" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release' OR '$(Configuration)' == 'ReleaseAOT'" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
   </ItemGroup>
 
   <ItemGroup>
