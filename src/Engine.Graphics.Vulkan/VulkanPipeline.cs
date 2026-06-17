@@ -14,7 +14,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
     private readonly VkDevice _device;
     private bool _disposed;
 
-    public VulkanPipeline(VkDevice device, VkFormat colorFormat, byte[] vertSpv, byte[] fragSpv)
+    public VulkanPipeline(VkDevice device, VkFormat colorFormat, VkFormat depthFormat, byte[] vertSpv, byte[] fragSpv)
     {
         _device = device;
         VertModule = CreateShaderModule(vertSpv);
@@ -115,6 +115,16 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 sampleShadingEnable = VkBool32.False,
             };
 
+            var depthStencilState = new VkPipelineDepthStencilStateCreateInfo
+            {
+                sType = VkStructureType.PipelineDepthStencilStateCreateInfo,
+                depthTestEnable = VkBool32.True,
+                depthWriteEnable = VkBool32.True,
+                depthCompareOp = VkCompareOp.Less,
+                depthBoundsTestEnable = VkBool32.False,
+                stencilTestEnable = VkBool32.False,
+            };
+
             var blendAttachment = new VkPipelineColorBlendAttachmentState
             {
                 blendEnable = VkBool32.False,
@@ -144,7 +154,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
             {
                 stageFlags = VkShaderStageFlags.Vertex,
                 offset = 0,
-                size = 4,
+                size = 64,
             };
 
             var descLayout = DescriptorSetLayout;
@@ -169,6 +179,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 sType = VkStructureType.PipelineRenderingCreateInfo,
                 colorAttachmentCount = 1,
                 pColorAttachmentFormats = &colorFormat,
+                depthAttachmentFormat = depthFormat,
             };
 
             var pipelineInfo = new VkGraphicsPipelineCreateInfo
@@ -182,6 +193,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 pViewportState = &viewportState,
                 pRasterizationState = &rasterizationState,
                 pMultisampleState = &multisampleState,
+                pDepthStencilState = &depthStencilState,
                 pColorBlendState = &colorBlendState,
                 pDynamicState = &dynamicState,
                 layout = PipelineLayout,

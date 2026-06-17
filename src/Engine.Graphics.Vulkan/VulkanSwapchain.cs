@@ -11,19 +11,26 @@ internal sealed unsafe class VulkanSwapchain : IDisposable
     public VkExtent2D Extent;
     public uint ImageCount;
 
+    public VkImage DepthImage;
+    public VkDeviceMemory DepthImageMemory;
+    public VkImageView DepthImageView;
+    public VkFormat DepthFormat = VkFormat.D32Sfloat;
+
     private readonly VkDevice _device;
     private readonly VkPhysicalDevice _physicalDevice;
     private readonly VkSurfaceKHR _surface;
     private readonly VkSurfaceFormatKHR _surfaceFormat;
+    private readonly VulkanContext _ctx;
     private bool _disposed;
 
     public VulkanSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-        VkSurfaceFormatKHR surfaceFormat, int width, int height)
+        VkSurfaceFormatKHR surfaceFormat, int width, int height, VulkanContext ctx)
     {
         _device = device;
         _physicalDevice = physicalDevice;
         _surface = surface;
         _surfaceFormat = surfaceFormat;
+        _ctx = ctx;
         Create(width, height);
     }
 
@@ -132,6 +139,81 @@ internal sealed unsafe class VulkanSwapchain : IDisposable
         }
 
         Console.WriteLine($"[Vulkan] Swapchain: {actualCount} images, {Extent.Width}x{Extent.Height}, format={Format}");
+
+        CreateDepthResources();
+    }
+
+    private void CreateDepthResources()
+    {
+        var imageInfo = new VkImageCreateInfo
+        {
+            sType = VkStructureType.ImageCreateInfo,
+            imageType = VkImageType.Type2D,
+            format = DepthFormat,
+            extent = new VkExtent3D { Width = Extent.Width, Height = Extent.Height, Depth = 1 },
+            mipLevels = 1,
+            arrayLayers = 1,
+            samples = VkSampleCountFlags.Count1,
+            tiling = VkImageTiling.Optimal,
+            usage = VkImageUsageFlags.DepthStencilAttachment,
+            sharingMode = VkSharingMode.Exclusive,
+            initialLayout = VkImageLayout.Undefined,
+        };
+
+        var depthImg = VkImage.Null;
+        var result = Vk.vkCreateImage(_device, &imageInfo, 0, &depthImg);
+        if (result != VkResult.Success)
+            throw new InvalidOperationException($"vkCreateImage (depth) failed: {result}");
+        DepthImage = depthImg;
+
+        var reqs = new VkMemoryRequirements();
+        Vk.vkGetImageMemoryRequirements(_device, DepthImage, &reqs);
+
+        var memTypeIndex = _ctx.FindMemoryType(reqs.memoryTypeBits, VkMemoryPropertyFlags.DeviceLocal);
+
+        var allocInfo = new VkMemoryAllocateInfo
+        {
+            sType = VkStructureType.MemoryAllocateInfo,
+            allocationSize = reqs.size,
+            memoryTypeIndex = memTypeIndex,
+        };
+
+        var depthMem = VkDeviceMemory.Null;
+        result = Vk.vkAllocateMemory(_device, &allocInfo, 0, &depthMem);
+        if (result != VkResult.Success)
+            throw new InvalidOperationException($"vkAllocateMemory (depth) failed: {result}");
+        DepthImageMemory = depthMem;
+
+        Vk.vkBindImageMemory(_device, DepthImage, DepthImageMemory, 0);
+
+        var viewInfo = new VkImageViewCreateInfo
+        {
+            sType = VkStructureType.ImageViewCreateInfo,
+            image = DepthImage,
+            viewType = VkImageViewType.Type2D,
+            format = DepthFormat,
+            components = new VkComponentMapping
+            {
+                R = VkComponentSwizzle.Identity,
+                G = VkComponentSwizzle.Identity,
+                B = VkComponentSwizzle.Identity,
+                A = VkComponentSwizzle.Identity,
+            },
+            subresourceRange = new VkImageSubresourceRange
+            {
+                AspectMask = VkImageAspectFlags.Depth,
+                BaseMipLevel = 0,
+                LevelCount = 1,
+                BaseArrayLayer = 0,
+                LayerCount = 1,
+            },
+        };
+
+        var depthView = VkImageView.Null;
+        result = Vk.vkCreateImageView(_device, &viewInfo, 0, &depthView);
+        if (result != VkResult.Success)
+            throw new InvalidOperationException($"vkCreateImageView (depth) failed: {result}");
+        DepthImageView = depthView;
     }
 
     public void Recreate(int width, int height)
@@ -143,6 +225,22 @@ internal sealed unsafe class VulkanSwapchain : IDisposable
 
     private void Cleanup()
     {
+        if (DepthImageView.Handle != 0)
+        {
+            Vk.vkDestroyImageView(_device, DepthImageView, 0);
+            DepthImageView = VkImageView.Null;
+        }
+        if (DepthImage.Handle != 0)
+        {
+            Vk.vkDestroyImage(_device, DepthImage, 0);
+            DepthImage = VkImage.Null;
+        }
+        if (DepthImageMemory.Handle != 0)
+        {
+            Vk.vkFreeMemory(_device, DepthImageMemory, 0);
+            DepthImageMemory = VkDeviceMemory.Null;
+        }
+
         for (int i = 0; i < ImageViews.Length; i++)
         {
             if (ImageViews[i].Handle != 0)

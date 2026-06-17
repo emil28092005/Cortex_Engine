@@ -671,7 +671,7 @@ public unsafe struct VkGraphicsPipelineCreateInfo
     public VkPipelineViewportStateCreateInfo* pViewportState;
     public VkPipelineRasterizationStateCreateInfo* pRasterizationState;
     public VkPipelineMultisampleStateCreateInfo* pMultisampleState;
-    public nint pDepthStencilState;
+    public VkPipelineDepthStencilStateCreateInfo* pDepthStencilState;
     public VkPipelineColorBlendStateCreateInfo* pColorBlendState;
     public VkPipelineDynamicStateCreateInfo* pDynamicState;
     public VkPipelineLayout layout;
@@ -792,7 +792,7 @@ public unsafe struct VkRenderingInfo
     public uint viewMask;
     public uint colorAttachmentCount;
     public VkRenderingAttachmentInfo* pColorAttachments;
-    public nint pDepthAttachment;
+    public VkRenderingAttachmentInfo* pDepthAttachment;
     public nint pStencilAttachment;
 }
 
@@ -906,6 +906,55 @@ public unsafe struct VkDebugUtilsMessengerCallbackDataEXT
     public nint pCmdBufLabels;
     public uint objectCount;
     public nint pObjects;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkStencilOpState
+{
+    public int failOp;
+    public int passOp;
+    public int depthFailOp;
+    public int compareOp;
+    public uint compareMask;
+    public uint writeMask;
+    public uint reference;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkPipelineDepthStencilStateCreateInfo
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public uint flags;
+    public VkBool32 depthTestEnable;
+    public VkBool32 depthWriteEnable;
+    public VkCompareOp depthCompareOp;
+    public VkBool32 depthBoundsTestEnable;
+    public VkBool32 stencilTestEnable;
+    public VkStencilOpState front;
+    public VkStencilOpState back;
+    public float minDepthBounds;
+    public float maxDepthBounds;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkImageCreateInfo
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public uint flags;
+    public VkImageType imageType;
+    public VkFormat format;
+    public VkExtent3D extent;
+    public uint mipLevels;
+    public uint arrayLayers;
+    public VkSampleCountFlags samples;
+    public VkImageTiling tiling;
+    public VkImageUsageFlags usage;
+    public VkSharingMode sharingMode;
+    public uint queueFamilyIndexCount;
+    public uint* pQueueFamilyIndices;
+    public VkImageLayout initialLayout;
 }
 
 [StructLayout(LayoutKind.Sequential)]

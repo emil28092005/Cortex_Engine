@@ -23,7 +23,7 @@ internal sealed class VulkanRenderContext : IRenderContext
         };
 
         _swapchain = new VulkanSwapchain(_ctx.Device, _ctx.PhysicalDevice, _ctx.Surface,
-            surfaceFormat, window.Width, window.Height);
+            surfaceFormat, window.Width, window.Height, _ctx);
     }
 
     public IRenderer CreateRenderer()

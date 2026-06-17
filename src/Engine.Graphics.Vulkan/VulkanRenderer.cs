@@ -34,7 +34,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         var vertSpv = LoadShader("Shaders/triangle.vert.spv");
         var fragSpv = LoadShader("Shaders/triangle.frag.spv");
 
-        _pipeline = new VulkanPipeline(ctx.Device, swapchain.Format, vertSpv, fragSpv);
+        _pipeline = new VulkanPipeline(ctx.Device, swapchain.Format, swapchain.DepthFormat, vertSpv, fragSpv);
 
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
@@ -109,9 +109,19 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             0, 0,
             0x400, 0x100);
 
+        TransitionImageLayoutDepth(cmd, _swapchain.DepthImage,
+            VkImageLayout.Undefined, VkImageLayout.DepthStencilAttachmentOptimal,
+            0, 0,
+            0x100, 0x200);
+
         var clearValue = new VkClearValue
         {
             Color = new VkClearColorValue { Float0 = 0.02f, Float1 = 0.02f, Float2 = 0.02f, Float3 = 1.0f },
+        };
+
+        var depthClearValue = new VkClearValue
+        {
+            DepthStencil = new VkClearDepthStencilValue { Depth = 1.0f, Stencil = 0 },
         };
 
         var colorAttachment = new VkRenderingAttachmentInfo
@@ -122,6 +132,16 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             loadOp = VkAttachmentLoadOp.Clear,
             storeOp = VkAttachmentStoreOp.Store,
             clearValue = clearValue,
+        };
+
+        var depthAttachment = new VkRenderingAttachmentInfo
+        {
+            sType = VkStructureType.RenderingAttachmentInfo,
+            imageView = _swapchain.DepthImageView,
+            imageLayout = VkImageLayout.DepthStencilAttachmentOptimal,
+            loadOp = VkAttachmentLoadOp.Clear,
+            storeOp = VkAttachmentStoreOp.Store,
+            clearValue = depthClearValue,
         };
 
         var renderingInfo = new VkRenderingInfo
@@ -135,6 +155,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             layerCount = 1,
             colorAttachmentCount = 1,
             pColorAttachments = &colorAttachment,
+            pDepthAttachment = &depthAttachment,
         };
 
         Vk.vkCmdBeginRendering(cmd, &renderingInfo);
@@ -168,7 +189,8 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         Vk.vkCmdBindIndexBuffer(cmd, _indexBuffer.Buffer, 0, 0);
 
         var angle = _totalTime;
-        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 4, &angle);
+        var model = Matrix4x4.CreateRotationY(angle) * Matrix4x4.CreateRotationX(angle * 0.5f);
+        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
 
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
 
@@ -267,6 +289,39 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             subresourceRange = new VkImageSubresourceRange
             {
                 AspectMask = VkImageAspectFlags.Color,
+                LevelCount = 1,
+                LayerCount = 1,
+            },
+        };
+
+        var depInfo = new VkDependencyInfo
+        {
+            sType = VkStructureType.DependencyInfo,
+            imageMemoryBarrierCount = 1,
+            pImageMemoryBarriers = &barrier,
+        };
+
+        Vk.vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
+
+    private static void TransitionImageLayoutDepth(VkCommandBuffer cmd, VkImage image,
+        VkImageLayout oldLayout, VkImageLayout newLayout,
+        ulong srcStage, ulong srcAccess,
+        ulong dstStage, ulong dstAccess)
+    {
+        var barrier = new VkImageMemoryBarrier2
+        {
+            sType = VkStructureType.ImageMemoryBarrier2,
+            srcStageMask = srcStage,
+            srcAccessMask = srcAccess,
+            dstStageMask = dstStage,
+            dstAccessMask = dstAccess,
+            oldLayout = oldLayout,
+            newLayout = newLayout,
+            image = image,
+            subresourceRange = new VkImageSubresourceRange
+            {
+                AspectMask = VkImageAspectFlags.Depth,
                 LevelCount = 1,
                 LayerCount = 1,
             },

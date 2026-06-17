@@ -47,6 +47,10 @@ internal static unsafe class Vk
     public delegate VkResult VkGetFenceStatus(VkDevice device, VkFence fence);
     public delegate VkResult VkCreateBuffer(VkDevice device, VkBufferCreateInfo* pCreateInfo, nint pAllocator, VkBuffer* pBuffer);
     public delegate void VkDestroyBuffer(VkDevice device, VkBuffer buffer, nint pAllocator);
+    public delegate VkResult VkCreateImage(VkDevice device, VkImageCreateInfo* pCreateInfo, nint pAllocator, VkImage* pImage);
+    public delegate void VkDestroyImage(VkDevice device, VkImage image, nint pAllocator);
+    public delegate void VkGetImageMemoryRequirements(VkDevice device, VkImage image, VkMemoryRequirements* pMemoryRequirements);
+    public delegate VkResult VkBindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, ulong memoryOffset);
     public delegate VkResult VkAllocateMemory(VkDevice device, VkMemoryAllocateInfo* pAllocateInfo, nint pAllocator, VkDeviceMemory* pMemory);
     public delegate void VkFreeMemory(VkDevice device, VkDeviceMemory memory, nint pAllocator);
     public delegate VkResult VkBindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, ulong memoryOffset);
@@ -124,6 +128,10 @@ internal static unsafe class Vk
     public static VkGetFenceStatus vkGetFenceStatus;
     public static VkCreateBuffer vkCreateBuffer;
     public static VkDestroyBuffer vkDestroyBuffer;
+    public static VkCreateImage vkCreateImage;
+    public static VkDestroyImage vkDestroyImage;
+    public static VkGetImageMemoryRequirements vkGetImageMemoryRequirements;
+    public static VkBindImageMemory vkBindImageMemory;
     public static VkAllocateMemory vkAllocateMemory;
     public static VkFreeMemory vkFreeMemory;
     public static VkBindBufferMemory vkBindBufferMemory;
@@ -208,6 +216,10 @@ internal static unsafe class Vk
         vkGetFenceStatus = LoadDev<VkGetFenceStatus>(p, "vkGetFenceStatus");
         vkCreateBuffer = LoadDev<VkCreateBuffer>(p, "vkCreateBuffer");
         vkDestroyBuffer = LoadDev<VkDestroyBuffer>(p, "vkDestroyBuffer");
+        vkCreateImage = LoadDev<VkCreateImage>(p, "vkCreateImage");
+        vkDestroyImage = LoadDev<VkDestroyImage>(p, "vkDestroyImage");
+        vkGetImageMemoryRequirements = LoadDev<VkGetImageMemoryRequirements>(p, "vkGetImageMemoryRequirements");
+        vkBindImageMemory = LoadDev<VkBindImageMemory>(p, "vkBindImageMemory");
         vkAllocateMemory = LoadDev<VkAllocateMemory>(p, "vkAllocateMemory");
         vkFreeMemory = LoadDev<VkFreeMemory>(p, "vkFreeMemory");
         vkBindBufferMemory = LoadDev<VkBindBufferMemory>(p, "vkBindBufferMemory");

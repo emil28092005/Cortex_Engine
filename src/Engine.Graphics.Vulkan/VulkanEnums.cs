@@ -61,6 +61,7 @@ public enum VkStructureType : int
     CommandBufferBeginInfo = 42,
     RenderPassBeginInfo = 43,
     ImageViewCreateInfo = 15,
+    ImageCreateInfo = 14,
     SemaphoreCreateInfo = 9,
     FenceCreateInfo = 8,
     SwapchainCreateInfoKHR = 1000001000,
@@ -207,6 +208,31 @@ public enum VkFrontFace : int
     Clockwise = 1,
 }
 
+public enum VkCompareOp : int
+{
+    Never = 0,
+    Less = 1,
+    Equal = 2,
+    LessOrEqual = 3,
+    Greater = 4,
+    NotEqual = 5,
+    GreaterOrEqual = 6,
+    Always = 7,
+}
+
+public enum VkImageType : int
+{
+    Type1D = 0,
+    Type2D = 1,
+    Type3D = 2,
+}
+
+public enum VkImageTiling : int
+{
+    Optimal = 0,
+    Linear = 1,
+}
+
 public enum VkBlendFactor : int
 {
     Zero = 0,
@@ -283,6 +309,8 @@ public enum VkPipelineStageFlags2 : ulong
 public enum VkAccessFlags2 : ulong
 {
     None = 0,
+    DepthStencilAttachmentWrite = 0x00000400,
+    DepthStencilAttachmentRead = 0x00000200,
     ColorAttachmentRead = 0x00000080,
     ColorAttachmentWrite = 0x00000100,
     TransferRead = 0x00000800,
