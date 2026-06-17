@@ -15,7 +15,8 @@ public static class MeshMath
     {
         var ab = b - a;
         var ac = c - a;
-        var normal = Vector3.Cross(ab, ac);
+        // Cross(ac, ab) instead of Cross(ab, ac) to match CW winding in typical OBJ files
+        var normal = Vector3.Cross(ac, ab);
         if (normal.LengthSquared() > 0.00001f)
             normal = Vector3.Normalize(normal);
         else

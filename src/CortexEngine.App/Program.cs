@@ -74,19 +74,7 @@ class Program
 
             world.Entity("MainLight")
                 .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(new Light(new Vector3(0.5f, -1.0f, -0.5f), new Vector3(1.0f, 0.95f, 0.8f), 1.0f));
-
-            world.Entity("FillLight")
-                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(new Light(new Vector3(-0.8f, -0.6f, 0.3f), new Vector3(0.3f, 0.4f, 0.6f), 0.6f));
-
-            world.Entity("FrontLight")
-                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(new Light(new Vector3(0.0f, -0.3f, -1.0f), new Vector3(0.8f, 0.8f, 0.9f), 0.4f));
-
-            world.Entity("GroundLight")
-                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(new Light(new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.15f, 0.15f, 0.2f), 0.3f));
+                .Set(Light.Directional(new Vector3(0.4f, -1.0f, -0.3f), new Vector3(1.0f, 0.95f, 0.85f), 2.0f));
 
             ICameraController[] cameraControllers =
             {
@@ -355,6 +343,12 @@ class Program
             .Set(new Transform(new Vector3(-4, 0.5f, -3), Quaternion.Identity, new Vector3(0.7f)))
             .Set(mesh)
             .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.4f, metallic: 0.0f, texturePath: "Content/checker.png"));
+
+        // Floor plane for shadow visibility
+        world.Entity("Floor")
+            .Set(new Transform(new Vector3(0, -0.02f, 0), Quaternion.Identity, new Vector3(20, 1, 20)))
+            .Set(mesh)
+            .Set(new Material(new Vector3(0.45f, 0.45f, 0.5f), roughness: 0.8f, metallic: 0.0f));
 
         world.Entity("Grid")
             .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))

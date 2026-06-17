@@ -224,7 +224,16 @@ public sealed class AiCommandProcessor
                 {
                     ref var light = ref e.Ensure<Light>();
                     writer.WriteStartObject("Light");
-                    WriteVector3(writer, "direction", light.Direction);
+                    writer.WriteString("type", light.Type.ToString());
+                    if (light.IsPoint)
+                    {
+                        WriteVector3(writer, "position", light.Position);
+                        writer.WriteNumber("range", light.Range);
+                    }
+                    else
+                    {
+                        WriteVector3(writer, "direction", light.Direction);
+                    }
                     WriteVector3(writer, "color", light.Color);
                     writer.WriteNumber("intensity", light.Intensity);
                     writer.WriteEndObject();

@@ -14,9 +14,10 @@ public class MeshMathTests
             new Vector3(1, 0, 0),
             new Vector3(0, 1, 0));
 
+        // CW winding (typical OBJ) → normal points -Z
         Assert.Equal(0f, n.X, 0.001f);
         Assert.Equal(0f, n.Y, 0.001f);
-        Assert.Equal(1f, n.Z, 0.001f);
+        Assert.Equal(-1f, n.Z, 0.001f);
     }
 
     [Fact]

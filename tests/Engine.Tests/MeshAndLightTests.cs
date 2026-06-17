@@ -25,7 +25,7 @@ public class MeshAndLightTests
     [Fact]
     public void Light_Direction_Is_Normalized()
     {
-        var light = new Light(new Vector3(0, 2, 0), Vector3.One, 1.0f);
+        var light = Light.Directional(new Vector3(0, 2, 0), Vector3.One, 1.0f);
 
         Assert.Equal(1f, light.Direction.Length(), 0.001f);
     }
@@ -33,7 +33,7 @@ public class MeshAndLightTests
     [Fact]
     public void Light_With_Zero_Direction_Defaults_To_UnitY()
     {
-        var light = new Light(Vector3.Zero, Vector3.One, 1.0f);
+        var light = Light.Directional(Vector3.Zero, Vector3.One, 1.0f);
 
         Assert.Equal(Vector3.UnitY, light.Direction);
     }

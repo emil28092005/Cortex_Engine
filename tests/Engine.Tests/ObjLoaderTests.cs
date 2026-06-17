@@ -97,9 +97,10 @@ public class ObjLoaderTests
         var mesh = ObjLoader.Load(path);
 
         var normal = mesh.Vertices[0].Normal;
+        // CW winding → normal points -Z
         Assert.Equal(0f, normal.X, 0.001f);
         Assert.Equal(0f, normal.Y, 0.001f);
-        Assert.Equal(1f, normal.Z, 0.001f);
+        Assert.Equal(-1f, normal.Z, 0.001f);
     }
 
     [Fact]

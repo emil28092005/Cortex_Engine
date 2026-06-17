@@ -74,9 +74,12 @@ public static class SceneSerializer
                 var l = e.Get<Light>();
                 entry.Light = new SceneLight
                 {
+                    Type = l.Type,
                     Direction = l.Direction,
+                    Position = l.Position,
                     Color = l.Color,
-                    Intensity = l.Intensity
+                    Intensity = l.Intensity,
+                    Range = l.Range
                 };
             }
 
@@ -144,10 +147,21 @@ public static class SceneSerializer
 
             if (entry.Light != null)
             {
-                entity.Set(new Light(
-                    entry.Light.Direction,
-                    entry.Light.Color,
-                    entry.Light.Intensity));
+                if (entry.Light.Type == LightType.Point)
+                {
+                    entity.Set(Light.Point(
+                        entry.Light.Position,
+                        entry.Light.Color,
+                        entry.Light.Intensity,
+                        entry.Light.Range));
+                }
+                else
+                {
+                    entity.Set(Light.Directional(
+                        entry.Light.Direction,
+                        entry.Light.Color,
+                        entry.Light.Intensity));
+                }
             }
 
             if (entry.Camera != null)
@@ -208,9 +222,12 @@ internal sealed class SceneMaterial
 
 internal sealed class SceneLight
 {
+    public LightType Type { get; set; }
     public Vector3 Direction { get; set; }
+    public Vector3 Position { get; set; }
     public Vector3 Color { get; set; }
     public float Intensity { get; set; }
+    public float Range { get; set; }
 }
 
 internal sealed class SceneCamera

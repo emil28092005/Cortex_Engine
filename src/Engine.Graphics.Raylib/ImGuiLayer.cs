@@ -220,6 +220,13 @@ public sealed class ImGuiLayer : IDisposable
 
             if (ImGui.CollapsingHeader("Light", ImGuiTreeNodeFlags.DefaultOpen))
             {
+                var type = (int)l.Type;
+                if (ImGui.Combo("Type", ref type, "Directional\0Point\0"))
+                {
+                    l.Type = (Engine.Core.Components.LightType)type;
+                    entity.Set(l);
+                }
+
                 var color = l.Color;
                 if (ImGui.ColorEdit3("Color", ref color))
                 {
@@ -228,17 +235,36 @@ public sealed class ImGuiLayer : IDisposable
                 }
 
                 var intensity = l.Intensity;
-                if (ImGui.SliderFloat("Intensity", ref intensity, 0.0f, 5.0f))
+                if (ImGui.SliderFloat("Intensity", ref intensity, 0.0f, 10.0f))
                 {
                     l.Intensity = intensity;
                     entity.Set(l);
                 }
 
-                var dir = l.Direction;
-                if (ImGui.DragFloat3("Direction", ref dir, 0.01f, -1f, 1f))
+                if (l.Type == Engine.Core.Components.LightType.Point)
                 {
-                    l.Direction = dir;
-                    entity.Set(l);
+                    var pos = l.Position;
+                    if (ImGui.DragFloat3("Position", ref pos, 0.1f))
+                    {
+                        l.Position = pos;
+                        entity.Set(l);
+                    }
+
+                    var range = l.Range;
+                    if (ImGui.DragFloat("Range", ref range, 0.5f, 1f, 100f))
+                    {
+                        l.Range = range;
+                        entity.Set(l);
+                    }
+                }
+                else
+                {
+                    var dir = l.Direction;
+                    if (ImGui.DragFloat3("Direction", ref dir, 0.01f, -1f, 1f))
+                    {
+                        l.Direction = dir;
+                        entity.Set(l);
+                    }
                 }
             }
         }
