@@ -7,11 +7,12 @@ using Flecs.NET.Core;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
+public sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
 {
-    private readonly VulkanContext _ctx;
-    private readonly VulkanSwapchain _swapchain;
+    public readonly VulkanContext _ctx;
+    public readonly VulkanSwapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
+    public VulkanImGui? ImGuiLayer;
 
     private VkCommandPool _commandPool;
     private VkCommandBuffer[] _commandBuffers = Array.Empty<VkCommandBuffer>();
@@ -535,6 +536,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
                 Vk.vkCmdDrawIndexed(cmd, meshBuffers.indexCount, 1, 0, 0, 0);
             }
         });
+
+        if (ImGuiLayer != null)
+        {
+            ImGuiLayer.Render(cmd);
+        }
 
         Vk.vkCmdEndRenderPass(cmd);
 

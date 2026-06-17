@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-internal static unsafe class Vk
+public static unsafe class Vk
 {
     public static VkInstance Instance;
     public static VkDevice Device;
@@ -242,168 +242,168 @@ internal static unsafe class Vk
 }
 
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, void* pAllocator, VkInstance* pInstance);
+unsafe public delegate VkResult PFN_vkCreateInstance(VkInstanceCreateInfo* pCreateInfo, void* pAllocator, VkInstance* pInstance);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyInstance(VkInstance instance, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyInstance(VkInstance instance, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkEnumeratePhysicalDevices(VkInstance instance, uint* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices);
+unsafe public delegate VkResult PFN_vkEnumeratePhysicalDevices(VkInstance instance, uint* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties* pProperties);
+unsafe public delegate void PFN_vkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties* pProperties);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties);
+unsafe public delegate void PFN_vkGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties);
+unsafe public delegate void PFN_vkGetPhysicalDeviceMemoryProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkEnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, byte* pLayerName, uint* pPropertyCount, VkExtensionProperties* pProperties);
+unsafe public delegate VkResult PFN_vkEnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, byte* pLayerName, uint* pPropertyCount, VkExtensionProperties* pProperties);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateDevice(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo* pCreateInfo, void* pAllocator, VkDevice* pDevice);
+unsafe public delegate VkResult PFN_vkCreateDevice(VkPhysicalDevice physicalDevice, VkDeviceCreateInfo* pCreateInfo, void* pAllocator, VkDevice* pDevice);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyDevice(VkDevice device, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyDevice(VkDevice device, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkGetDeviceQueue(VkDevice device, uint queueFamilyIndex, uint queueIndex, VkQueue* pQueue);
+unsafe public delegate void PFN_vkGetDeviceQueue(VkDevice device, uint queueFamilyIndex, uint queueIndex, VkQueue* pQueue);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateSwapchainKHR(VkDevice device, VkSwapchainCreateInfoKHR* pCreateInfo, void* pAllocator, VkSwapchainKHR* pSwapchain);
+unsafe public delegate VkResult PFN_vkCreateSwapchainKHR(VkDevice device, VkSwapchainCreateInfoKHR* pCreateInfo, void* pAllocator, VkSwapchainKHR* pSwapchain);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, void* pAllocator);
+unsafe public delegate void PFN_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint* pSwapchainImageCount, VkImage* pSwapchainImages);
+unsafe public delegate VkResult PFN_vkGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint* pSwapchainImageCount, VkImage* pSwapchainImages);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateImageView(VkDevice device, VkImageViewCreateInfo* pCreateInfo, void* pAllocator, VkImageView* pView);
+unsafe public delegate VkResult PFN_vkCreateImageView(VkDevice device, VkImageViewCreateInfo* pCreateInfo, void* pAllocator, VkImageView* pView);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyImageView(VkDevice device, VkImageView imageView, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyImageView(VkDevice device, VkImageView imageView, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateImage(VkDevice device, VkImageCreateInfo* pCreateInfo, void* pAllocator, VkImage* pImage);
+unsafe public delegate VkResult PFN_vkCreateImage(VkDevice device, VkImageCreateInfo* pCreateInfo, void* pAllocator, VkImage* pImage);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyImage(VkDevice device, VkImage image, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyImage(VkDevice device, VkImage image, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkGetImageMemoryRequirements(VkDevice device, VkImage image, void* pMemoryRequirements);
+unsafe public delegate void PFN_vkGetImageMemoryRequirements(VkDevice device, VkImage image, void* pMemoryRequirements);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkBindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, ulong memoryOffset);
+unsafe public delegate VkResult PFN_vkBindImageMemory(VkDevice device, VkImage image, VkDeviceMemory memory, ulong memoryOffset);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateRenderPass(VkDevice device, VkRenderPassCreateInfo* pCreateInfo, void* pAllocator, VkRenderPass* pRenderPass);
+unsafe public delegate VkResult PFN_vkCreateRenderPass(VkDevice device, VkRenderPassCreateInfo* pCreateInfo, void* pAllocator, VkRenderPass* pRenderPass);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyRenderPass(VkDevice device, VkRenderPass renderPass, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyRenderPass(VkDevice device, VkRenderPass renderPass, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateFramebuffer(VkDevice device, VkFramebufferCreateInfo* pCreateInfo, void* pAllocator, VkFramebuffer* pFramebuffer);
+unsafe public delegate VkResult PFN_vkCreateFramebuffer(VkDevice device, VkFramebufferCreateInfo* pCreateInfo, void* pAllocator, VkFramebuffer* pFramebuffer);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateShaderModule(VkDevice device, VkShaderModuleCreateInfo* pCreateInfo, void* pAllocator, VkShaderModule* pShaderModule);
+unsafe public delegate VkResult PFN_vkCreateShaderModule(VkDevice device, VkShaderModuleCreateInfo* pCreateInfo, void* pAllocator, VkShaderModule* pShaderModule);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyShaderModule(VkDevice device, VkShaderModule shaderModule, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyShaderModule(VkDevice device, VkShaderModule shaderModule, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateDescriptorSetLayout(VkDevice device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, void* pAllocator, VkDescriptorSetLayout* pSetLayout);
+unsafe public delegate VkResult PFN_vkCreateDescriptorSetLayout(VkDevice device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, void* pAllocator, VkDescriptorSetLayout* pSetLayout);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreatePipelineLayout(VkDevice device, VkPipelineLayoutCreateInfo* pCreateInfo, void* pAllocator, VkPipelineLayout* pPipelineLayout);
+unsafe public delegate VkResult PFN_vkCreatePipelineLayout(VkDevice device, VkPipelineLayoutCreateInfo* pCreateInfo, void* pAllocator, VkPipelineLayout* pPipelineLayout);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyPipelineLayout(VkDevice device, VkPipelineLayout pipelineLayout, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyPipelineLayout(VkDevice device, VkPipelineLayout pipelineLayout, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateGraphicsPipelines(VkDevice device, ulong pipelineCache, uint createInfoCount, VkGraphicsPipelineCreateInfo* pCreateInfos, void* pAllocator, VkPipeline* pPipelines);
+unsafe public delegate VkResult PFN_vkCreateGraphicsPipelines(VkDevice device, ulong pipelineCache, uint createInfoCount, VkGraphicsPipelineCreateInfo* pCreateInfos, void* pAllocator, VkPipeline* pPipelines);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyPipeline(VkDevice device, VkPipeline pipeline, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyPipeline(VkDevice device, VkPipeline pipeline, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateDescriptorPool(VkDevice device, VkDescriptorPoolCreateInfo* pCreateInfo, void* pAllocator, VkDescriptorPool* pDescriptorPool);
+unsafe public delegate VkResult PFN_vkCreateDescriptorPool(VkDevice device, VkDescriptorPoolCreateInfo* pCreateInfo, void* pAllocator, VkDescriptorPool* pDescriptorPool);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkAllocateDescriptorSets(VkDevice device, VkDescriptorSetAllocateInfo* pAllocateInfo, VkDescriptorSet* pDescriptorSets);
+unsafe public delegate VkResult PFN_vkAllocateDescriptorSets(VkDevice device, VkDescriptorSetAllocateInfo* pAllocateInfo, VkDescriptorSet* pDescriptorSets);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkUpdateDescriptorSets(VkDevice device, uint descriptorWriteCount, VkWriteDescriptorSet* pDescriptorWrites, uint descriptorCopyCount, void* pDescriptorCopies);
+unsafe public delegate void PFN_vkUpdateDescriptorSets(VkDevice device, uint descriptorWriteCount, VkWriteDescriptorSet* pDescriptorWrites, uint descriptorCopyCount, void* pDescriptorCopies);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateBuffer(VkDevice device, VkBufferCreateInfo* pCreateInfo, void* pAllocator, VkBuffer* pBuffer);
+unsafe public delegate VkResult PFN_vkCreateBuffer(VkDevice device, VkBufferCreateInfo* pCreateInfo, void* pAllocator, VkBuffer* pBuffer);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyBuffer(VkDevice device, VkBuffer buffer, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyBuffer(VkDevice device, VkBuffer buffer, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkGetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, void* pMemoryRequirements);
+unsafe public delegate void PFN_vkGetBufferMemoryRequirements(VkDevice device, VkBuffer buffer, void* pMemoryRequirements);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkBindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, ulong memoryOffset);
+unsafe public delegate VkResult PFN_vkBindBufferMemory(VkDevice device, VkBuffer buffer, VkDeviceMemory memory, ulong memoryOffset);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkAllocateMemory(VkDevice device, VkMemoryAllocateInfo* pAllocateInfo, void* pAllocator, VkDeviceMemory* pMemory);
+unsafe public delegate VkResult PFN_vkAllocateMemory(VkDevice device, VkMemoryAllocateInfo* pAllocateInfo, void* pAllocator, VkDeviceMemory* pMemory);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkFreeMemory(VkDevice device, VkDeviceMemory memory, void* pAllocator);
+unsafe public delegate void PFN_vkFreeMemory(VkDevice device, VkDeviceMemory memory, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkMapMemory(VkDevice device, VkDeviceMemory memory, ulong offset, ulong size, uint flags, void** ppData);
+unsafe public delegate VkResult PFN_vkMapMemory(VkDevice device, VkDeviceMemory memory, ulong offset, ulong size, uint flags, void** ppData);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkUnmapMemory(VkDevice device, VkDeviceMemory memory);
+unsafe public delegate void PFN_vkUnmapMemory(VkDevice device, VkDeviceMemory memory);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateCommandPool(VkDevice device, VkCommandPoolCreateInfo* pCreateInfo, void* pAllocator, VkCommandPool* pCommandPool);
+unsafe public delegate VkResult PFN_vkCreateCommandPool(VkDevice device, VkCommandPoolCreateInfo* pCreateInfo, void* pAllocator, VkCommandPool* pCommandPool);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyCommandPool(VkDevice device, VkCommandPool commandPool, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyCommandPool(VkDevice device, VkCommandPool commandPool, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkAllocateCommandBuffers(VkDevice device, VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers);
+unsafe public delegate VkResult PFN_vkAllocateCommandBuffers(VkDevice device, VkCommandBufferAllocateInfo* pAllocateInfo, VkCommandBuffer* pCommandBuffers);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint commandBufferCount, VkCommandBuffer* pCommandBuffers);
+unsafe public delegate void PFN_vkFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint commandBufferCount, VkCommandBuffer* pCommandBuffers);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferBeginInfo* pBeginInfo);
+unsafe public delegate VkResult PFN_vkBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferBeginInfo* pBeginInfo);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkEndCommandBuffer(VkCommandBuffer commandBuffer);
+unsafe public delegate VkResult PFN_vkEndCommandBuffer(VkCommandBuffer commandBuffer);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkResetCommandBuffer(VkCommandBuffer commandBuffer, uint flags);
+unsafe public delegate VkResult PFN_vkResetCommandBuffer(VkCommandBuffer commandBuffer, uint flags);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkQueueSubmit(VkQueue queue, uint submitCount, VkSubmitInfo* pSubmits, VkFence fence);
+unsafe public delegate VkResult PFN_vkQueueSubmit(VkQueue queue, uint submitCount, VkSubmitInfo* pSubmits, VkFence fence);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkQueueWaitIdle(VkQueue queue);
+unsafe public delegate VkResult PFN_vkQueueWaitIdle(VkQueue queue);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR* pPresentInfo);
+unsafe public delegate VkResult PFN_vkQueuePresentKHR(VkQueue queue, VkPresentInfoKHR* pPresentInfo);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, ulong timeout, VkSemaphore semaphore, VkFence fence, uint* pImageIndex);
+unsafe public delegate VkResult PFN_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, ulong timeout, VkSemaphore semaphore, VkFence fence, uint* pImageIndex);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateSemaphore(VkDevice device, VkSemaphoreCreateInfo* pCreateInfo, void* pAllocator, VkSemaphore* pSemaphore);
+unsafe public delegate VkResult PFN_vkCreateSemaphore(VkDevice device, VkSemaphoreCreateInfo* pCreateInfo, void* pAllocator, VkSemaphore* pSemaphore);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroySemaphore(VkDevice device, VkSemaphore semaphore, void* pAllocator);
+unsafe public delegate void PFN_vkDestroySemaphore(VkDevice device, VkSemaphore semaphore, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateFence(VkDevice device, VkFenceCreateInfo* pCreateInfo, void* pAllocator, VkFence* pFence);
+unsafe public delegate VkResult PFN_vkCreateFence(VkDevice device, VkFenceCreateInfo* pCreateInfo, void* pAllocator, VkFence* pFence);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroyFence(VkDevice device, VkFence fence, void* pAllocator);
+unsafe public delegate void PFN_vkDestroyFence(VkDevice device, VkFence fence, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkWaitForFences(VkDevice device, uint fenceCount, VkFence* pFences, uint waitAll, ulong timeout);
+unsafe public delegate VkResult PFN_vkWaitForFences(VkDevice device, uint fenceCount, VkFence* pFences, uint waitAll, ulong timeout);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkResetFences(VkDevice device, uint fenceCount, VkFence* pFences);
+unsafe public delegate VkResult PFN_vkResetFences(VkDevice device, uint fenceCount, VkFence* pFences);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents);
+unsafe public delegate void PFN_vkCmdBeginRenderPass(VkCommandBuffer commandBuffer, VkRenderPassBeginInfo* pRenderPassBegin, VkSubpassContents contents);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdEndRenderPass(VkCommandBuffer commandBuffer);
+unsafe public delegate void PFN_vkCmdEndRenderPass(VkCommandBuffer commandBuffer);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdBindPipeline(VkCommandBuffer commandBuffer, int pipelineBindPoint, VkPipeline pipeline);
+unsafe public delegate void PFN_vkCmdBindPipeline(VkCommandBuffer commandBuffer, int pipelineBindPoint, VkPipeline pipeline);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdBindDescriptorSets(VkCommandBuffer commandBuffer, int pipelineBindPoint, VkPipelineLayout layout, uint firstSet, uint descriptorSetCount, VkDescriptorSet* pDescriptorSets, uint dynamicOffsetCount, uint* pDynamicOffsets);
+unsafe public delegate void PFN_vkCmdBindDescriptorSets(VkCommandBuffer commandBuffer, int pipelineBindPoint, VkPipelineLayout layout, uint firstSet, uint descriptorSetCount, VkDescriptorSet* pDescriptorSets, uint dynamicOffsetCount, uint* pDynamicOffsets);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint firstBinding, uint bindingCount, VkBuffer* pBuffers, ulong* pOffsets);
+unsafe public delegate void PFN_vkCmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint firstBinding, uint bindingCount, VkBuffer* pBuffers, ulong* pOffsets);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, ulong offset, VkIndexType indexType);
+unsafe public delegate void PFN_vkCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, ulong offset, VkIndexType indexType);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdDrawIndexed(VkCommandBuffer commandBuffer, uint indexCount, uint instanceCount, uint firstIndex, int vertexOffset, uint firstInstance);
+unsafe public delegate void PFN_vkCmdDrawIndexed(VkCommandBuffer commandBuffer, uint indexCount, uint instanceCount, uint firstIndex, int vertexOffset, uint firstInstance);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdDraw(VkCommandBuffer commandBuffer, uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
+unsafe public delegate void PFN_vkCmdDraw(VkCommandBuffer commandBuffer, uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdSetViewport(VkCommandBuffer commandBuffer, uint firstViewport, uint viewportCount, VkViewport* pViewports);
+unsafe public delegate void PFN_vkCmdSetViewport(VkCommandBuffer commandBuffer, uint firstViewport, uint viewportCount, VkViewport* pViewports);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdSetScissor(VkCommandBuffer commandBuffer, uint firstScissor, uint scissorCount, VkRect2D* pScissors);
+unsafe public delegate void PFN_vkCmdSetScissor(VkCommandBuffer commandBuffer, uint firstScissor, uint scissorCount, VkRect2D* pScissors);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, int dependencyFlags, uint memoryBarrierCount, void* pMemoryBarriers, uint bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, uint imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers);
+unsafe public delegate void PFN_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, int dependencyFlags, uint memoryBarrierCount, void* pMemoryBarriers, uint bufferMemoryBarrierCount, VkBufferMemoryBarrier* pBufferMemoryBarriers, uint imageMemoryBarrierCount, VkImageMemoryBarrier* pImageMemoryBarriers);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint regionCount, VkBufferCopy* pRegions);
+unsafe public delegate void PFN_vkCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint regionCount, VkBufferCopy* pRegions);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage, int dstImageLayout, uint regionCount, VkBufferImageCopy* pRegions);
+unsafe public delegate void PFN_vkCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage, int dstImageLayout, uint regionCount, VkBufferImageCopy* pRegions);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, int srcImageLayout, VkBuffer dstBuffer, uint regionCount, VkBufferImageCopy* pRegions);
+unsafe public delegate void PFN_vkCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, int srcImageLayout, VkBuffer dstBuffer, uint regionCount, VkBufferImageCopy* pRegions);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, int imageLayout, VkClearColorValue* pColor, uint rangeCount, VkImageSubresourceRange* pRanges);
+unsafe public delegate void PFN_vkCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, int imageLayout, VkClearColorValue* pColor, uint rangeCount, VkImageSubresourceRange* pRanges);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint offset, uint size, void* pValues);
+unsafe public delegate void PFN_vkCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint offset, uint size, void* pValues);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkCreateSampler(VkDevice device, VkSamplerCreateInfo* pCreateInfo, void* pAllocator, void* pSampler);
+unsafe public delegate VkResult PFN_vkCreateSampler(VkDevice device, VkSamplerCreateInfo* pCreateInfo, void* pAllocator, void* pSampler);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroySampler(VkDevice device, void* sampler, void* pAllocator);
+unsafe public delegate void PFN_vkDestroySampler(VkDevice device, void* sampler, void* pAllocator);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint queueFamilyIndex, VkSurfaceKHR surface, uint* pSupported);
+unsafe public delegate VkResult PFN_vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint queueFamilyIndex, VkSurfaceKHR surface, uint* pSupported);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities);
+unsafe public delegate VkResult PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR* pSurfaceCapabilities);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats);
+unsafe public delegate VkResult PFN_vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate VkResult PFN_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint* pPresentModeCount, VkPresentModeKHR* pPresentModes);
+unsafe public delegate VkResult PFN_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint* pPresentModeCount, VkPresentModeKHR* pPresentModes);
 [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-unsafe internal delegate void PFN_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, void* pAllocator);
+unsafe public delegate void PFN_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, void* pAllocator);

@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-internal static unsafe partial class VulkanNative
+public static unsafe partial class VulkanNative
 {
     private const string VulkanLib = "vulkan-1.dll";
     private const string VulkanLibLinux = "libvulkan.so.1";

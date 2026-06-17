@@ -14,6 +14,7 @@ using Engine.Graphics.Loaders;
 using Engine.Graphics.Vulkan;
 using Engine.Physics;
 using Flecs.NET.Core;
+using ImGuiNET;
 
 namespace CortexEngine.App;
 
@@ -45,6 +46,16 @@ class Program
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
+
+            VulkanImGui? imGuiLayer = null;
+            if (!cameraTour && renderer is VulkanRenderer vkRenderer)
+            {
+                ImGui.CreateContext();
+                imGuiLayer = new VulkanImGui(vkRenderer._ctx, vkRenderer._swapchain);
+                vkRenderer.ImGuiLayer = imGuiLayer;
+                ImGui.GetIO().DisplaySize = new System.Numerics.Vector2(window.Width, window.Height);
+                Console.WriteLine("[App] ImGui initialized.");
+            }
 
             var (modelPath, mcpPort) = ParseArgs(args);
             var mesh = LoadModel(modelPath);
@@ -249,6 +260,35 @@ class Program
                     demoScreenshotRequested = true;
                 }
 
+                if (imGuiLayer != null)
+                {
+                    ImGui.NewFrame();
+                    ImGui.Begin("Cortex Engine Debug");
+                    ImGui.Text($"FPS: {currentFps}");
+                    ImGui.Text($"Delta: {timing.DeltaTime * 1000.0:F2} ms");
+                    ImGui.Text($"Camera: {cameraController.Name}");
+                    ImGui.Separator();
+                    var cam = cameraEntity.Get<Camera>();
+                    ImGui.Text($"Pos: ({cam.Position.X:F2}, {cam.Position.Y:F2}, {cam.Position.Z:F2})");
+                    ImGui.Text($"Target: ({cam.Target.X:F2}, {cam.Target.Y:F2}, {cam.Target.Z:F2})");
+                    ImGui.Separator();
+
+                    var entityCount = 0;
+                    world.Each((Entity e, ref Transform _) => entityCount++);
+                    ImGui.Text($"Entities: {entityCount}");
+                    ImGui.Text($"Press F to toggle camera");
+
+                    ImGui.Separator();
+                    ImGui.Text("Lights:");
+                    world.Each((Entity e, ref Light light) =>
+                    {
+                        ImGui.Text($"  {e.Name()}: {light.Type} I={light.Intensity:F1}");
+                    });
+
+                    ImGui.End();
+                    ImGui.Render();
+                }
+
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();
 
@@ -263,6 +303,7 @@ class Program
             }
 
             Console.WriteLine("Shutting down...");
+            imGuiLayer?.Dispose();
 #if !RELEASE_AOT
             if (mcpApp != null)
                 await mcpApp.StopAsync();

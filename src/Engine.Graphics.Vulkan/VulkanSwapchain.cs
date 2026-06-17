@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanSwapchain : IDisposable
+public sealed unsafe class VulkanSwapchain : IDisposable
 {
     public VkSwapchainKHR Swapchain;
     public VkImage[] SwapchainImages = Array.Empty<VkImage>();

@@ -5,7 +5,7 @@ using SDL;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanContext : IDisposable
+public sealed unsafe class VulkanContext : IDisposable
 {
     public VkInstance Instance;
     public VkPhysicalDevice PhysicalDevice;

@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanBuffer : IDisposable
+public sealed unsafe class VulkanBuffer : IDisposable
 {
     public VkBuffer Buffer;
     public VkDeviceMemory Memory;

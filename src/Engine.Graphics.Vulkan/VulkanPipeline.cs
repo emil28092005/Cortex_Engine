@@ -3,7 +3,7 @@ using System.Text;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanPipeline : IDisposable
+public sealed unsafe class VulkanPipeline : IDisposable
 {
     public VkPipelineLayout PipelineLayout;
     public VkPipeline Pipeline;

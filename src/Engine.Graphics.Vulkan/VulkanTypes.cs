@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-internal enum VkResult : int
+public enum VkResult : int
 {
     Success = 0,
     NotReady = 1,
@@ -28,7 +28,7 @@ internal enum VkResult : int
     ErrorValidationFailedEXT = -1000011001,
 }
 
-internal enum VkStructureType : int
+public enum VkStructureType : int
 {
     ApplicationInfo = 0,
     InstanceCreateInfo = 1,
@@ -82,7 +82,7 @@ internal enum VkStructureType : int
     SurfaceFormatKHR = 1000000001,
 }
 
-internal enum VkFormat : int
+public enum VkFormat : int
 {
     Undefined = 0,
     R8G8B8A8Unorm = 37,
@@ -99,7 +99,7 @@ internal enum VkFormat : int
     D16Unorm = 124,
 }
 
-internal enum VkImageUsageFlags : uint
+public enum VkImageUsageFlags : uint
 {
     TransferSrc = 0x00000001,
     TransferDst = 0x00000002,
@@ -109,14 +109,14 @@ internal enum VkImageUsageFlags : uint
     DepthStencilAttachment = 0x00000020,
 }
 
-internal enum VkImageAspectFlags : uint
+public enum VkImageAspectFlags : uint
 {
     Color = 0x00000001,
     Depth = 0x00000002,
     Stencil = 0x00000004,
 }
 
-internal enum VkImageLayout : int
+public enum VkImageLayout : int
 {
     Undefined = 0,
     General = 1,
@@ -130,7 +130,7 @@ internal enum VkImageLayout : int
     PresentSrcKHR = 1000001002,
 }
 
-internal enum VkPipelineStageFlags : uint
+public enum VkPipelineStageFlags : uint
 {
     TopOfPipe = 0x00000001,
     DrawIndirect = 0x00000002,
@@ -147,7 +147,7 @@ internal enum VkPipelineStageFlags : uint
     AllCommands = 0x00010000,
 }
 
-internal enum VkAccessFlags : uint
+public enum VkAccessFlags : uint
 {
     IndirectCommandRead = 0x00000001,
     IndexRead = 0x00000002,
@@ -168,26 +168,26 @@ internal enum VkAccessFlags : uint
     MemoryWrite = 0x00010000,
 }
 
-internal enum VkCommandBufferLevel : int
+public enum VkCommandBufferLevel : int
 {
     Primary = 0,
     Secondary = 1,
 }
 
-internal enum VkCommandBufferUsageFlags : uint
+public enum VkCommandBufferUsageFlags : uint
 {
     OneTimeSubmit = 0x00000001,
     RenderPassContinue = 0x00000002,
     SimultaneousUse = 0x00000004,
 }
 
-internal enum VkIndexType : int
+public enum VkIndexType : int
 {
     Uint16 = 0,
     Uint32 = 1,
 }
 
-internal enum VkPrimitiveTopology : int
+public enum VkPrimitiveTopology : int
 {
     PointList = 0,
     LineList = 1,
@@ -197,14 +197,14 @@ internal enum VkPrimitiveTopology : int
     TriangleFan = 5,
 }
 
-internal enum VkPolygonMode : int
+public enum VkPolygonMode : int
 {
     Fill = 0,
     Line = 1,
     Point = 2,
 }
 
-internal enum VkCullModeFlags : uint
+public enum VkCullModeFlags : uint
 {
     None = 0,
     Front = 0x00000001,
@@ -212,13 +212,13 @@ internal enum VkCullModeFlags : uint
     FrontAndBack = 0x00000003,
 }
 
-internal enum VkFrontFace : int
+public enum VkFrontFace : int
 {
     CounterClockwise = 0,
     Clockwise = 1,
 }
 
-internal enum VkBlendFactor : int
+public enum VkBlendFactor : int
 {
     Zero = 0,
     One = 1,
@@ -232,14 +232,14 @@ internal enum VkBlendFactor : int
     OneMinusDstAlpha = 9,
 }
 
-internal enum VkBlendOp : int
+public enum VkBlendOp : int
 {
     Add = 0,
     Subtract = 1,
     ReverseSubtract = 2,
 }
 
-internal enum VkColorComponentFlags : uint
+public enum VkColorComponentFlags : uint
 {
     R = 0x00000010,
     G = 0x00000020,
@@ -247,7 +247,7 @@ internal enum VkColorComponentFlags : uint
     A = 0x00000080,
 }
 
-internal enum VkCompareOp : int
+public enum VkCompareOp : int
 {
     Never = 0,
     Less = 1,
@@ -259,7 +259,7 @@ internal enum VkCompareOp : int
     Always = 7,
 }
 
-internal enum VkDescriptorType : int
+public enum VkDescriptorType : int
 {
     Sampler = 0,
     CombinedImageSampler = 1,
@@ -273,14 +273,14 @@ internal enum VkDescriptorType : int
     StorageBufferDynamic = 9,
 }
 
-internal enum VkShaderStageFlags : uint
+public enum VkShaderStageFlags : uint
 {
     Vertex = 0x00000001,
     Fragment = 0x00000010,
     AllGraphics = 0x0000001F,
 }
 
-internal enum VkBufferUsageFlags : uint
+public enum VkBufferUsageFlags : uint
 {
     TransferSrc = 0x00000001,
     TransferDst = 0x00000002,
@@ -293,7 +293,7 @@ internal enum VkBufferUsageFlags : uint
     IndirectBuffer = 0x00000100,
 }
 
-internal enum VkMemoryPropertyFlags : uint
+public enum VkMemoryPropertyFlags : uint
 {
     DeviceLocal = 0x00000001,
     HostVisible = 0x00000002,
@@ -302,7 +302,7 @@ internal enum VkMemoryPropertyFlags : uint
     LazilyAllocated = 0x00000010,
 }
 
-internal enum VkQueueFlags : uint
+public enum VkQueueFlags : uint
 {
     Graphics = 0x00000001,
     Compute = 0x00000002,
@@ -310,7 +310,7 @@ internal enum VkQueueFlags : uint
     SparseBinding = 0x00000008,
 }
 
-internal enum VkPhysicalDeviceType : int
+public enum VkPhysicalDeviceType : int
 {
     Other = 0,
     IntegratedGpu = 1,
@@ -319,7 +319,7 @@ internal enum VkPhysicalDeviceType : int
     Cpu = 4,
 }
 
-internal enum VkPresentModeKHR : int
+public enum VkPresentModeKHR : int
 {
     Immediate = 0,
     Fifo = 1,
@@ -327,57 +327,57 @@ internal enum VkPresentModeKHR : int
     Mailbox = 3,
 }
 
-internal enum VkColorSpaceKHR : int
+public enum VkColorSpaceKHR : int
 {
     SrgbNonlinear = 0,
 }
 
-internal enum VkSurfaceTransformFlagsKHR : uint
+public enum VkSurfaceTransformFlagsKHR : uint
 {
     Identity = 0x00000001,
 }
 
-internal enum VkAttachmentLoadOp : int
+public enum VkAttachmentLoadOp : int
 {
     Load = 0,
     Clear = 1,
     DontCare = 2,
 }
 
-internal enum VkAttachmentStoreOp : int
+public enum VkAttachmentStoreOp : int
 {
     Store = 0,
     DontCare = 1,
 }
 
-internal enum VkSampleCountFlags : uint
+public enum VkSampleCountFlags : uint
 {
     One = 0x00000001,
 }
 
-internal enum VkSharingMode : int
+public enum VkSharingMode : int
 {
     Exclusive = 0,
     Concurrent = 1,
 }
 
-internal enum VkFenceCreateFlags : uint
+public enum VkFenceCreateFlags : uint
 {
     Signaled = 0x00000001,
 }
 
-internal enum VkDescriptorPoolCreateFlags : uint
+public enum VkDescriptorPoolCreateFlags : uint
 {
     FreeDescriptorSet = 0x00000001,
 }
 
-internal enum VkSubpassContents : int
+public enum VkSubpassContents : int
 {
     Inline = 0,
     SecondaryCommandBuffers = 1,
 }
 
-internal enum VkImageViewType : int
+public enum VkImageViewType : int
 {
     _1D = 0,
     _2D = 1,
@@ -388,14 +388,14 @@ internal enum VkImageViewType : int
     CubeArray = 6,
 }
 
-internal enum VkImageType : int
+public enum VkImageType : int
 {
     _1D = 0,
     _2D = 1,
     _3D = 2,
 }
 
-internal enum VkSamplerAddressMode : int
+public enum VkSamplerAddressMode : int
 {
     Repeat = 0,
     MirroredRepeat = 1,
@@ -403,94 +403,96 @@ internal enum VkSamplerAddressMode : int
     ClampToBorder = 3,
 }
 
-internal enum VkFilter : int
+public enum VkFilter : int
 {
     Nearest = 0,
     Linear = 1,
 }
 
-internal enum VkSamplerMipmapMode : int
+public enum VkSamplerMipmapMode : int
 {
     Nearest = 0,
     Linear = 1,
 }
 
-internal enum VkBorderColor : int
+public enum VkBorderColor : int
 {
     FloatTransparentBlack = 4,
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkHandle { public ulong Value; }
+unsafe public struct VkHandle { public ulong Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkInstance { public ulong Value; public static implicit operator ulong(VkInstance h) => h.Value; }
+unsafe public struct VkInstance { public ulong Value; public static implicit operator ulong(VkInstance h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPhysicalDevice { public ulong Value; public static implicit operator ulong(VkPhysicalDevice h) => h.Value; }
+unsafe public struct VkPhysicalDevice { public ulong Value; public static implicit operator ulong(VkPhysicalDevice h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDevice { public ulong Value; public static implicit operator ulong(VkDevice h) => h.Value; }
+unsafe public struct VkDevice { public ulong Value; public static implicit operator ulong(VkDevice h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkQueue { public ulong Value; public static implicit operator ulong(VkQueue h) => h.Value; }
+unsafe public struct VkQueue { public ulong Value; public static implicit operator ulong(VkQueue h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkCommandBuffer { public ulong Value; public static implicit operator ulong(VkCommandBuffer h) => h.Value; }
+unsafe public struct VkCommandBuffer { public ulong Value; public static implicit operator ulong(VkCommandBuffer h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkCommandPool { public ulong Value; public static implicit operator ulong(VkCommandPool h) => h.Value; }
+unsafe public struct VkCommandPool { public ulong Value; public static implicit operator ulong(VkCommandPool h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkBuffer { public ulong Value; public static implicit operator ulong(VkBuffer h) => h.Value; }
+unsafe public struct VkBuffer { public ulong Value; public static implicit operator ulong(VkBuffer h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDeviceMemory { public ulong Value; public static implicit operator ulong(VkDeviceMemory h) => h.Value; }
+unsafe public struct VkDeviceMemory { public ulong Value; public static implicit operator ulong(VkDeviceMemory h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImage { public ulong Value; public static implicit operator ulong(VkImage h) => h.Value; }
+unsafe public struct VkImage { public ulong Value; public static implicit operator ulong(VkImage h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImageView { public ulong Value; public static implicit operator ulong(VkImageView h) => h.Value; }
+unsafe public struct VkImageView { public ulong Value; public static implicit operator ulong(VkImageView h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkShaderModule { public ulong Value; public static implicit operator ulong(VkShaderModule h) => h.Value; }
+unsafe public struct VkShaderModule { public ulong Value; public static implicit operator ulong(VkShaderModule h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineLayout { public ulong Value; public static implicit operator ulong(VkPipelineLayout h) => h.Value; }
+unsafe public struct VkPipelineLayout { public ulong Value; public static implicit operator ulong(VkPipelineLayout h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipeline { public ulong Value; public static implicit operator ulong(VkPipeline h) => h.Value; }
+unsafe public struct VkPipeline { public ulong Value; public static implicit operator ulong(VkPipeline h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkRenderPass { public ulong Value; public static implicit operator ulong(VkRenderPass h) => h.Value; }
+unsafe public struct VkSampler { public ulong Value; public static implicit operator ulong(VkSampler h) => h.Value; }
+
+unsafe public struct VkRenderPass { public ulong Value; public static implicit operator ulong(VkRenderPass h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkFramebuffer { public ulong Value; public static implicit operator ulong(VkFramebuffer h) => h.Value; }
+unsafe public struct VkFramebuffer { public ulong Value; public static implicit operator ulong(VkFramebuffer h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorSetLayout { public ulong Value; public static implicit operator ulong(VkDescriptorSetLayout h) => h.Value; }
+unsafe public struct VkDescriptorSetLayout { public ulong Value; public static implicit operator ulong(VkDescriptorSetLayout h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorPool { public ulong Value; public static implicit operator ulong(VkDescriptorPool h) => h.Value; }
+unsafe public struct VkDescriptorPool { public ulong Value; public static implicit operator ulong(VkDescriptorPool h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorSet { public ulong Value; public static implicit operator ulong(VkDescriptorSet h) => h.Value; }
+unsafe public struct VkDescriptorSet { public ulong Value; public static implicit operator ulong(VkDescriptorSet h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSemaphore { public ulong Value; public static implicit operator ulong(VkSemaphore h) => h.Value; }
+unsafe public struct VkSemaphore { public ulong Value; public static implicit operator ulong(VkSemaphore h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkFence { public ulong Value; public static implicit operator ulong(VkFence h) => h.Value; }
+unsafe public struct VkFence { public ulong Value; public static implicit operator ulong(VkFence h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSwapchainKHR { public ulong Value; public static implicit operator ulong(VkSwapchainKHR h) => h.Value; }
+unsafe public struct VkSwapchainKHR { public ulong Value; public static implicit operator ulong(VkSwapchainKHR h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSurfaceKHR { public ulong Value; public static implicit operator ulong(VkSurfaceKHR h) => h.Value; }
+unsafe public struct VkSurfaceKHR { public ulong Value; public static implicit operator ulong(VkSurfaceKHR h) => h.Value; }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkApplicationInfo
+unsafe public struct VkApplicationInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -502,7 +504,7 @@ unsafe internal struct VkApplicationInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkInstanceCreateInfo
+unsafe public struct VkInstanceCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -515,7 +517,7 @@ unsafe internal struct VkInstanceCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDeviceQueueCreateInfo
+unsafe public struct VkDeviceQueueCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -526,7 +528,7 @@ unsafe internal struct VkDeviceQueueCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDeviceCreateInfo
+unsafe public struct VkDeviceCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -541,12 +543,12 @@ unsafe internal struct VkDeviceCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential, Size = 228)]
-internal struct VkPhysicalDeviceFeatures
+public struct VkPhysicalDeviceFeatures
 {
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal unsafe struct VkPhysicalDeviceProperties
+public unsafe struct VkPhysicalDeviceProperties
 {
     public uint apiVersion;
     public uint driverVersion;
@@ -560,7 +562,7 @@ internal unsafe struct VkPhysicalDeviceProperties
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal unsafe struct VkPhysicalDeviceLimits
+public unsafe struct VkPhysicalDeviceLimits
 {
     public uint maxImageDimension1D;
     public uint maxImageDimension2D;
@@ -671,7 +673,7 @@ internal unsafe struct VkPhysicalDeviceLimits
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPhysicalDeviceSparseProperties
+unsafe public struct VkPhysicalDeviceSparseProperties
 {
     public uint residencyStandard2DBlockShape;
     public uint residencyStandard2DMultisampleBlockShape;
@@ -681,7 +683,7 @@ unsafe internal struct VkPhysicalDeviceSparseProperties
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkQueueFamilyProperties
+unsafe public struct VkQueueFamilyProperties
 {
     public VkQueueFlags queueFlags;
     public uint queueCount;
@@ -690,7 +692,7 @@ unsafe internal struct VkQueueFamilyProperties
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkExtent3D
+unsafe public struct VkExtent3D
 {
     public int width;
     public int height;
@@ -698,14 +700,14 @@ unsafe internal struct VkExtent3D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkExtent2D
+unsafe public struct VkExtent2D
 {
     public int width;
     public int height;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal unsafe struct VkPhysicalDeviceMemoryProperties
+public unsafe struct VkPhysicalDeviceMemoryProperties
 {
     public uint memoryTypeCount;
     public VkMemoryType memoryTypes0;
@@ -731,14 +733,14 @@ internal unsafe struct VkPhysicalDeviceMemoryProperties
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkMemoryType
+unsafe public struct VkMemoryType
 {
     public VkMemoryPropertyFlags propertyFlags;
     public uint heapIndex;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkMemoryHeap
+unsafe public struct VkMemoryHeap
 {
     public ulong size;
     public uint flags;
@@ -746,7 +748,7 @@ unsafe internal struct VkMemoryHeap
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSurfaceCapabilitiesKHR
+unsafe public struct VkSurfaceCapabilitiesKHR
 {
     public uint minImageCount;
     public uint maxImageCount;
@@ -761,14 +763,14 @@ unsafe internal struct VkSurfaceCapabilitiesKHR
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSurfaceFormatKHR
+unsafe public struct VkSurfaceFormatKHR
 {
     public VkFormat format;
     public VkColorSpaceKHR colorSpace;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSwapchainCreateInfoKHR
+unsafe public struct VkSwapchainCreateInfoKHR
 {
     public VkStructureType sType;
     public void* pNext;
@@ -791,7 +793,7 @@ unsafe internal struct VkSwapchainCreateInfoKHR
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPresentInfoKHR
+unsafe public struct VkPresentInfoKHR
 {
     public VkStructureType sType;
     public void* pNext;
@@ -804,7 +806,7 @@ unsafe internal struct VkPresentInfoKHR
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSubmitInfo
+unsafe public struct VkSubmitInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -818,7 +820,7 @@ unsafe internal struct VkSubmitInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImageCreateInfo
+unsafe public struct VkImageCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -838,7 +840,7 @@ unsafe internal struct VkImageCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImageViewCreateInfo
+unsafe public struct VkImageViewCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -851,7 +853,7 @@ unsafe internal struct VkImageViewCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkComponentMapping
+unsafe public struct VkComponentMapping
 {
     public int r;
     public int g;
@@ -860,7 +862,7 @@ unsafe internal struct VkComponentMapping
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImageSubresourceRange
+unsafe public struct VkImageSubresourceRange
 {
     public VkImageAspectFlags aspectMask;
     public uint baseMipLevel;
@@ -870,7 +872,7 @@ unsafe internal struct VkImageSubresourceRange
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkMemoryAllocateInfo
+unsafe public struct VkMemoryAllocateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -879,7 +881,7 @@ unsafe internal struct VkMemoryAllocateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkBufferCreateInfo
+unsafe public struct VkBufferCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -892,7 +894,7 @@ unsafe internal struct VkBufferCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkShaderModuleCreateInfo
+unsafe public struct VkShaderModuleCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -902,7 +904,7 @@ unsafe internal struct VkShaderModuleCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineShaderStageCreateInfo
+unsafe public struct VkPipelineShaderStageCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -914,7 +916,7 @@ unsafe internal struct VkPipelineShaderStageCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineLayoutCreateInfo
+unsafe public struct VkPipelineLayoutCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -926,7 +928,7 @@ unsafe internal struct VkPipelineLayoutCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPushConstantRange
+unsafe public struct VkPushConstantRange
 {
     public VkShaderStageFlags stageFlags;
     public uint offset;
@@ -934,7 +936,7 @@ unsafe internal struct VkPushConstantRange
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorSetLayoutCreateInfo
+unsafe public struct VkDescriptorSetLayoutCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -944,7 +946,7 @@ unsafe internal struct VkDescriptorSetLayoutCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorSetLayoutBinding
+unsafe public struct VkDescriptorSetLayoutBinding
 {
     public uint binding;
     public VkDescriptorType descriptorType;
@@ -954,7 +956,7 @@ unsafe internal struct VkDescriptorSetLayoutBinding
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorPoolCreateInfo
+unsafe public struct VkDescriptorPoolCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -965,14 +967,14 @@ unsafe internal struct VkDescriptorPoolCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorPoolSize
+unsafe public struct VkDescriptorPoolSize
 {
     public VkDescriptorType type;
     public uint descriptorCount;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorSetAllocateInfo
+unsafe public struct VkDescriptorSetAllocateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -982,7 +984,7 @@ unsafe internal struct VkDescriptorSetAllocateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkWriteDescriptorSet
+unsafe public struct VkWriteDescriptorSet
 {
     public VkStructureType sType;
     public void* pNext;
@@ -997,7 +999,7 @@ unsafe internal struct VkWriteDescriptorSet
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkDescriptorBufferInfo
+unsafe public struct VkDescriptorBufferInfo
 {
     public VkBuffer buffer;
     public ulong offset;
@@ -1005,7 +1007,7 @@ unsafe internal struct VkDescriptorBufferInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkVertexInputBindingDescription
+unsafe public struct VkVertexInputBindingDescription
 {
     public uint binding;
     public uint stride;
@@ -1013,7 +1015,7 @@ unsafe internal struct VkVertexInputBindingDescription
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkVertexInputAttributeDescription
+unsafe public struct VkVertexInputAttributeDescription
 {
     public uint location;
     public uint binding;
@@ -1022,7 +1024,7 @@ unsafe internal struct VkVertexInputAttributeDescription
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineVertexInputStateCreateInfo
+unsafe public struct VkPipelineVertexInputStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1034,7 +1036,7 @@ unsafe internal struct VkPipelineVertexInputStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineInputAssemblyStateCreateInfo
+unsafe public struct VkPipelineInputAssemblyStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1044,7 +1046,7 @@ unsafe internal struct VkPipelineInputAssemblyStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkViewport
+unsafe public struct VkViewport
 {
     public float x;
     public float y;
@@ -1055,21 +1057,21 @@ unsafe internal struct VkViewport
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkRect2D
+unsafe public struct VkRect2D
 {
     public VkOffset2D offset;
     public VkExtent2D extent;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkOffset2D
+unsafe public struct VkOffset2D
 {
     public int x;
     public int y;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineViewportStateCreateInfo
+unsafe public struct VkPipelineViewportStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1081,7 +1083,7 @@ unsafe internal struct VkPipelineViewportStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineRasterizationStateCreateInfo
+unsafe public struct VkPipelineRasterizationStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1099,7 +1101,7 @@ unsafe internal struct VkPipelineRasterizationStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineMultisampleStateCreateInfo
+unsafe public struct VkPipelineMultisampleStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1113,7 +1115,7 @@ unsafe internal struct VkPipelineMultisampleStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineDepthStencilStateCreateInfo
+unsafe public struct VkPipelineDepthStencilStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1130,7 +1132,7 @@ unsafe internal struct VkPipelineDepthStencilStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct VkStencilOpState
+public struct VkStencilOpState
 {
     public int failOp;
     public int passOp;
@@ -1142,7 +1144,7 @@ internal struct VkStencilOpState
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineColorBlendAttachmentState
+unsafe public struct VkPipelineColorBlendAttachmentState
 {
     public uint blendEnable;
     public VkBlendFactor srcColorBlendFactor;
@@ -1155,7 +1157,7 @@ unsafe internal struct VkPipelineColorBlendAttachmentState
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkPipelineColorBlendStateCreateInfo
+unsafe public struct VkPipelineColorBlendStateCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1168,7 +1170,7 @@ unsafe internal struct VkPipelineColorBlendStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkGraphicsPipelineCreateInfo
+unsafe public struct VkGraphicsPipelineCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1192,7 +1194,7 @@ unsafe internal struct VkGraphicsPipelineCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkRenderPassCreateInfo
+unsafe public struct VkRenderPassCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1206,7 +1208,7 @@ unsafe internal struct VkRenderPassCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkAttachmentDescription
+unsafe public struct VkAttachmentDescription
 {
     public uint flags;
     public VkFormat format;
@@ -1220,14 +1222,14 @@ unsafe internal struct VkAttachmentDescription
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkAttachmentReference
+unsafe public struct VkAttachmentReference
 {
     public uint attachment;
     public VkImageLayout layout;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSubpassDescription
+unsafe public struct VkSubpassDescription
 {
     public uint flags;
     public int pipelineBindPoint;
@@ -1242,7 +1244,7 @@ unsafe internal struct VkSubpassDescription
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSubpassDependency
+unsafe public struct VkSubpassDependency
 {
     public uint srcSubpass;
     public uint dstSubpass;
@@ -1255,7 +1257,7 @@ unsafe internal struct VkSubpassDependency
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkFramebufferCreateInfo
+unsafe public struct VkFramebufferCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1269,7 +1271,7 @@ unsafe internal struct VkFramebufferCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkCommandPoolCreateInfo
+unsafe public struct VkCommandPoolCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1278,7 +1280,7 @@ unsafe internal struct VkCommandPoolCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkCommandBufferAllocateInfo
+unsafe public struct VkCommandBufferAllocateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1288,7 +1290,7 @@ unsafe internal struct VkCommandBufferAllocateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkCommandBufferBeginInfo
+unsafe public struct VkCommandBufferBeginInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1297,7 +1299,7 @@ unsafe internal struct VkCommandBufferBeginInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkRenderPassBeginInfo
+unsafe public struct VkRenderPassBeginInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1309,27 +1311,27 @@ unsafe internal struct VkRenderPassBeginInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkClearValue
+unsafe public struct VkClearValue
 {
     public VkClearColorValue color;
     public VkClearDepthStencilValue depthStencil;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkClearColorValue
+unsafe public struct VkClearColorValue
 {
     public float r, g, b, a;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkClearDepthStencilValue
+unsafe public struct VkClearDepthStencilValue
 {
     public float depth;
     public uint stencil;
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkBufferCopy
+unsafe public struct VkBufferCopy
 {
     public ulong srcOffset;
     public ulong dstOffset;
@@ -1337,7 +1339,7 @@ unsafe internal struct VkBufferCopy
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkBufferImageCopy
+unsafe public struct VkBufferImageCopy
 {
     public ulong bufferOffset;
     public uint bufferRowLength;
@@ -1348,7 +1350,7 @@ unsafe internal struct VkBufferImageCopy
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImageSubresourceLayers
+unsafe public struct VkImageSubresourceLayers
 {
     public VkImageAspectFlags aspectMask;
     public uint mipLevel;
@@ -1357,7 +1359,7 @@ unsafe internal struct VkImageSubresourceLayers
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkOffset3D
+unsafe public struct VkOffset3D
 {
     public int x;
     public int y;
@@ -1365,7 +1367,7 @@ unsafe internal struct VkOffset3D
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkImageMemoryBarrier
+unsafe public struct VkImageMemoryBarrier
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1380,7 +1382,7 @@ unsafe internal struct VkImageMemoryBarrier
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkBufferMemoryBarrier
+unsafe public struct VkBufferMemoryBarrier
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1394,7 +1396,7 @@ unsafe internal struct VkBufferMemoryBarrier
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSemaphoreCreateInfo
+unsafe public struct VkSemaphoreCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1402,7 +1404,7 @@ unsafe internal struct VkSemaphoreCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkFenceCreateInfo
+unsafe public struct VkFenceCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
@@ -1410,14 +1412,14 @@ unsafe internal struct VkFenceCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential, Size = 260)]
-internal unsafe struct VkExtensionProperties
+public unsafe struct VkExtensionProperties
 {
     public fixed byte extensionName[256];
     public uint specVersion;
 }
 
 [StructLayout(LayoutKind.Sequential, Size = 264)]
-internal unsafe struct VkLayerProperties
+public unsafe struct VkLayerProperties
 {
     public fixed byte layerName[256];
     public uint specVersion;
@@ -1426,7 +1428,7 @@ internal unsafe struct VkLayerProperties
 }
 
 [StructLayout(LayoutKind.Sequential)]
-unsafe internal struct VkSamplerCreateInfo
+unsafe public struct VkSamplerCreateInfo
 {
     public VkStructureType sType;
     public void* pNext;
