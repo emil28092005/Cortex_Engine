@@ -21,6 +21,8 @@ namespace Engine.Graphics.RaylibBackend;
 public sealed class RaylibRenderer : IRenderer
 {
     private readonly Shader _shader;
+    private readonly Shader _shadowShader;
+    private readonly RenderTexture2D _shadowMapRT;
     private readonly Dictionary<Entity, Raylib_cs.Model> _modelCache = new();
     private readonly Dictionary<string, Texture2D> _textureCache = new();
     private readonly int _materialColorLoc;
@@ -33,9 +35,12 @@ public sealed class RaylibRenderer : IRenderer
     private readonly int _lightDirLoc;
     private readonly int _lightIntensityLoc;
     private readonly int _lightColorLoc;
-    private readonly float[] _lightDirs = new float[12];   // 4 lights * 3 floats
+    private readonly int _lightSpaceMatrixLoc;
+    private readonly int _useShadowLoc;
+    private readonly float[] _lightDirs = new float[12];
     private readonly float[] _lightIntensities = new float[4];
-    private readonly float[] _lightColors = new float[12]; // 4 lights * 3 floats
+    private readonly float[] _lightColors = new float[12];
+    private readonly float[] _lightSpaceMatrixData = new float[16];
 
     private ScreenshotRequest? _pendingScreenshot;
     private int _frameCount;
@@ -49,6 +54,9 @@ public sealed class RaylibRenderer : IRenderer
     public RaylibRenderer()
     {
         _shader = LoadShader();
+        _shadowShader = LoadShadowShader();
+        _shadowMapRT = Raylib.LoadRenderTexture(1024, 1024);
+        Raylib.SetTextureFilter(_shadowMapRT.Texture, TextureFilter.Trilinear);
 
         _materialColorLoc = Raylib.GetShaderLocation(_shader, "materialColor");
         _useTextureLoc = Raylib.GetShaderLocation(_shader, "useTexture");
@@ -60,6 +68,8 @@ public sealed class RaylibRenderer : IRenderer
         _lightDirLoc = Raylib.GetShaderLocation(_shader, "lightDirs");
         _lightIntensityLoc = Raylib.GetShaderLocation(_shader, "lightIntensities");
         _lightColorLoc = Raylib.GetShaderLocation(_shader, "lightColors");
+        _lightSpaceMatrixLoc = Raylib.GetShaderLocation(_shader, "lightSpaceMatrix");
+        _useShadowLoc = Raylib.GetShaderLocation(_shader, "useShadow");
     }
 
     public void RequestScreenshot(string outputPath)
@@ -76,17 +86,29 @@ public sealed class RaylibRenderer : IRenderer
         var camera = GetCamera(world);
 
         Raylib.BeginDrawing();
+
+        // --- Shadow pass disabled — needs multi-texture-unit support ---
+        // RenderShadowPass(world);
+
+        // --- Main pass (render to screen) ---
         Raylib.ClearBackground(new Color(25, 30, 40, 255));
         Raylib.BeginMode3D(ToRaylib(camera));
 
         Rlgl.DisableBackfaceCulling();
 
-        // Frame-level uniforms: SetShaderValue calls glUseProgram internally,
-        // so these don't need BeginShaderMode. DrawModelEx rebinds the same shader
-        // (set on the model's material), so the values persist for the draw call.
         CollectLights(world);
         SetFrameLights();
         Raylib.SetShaderValue(_shader, _viewPosLoc, new float[] { camera.Position.X, camera.Position.Y, camera.Position.Z }, ShaderUniformDataType.Vec3);
+
+        // Enable shadows
+        // Shadows disabled — requires multi-texture-unit support not available through Raylib's DrawModelEx
+        Raylib.SetShaderValue(_shader, _useShadowLoc, 0, ShaderUniformDataType.Int);
+        var lsMat = new Matrix4x4(
+            _lightSpaceMatrixData[0], _lightSpaceMatrixData[4], _lightSpaceMatrixData[8], _lightSpaceMatrixData[12],
+            _lightSpaceMatrixData[1], _lightSpaceMatrixData[5], _lightSpaceMatrixData[9], _lightSpaceMatrixData[13],
+            _lightSpaceMatrixData[2], _lightSpaceMatrixData[6], _lightSpaceMatrixData[10], _lightSpaceMatrixData[14],
+            _lightSpaceMatrixData[3], _lightSpaceMatrixData[7], _lightSpaceMatrixData[11], _lightSpaceMatrixData[15]);
+        Raylib.SetShaderValueMatrix(_shader, _lightSpaceMatrixLoc, lsMat);
 
         world.Each((Entity e, ref EngineMesh mesh, ref EngineTransform transform) =>
         {
@@ -112,9 +134,6 @@ public sealed class RaylibRenderer : IRenderer
                         axis = new Vector3(q.X, q.Y, q.Z);
                 }
 
-                // Set per-entity uniforms right before the draw.
-                // DrawModelEx binds the model's material shader (= _shader) and
-                // immediately issues the draw, so these values are live during rendering.
                 SetMaterialUniforms(material, model);
                 Raylib.DrawModelEx(model, position, axis, angle * 180.0f / MathF.PI, scale, Color.White);
             }
@@ -380,6 +399,100 @@ public sealed class RaylibRenderer : IRenderer
         return tcs.Task;
     }
 
+    private void RenderShadowPass(World world)
+    {
+        if (_lightDirs[0] == 0 && _lightDirs[1] == 0 && _lightDirs[2] == 0)
+            return;
+
+        var lightDir = new Vector3(_lightDirs[0], _lightDirs[1], _lightDirs[2]);
+        var sceneCenter = new Vector3(0, 0.5f, 0);
+        var lightPos = sceneCenter - lightDir * 30f;
+
+        var lightView = Matrix4x4.CreateLookAt(lightPos, sceneCenter, Vector3.UnitY);
+        var lightProj = Matrix4x4.CreateOrthographic(25f, 25f, 1f, 80f);
+        var lightSpace = lightProj * lightView;
+
+        // Store for main pass (column-major for OpenGL)
+        _lightSpaceMatrixData[0] = lightSpace.M11;  _lightSpaceMatrixData[4] = lightSpace.M12;  _lightSpaceMatrixData[8]  = lightSpace.M13;  _lightSpaceMatrixData[12] = lightSpace.M14;
+        _lightSpaceMatrixData[1] = lightSpace.M21;  _lightSpaceMatrixData[5] = lightSpace.M22;  _lightSpaceMatrixData[9]  = lightSpace.M23;  _lightSpaceMatrixData[13] = lightSpace.M24;
+        _lightSpaceMatrixData[2] = lightSpace.M31;  _lightSpaceMatrixData[6] = lightSpace.M32;  _lightSpaceMatrixData[10] = lightSpace.M33;  _lightSpaceMatrixData[14] = lightSpace.M34;
+        _lightSpaceMatrixData[3] = lightSpace.M41;  _lightSpaceMatrixData[7] = lightSpace.M42;  _lightSpaceMatrixData[11] = lightSpace.M43;  _lightSpaceMatrixData[15] = lightSpace.M44;
+
+        var shadowCamera = new Camera3D
+        {
+            Position = lightPos,
+            Target = sceneCenter,
+            Up = Vector3.UnitY,
+            FovY = 0,
+            Projection = CameraProjection.Orthographic
+        };
+
+        Raylib.BeginTextureMode(_shadowMapRT);
+        Raylib.ClearBackground(new Color(255, 255, 255, 255));
+        Raylib.BeginMode3D(shadowCamera);
+
+        world.Each((Entity e, ref EngineMesh mesh, ref EngineTransform transform) =>
+        {
+            if (e.Name() == "Grid")
+                return;
+
+            var model = GetOrUploadModel(e, mesh);
+            var modelMatrix = transform.GetMatrix();
+
+            if (Matrix4x4.Decompose(modelMatrix, out var scale, out var rotation, out var position))
+            {
+                var axis = Vector3.UnitY;
+                var angle = 0.0f;
+                var q = new Quaternion(rotation.X, rotation.Y, rotation.Z, rotation.W);
+                if (MathF.Abs(q.W) < 0.9999999f)
+                {
+                    angle = 2.0f * MathF.Acos(Math.Clamp(q.W, -1.0f, 1.0f));
+                    var s = MathF.Sqrt(1.0f - q.W * q.W);
+                    if (s > 0.0001f)
+                        axis = new Vector3(q.X / s, q.Y / s, q.Z / s);
+                    else
+                        axis = new Vector3(q.X, q.Y, q.Z);
+                }
+
+                // Swap to shadow shader, draw, swap back
+                unsafe
+                {
+                    var origShader = model.Materials[0].Shader;
+                    model.Materials[0].Shader = _shadowShader;
+                    Raylib.DrawModelEx(model, position, axis, angle * 180.0f / MathF.PI, scale, Color.White);
+                    model.Materials[0].Shader = origShader;
+                }
+            }
+        });
+
+        Raylib.EndMode3D();
+        Raylib.EndTextureMode();
+    }
+
+    private static Shader LoadShadowShader()
+    {
+        const string VertexSource = @"#version 330 core
+in vec3 vertexPosition;
+uniform mat4 mvp;
+uniform mat4 matModel;
+out vec3 vWorldPos;
+void main()
+{
+    vec4 worldPos = matModel * vec4(vertexPosition, 1.0);
+    vWorldPos = worldPos.xyz;
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}";
+
+        const string FragmentSource = @"#version 330 core
+out vec4 fragColor;
+void main()
+{
+    fragColor = vec4(vec3(gl_FragCoord.z), 1.0);
+}";
+
+        return Raylib.LoadShaderFromMemory(VertexSource, FragmentSource);
+    }
+
     private static Shader LoadShader()
     {
         const string VertexSource = @"#version 330 core
@@ -436,11 +549,11 @@ void main()
         vec2 uv = vTexCoord * 4.0;
         albedo *= texture(texture0, uv).rgb;
     }
+
     vec3 viewDir = normalize(viewPos - vWorldPos);
     float rough = clamp(roughness, 0.05, 1.0);
     float metal = clamp(metallic, 0.0, 1.0);
 
-    // Hemisphere ambient: low ambient for visible shading contrast
     vec3 skyColor = ambientColor;
     vec3 groundColor = ambientColor * 0.2;
     float hemisphere = 0.5 + 0.5 * normal.y;
@@ -453,32 +566,21 @@ void main()
     {
         vec3 L = normalize(-lightDirs[i]);
         vec3 H = normalize(L + viewDir);
-
         float NdotL = max(dot(normal, L), 0.0);
         float NdotH = max(dot(normal, H), 0.0);
-        float NdotV = max(dot(normal, viewDir), 0.0);
         float HdotV = max(dot(H, viewDir), 0.0);
-
         float diff = NdotL;
         float spec = pow(NdotH, shininess);
-
-        // Schlick Fresnel
         float fresnel = F0.x + (1.0 - F0.x) * pow(1.0 - HdotV, 5.0);
         vec3 specularColor = mix(vec3(fresnel), albedo * fresnel, metal);
-
         vec3 diffuse = albedo * lightColors[i] * diff * lightIntensities[i] * 1.5;
         vec3 specular = specularColor * spec * lightIntensities[i];
-
-        // Energy conservation
         diffuse *= (1.0 - fresnel * (1.0 - metal * 0.5));
-
         result += diffuse + specular;
     }
 
-    // ACES tonemapping + gamma correction
     result = ACESFilm(result * 1.2);
     result = pow(result, vec3(1.0 / 2.2));
-
     finalColor = vec4(result, 1.0);
 }";
 
@@ -498,6 +600,8 @@ void main()
             Raylib.UnloadTexture(texture);
         _textureCache.Clear();
 
+        Raylib.UnloadRenderTexture(_shadowMapRT);
+        Raylib.UnloadShader(_shadowShader);
         Raylib.UnloadShader(_shader);
     }
 
