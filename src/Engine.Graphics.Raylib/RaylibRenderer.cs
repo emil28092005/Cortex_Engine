@@ -20,7 +20,12 @@ namespace Engine.Graphics.RaylibBackend;
 /// </summary>
 public sealed class RaylibRenderer : IRenderer
 {
+    private const int ShadowMapSize = 2048;
+
     private readonly Shader _shader;
+    private readonly Shader _shadowShader;
+    private readonly uint _shadowFbo;
+    private readonly uint _shadowDepthTex;
     private readonly Dictionary<Entity, Raylib_cs.Model> _modelCache = new();
     private readonly Dictionary<string, Texture2D> _textureCache = new();
     private readonly int _materialColorLoc;
@@ -36,7 +41,8 @@ public sealed class RaylibRenderer : IRenderer
     private readonly int _lightPosLoc;
     private readonly int _lightTypeLoc;
     private readonly int _lightRangeLoc;
-    // Shadow receiver shader uniforms
+    private readonly int _lightViewProjLoc;
+    private readonly int _shadowMapLoc;
     private readonly float[] _lightDirs = new float[12];
     private readonly float[] _lightPositions = new float[12];
     private readonly float[] _lightRanges = new float[4];
@@ -57,6 +63,13 @@ public sealed class RaylibRenderer : IRenderer
     public RaylibRenderer()
     {
         _shader = LoadShader();
+        _shadowShader = LoadShadowShader();
+
+        // Create depth-only FBO for shadow mapping (per official raylib example)
+        _shadowFbo = Rlgl.LoadFramebuffer();
+        _shadowDepthTex = Rlgl.LoadTextureDepth(ShadowMapSize, ShadowMapSize, false);
+        Rlgl.FramebufferAttach(_shadowFbo, _shadowDepthTex, FramebufferAttachType.Depth, FramebufferAttachTextureType.Texture2D, 0);
+        Rlgl.FramebufferComplete(_shadowFbo);
 
         // Main shader uniform locations
         _materialColorLoc = Raylib.GetShaderLocation(_shader, "materialColor");
@@ -72,7 +85,8 @@ public sealed class RaylibRenderer : IRenderer
         _lightPosLoc = Raylib.GetShaderLocation(_shader, "lightPositions");
         _lightTypeLoc = Raylib.GetShaderLocation(_shader, "lightTypes");
         _lightRangeLoc = Raylib.GetShaderLocation(_shader, "lightRanges");
-
+        _lightViewProjLoc = Raylib.GetShaderLocation(_shader, "lightViewProj");
+        _shadowMapLoc = Raylib.GetShaderLocation(_shader, "shadowMap");
     }
 
     public void RequestScreenshot(string outputPath)
@@ -87,7 +101,68 @@ public sealed class RaylibRenderer : IRenderer
     public void RenderWorld(World world)
     {
         var camera = GetCamera(world);
+        CollectLights(world);
 
+        var hasDirectionalLight = _lightCount > 0 && _lightTypes[0] == (int)LightType.Directional;
+        Matrix4x4 lightViewProj = Matrix4x4.Identity;
+
+        // === PASS 1: Shadow map (render depth from light's POV) ===
+        if (hasDirectionalLight)
+        {
+            var lightDir = new Vector3(_lightDirs[0], _lightDirs[1], _lightDirs[2]);
+            var sceneCenter = new Vector3(0, 0.5f, 0);
+            var lightPos = sceneCenter - lightDir * 30f;
+            var up = MathF.Abs(Vector3.Dot(lightDir, Vector3.UnitY)) > 0.99f
+                ? Vector3.UnitZ : Vector3.UnitY;
+
+            var shadowCamera = new Camera3D
+            {
+                Position = lightPos,
+                Target = sceneCenter,
+                Up = up,
+                FovY = 0,
+                Projection = CameraProjection.Orthographic
+            };
+
+            // Use BeginTextureMode with our custom depth FBO
+            Rlgl.EnableFramebuffer(_shadowFbo);
+            Rlgl.Viewport(0, 0, ShadowMapSize, ShadowMapSize);
+            Rlgl.ClearColor(255, 255, 255, 255);
+            Rlgl.ClearScreenBuffers();
+
+            Raylib.BeginMode3D(shadowCamera);
+
+            // Grab light view/proj matrices AFTER BeginMode3D (like official example)
+            lightViewProj = Rlgl.GetMatrixModelview() * Rlgl.GetMatrixProjection();
+
+            // Draw all shadow casters with the simple shadow shader
+            world.Each((Entity e, ref EngineMesh mesh, ref EngineTransform transform) =>
+            {
+                if (e.Name() == "Grid" || e.Name() == "Floor")
+                    return;
+
+                var model = GetOrUploadModel(e, mesh);
+                var modelMatrix = transform.GetMatrix();
+
+                if (Matrix4x4.Decompose(modelMatrix, out var scale, out var rotation, out var position))
+                {
+                    var (axis, angle) = QuaternionToAxisAngle(rotation);
+                    unsafe
+                    {
+                        var origShader = model.Materials[0].Shader;
+                        model.Materials[0].Shader = _shadowShader;
+                        Raylib.DrawModelEx(model, position, axis, angle * 180.0f / MathF.PI, scale, Color.White);
+                        model.Materials[0].Shader = origShader;
+                    }
+                }
+            });
+
+            Raylib.EndMode3D();
+            Rlgl.DisableFramebuffer();
+            Rlgl.Viewport(0, 0, Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+        }
+
+        // === PASS 2: Main render with shadow sampling ===
         Raylib.BeginDrawing();
         Raylib.ClearBackground(new Color(25, 30, 40, 255));
         Raylib.BeginMode3D(ToRaylib(camera));
@@ -95,6 +170,19 @@ public sealed class RaylibRenderer : IRenderer
         CollectLights(world);
         SetFrameLights();
         Raylib.SetShaderValue(_shader, _viewPosLoc, new float[] { camera.Position.X, camera.Position.Y, camera.Position.Z }, ShaderUniformDataType.Vec3);
+
+        // Set shadow uniforms on the main shader
+        if (hasDirectionalLight && _lightViewProjLoc >= 0)
+        {
+            Raylib.SetShaderValueMatrix(_shader, _lightViewProjLoc, lightViewProj);
+            // Bind shadow map on texture unit 1, tell shader sampler to use it
+            if (_shadowMapLoc >= 0)
+            {
+                Rlgl.ActiveTextureSlot(1);
+                Rlgl.EnableTexture(_shadowDepthTex);
+                Raylib.SetShaderValue(_shader, _shadowMapLoc, 1, ShaderUniformDataType.Int);
+            }
+        }
 
         Rlgl.DisableBackfaceCulling();
 
@@ -114,6 +202,9 @@ public sealed class RaylibRenderer : IRenderer
                 Raylib.DrawModelEx(model, position, axis, angle * 180.0f / MathF.PI, scale, Color.White);
             }
         });
+
+        // Reset texture unit 0 after shadow binding
+        Rlgl.ActiveTextureSlot(0);
 
         Rlgl.EnableBackfaceCulling();
 
@@ -410,6 +501,22 @@ public sealed class RaylibRenderer : IRenderer
 
 
 
+    private static Shader LoadShadowShader()
+    {
+        const string VertexSource = @"#version 330 core
+in vec3 vertexPosition;
+uniform mat4 mvp;
+void main()
+{
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}";
+
+        const string FragmentSource = @"#version 330 core
+void main() {}";
+
+        return Raylib.LoadShaderFromMemory(VertexSource, FragmentSource);
+    }
+
     private static Shader LoadShader()
     {
         const string VertexSource = @"#version 330 core
@@ -453,6 +560,8 @@ uniform float lightIntensities[4];
 uniform vec3 lightColors[4];
 uniform int lightTypes[4];
 uniform float lightRanges[4];
+uniform mat4 lightViewProj;
+uniform sampler2D shadowMap;
 
 vec3 ACESFilm(vec3 x)
 {
@@ -460,7 +569,6 @@ vec3 ACESFilm(vec3 x)
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
-// Smooth point light attenuation (Unity-like)
 float Attenuation(float dist, float range)
 {
     float r = max(range, 0.001);
@@ -471,15 +579,32 @@ float Attenuation(float dist, float range)
     return clamp(1.0 / (1.0 + 25.0 * x4), 0.0, 1.0) * smoothstep(1.0, 0.0, x);
 }
 
+float CalculateShadow(vec3 worldPos)
+{
+    vec4 lp = lightViewProj * vec4(worldPos, 1.0);
+    vec3 ndc = lp.xyz / lp.w;
+    vec3 uvw = ndc * 0.5 + 0.5;
+    if (uvw.x < 0.0 || uvw.x > 1.0 || uvw.y < 0.0 || uvw.y > 1.0 || uvw.z > 1.0)
+        return 1.0;
+    float bias = 0.005;
+    vec2 ts = vec2(1.0 / 2048.0);
+    float s = 0.0;
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            float d = texture(shadowMap, uvw.xy + vec2(x, y) * ts).r;
+            s += (uvw.z - bias > d) ? 0.3 : 1.0;
+        }
+    }
+    return s / 9.0;
+}
+
 void main()
 {
     vec3 normal = normalize(vNormal);
-    // Convert sRGB vertex color + material color to linear before lighting
     vec3 albedo = pow(vColor.rgb * materialColor.rgb, vec3(2.2));
     if (useTexture != 0)
     {
         vec2 uv = vTexCoord * 4.0;
-        // Texture is already in sRGB — convert to linear
         vec3 texColor = pow(texture(texture0, uv).rgb, vec3(2.2));
         albedo *= texColor;
     }
@@ -493,7 +618,11 @@ void main()
     float hemisphere = 0.5 + 0.5 * normal.y;
     vec3 result = albedo * mix(groundColor, skyColor, hemisphere) * 0.4;
 
-    // F0 as vec3: dielectric 0.04, metals use albedo
+    // Shadow factor for first directional light
+    float shadow = 1.0;
+    if (lightCount > 0 && lightTypes[0] == 0)
+        shadow = CalculateShadow(vWorldPos);
+
     vec3 F0 = mix(vec3(0.04), albedo, metal);
     float shininess = mix(8.0, 256.0, 1.0 - rough);
 
@@ -502,17 +631,19 @@ void main()
         vec3 L;
         float atten = 1.0;
 
-        if (lightTypes[i] == 1) // Point light
+        if (lightTypes[i] == 1)
         {
             vec3 toLight = lightPositions[i] - vWorldPos;
             float dist = length(toLight);
             L = toLight / max(dist, 0.001);
             atten = Attenuation(dist, lightRanges[i]);
         }
-        else // Directional light
+        else
         {
             L = normalize(-lightDirs[i]);
         }
+
+        float lightShadow = (i == 0 && lightTypes[0] == 0) ? shadow : 1.0;
 
         vec3 H = normalize(L + viewDir);
         float NdotL = max(dot(normal, L), 0.0);
@@ -522,8 +653,8 @@ void main()
         float spec = pow(NdotH, shininess);
         vec3 fresnel = F0 + (1.0 - F0) * pow(1.0 - HdotV, 5.0);
         vec3 specularColor = mix(fresnel, albedo * fresnel, metal);
-        vec3 diffuse = albedo * lightColors[i] * diff * lightIntensities[i] * atten * 1.5;
-        vec3 specular = specularColor * spec * lightIntensities[i] * atten;
+        vec3 diffuse = albedo * lightColors[i] * diff * lightIntensities[i] * atten * 1.5 * lightShadow;
+        vec3 specular = specularColor * spec * lightIntensities[i] * atten * lightShadow;
         diffuse *= (1.0 - fresnel * (1.0 - metal * 0.5));
         result += diffuse + specular;
     }
@@ -549,6 +680,9 @@ void main()
             Raylib.UnloadTexture(texture);
         _textureCache.Clear();
 
+        Raylib.UnloadShader(_shadowShader);
+        Rlgl.UnloadTexture(_shadowDepthTex);
+        Rlgl.UnloadFramebuffer(_shadowFbo);
         Raylib.UnloadShader(_shader);
     }
 
