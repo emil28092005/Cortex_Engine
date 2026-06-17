@@ -58,6 +58,8 @@ internal static unsafe class Vk
     public delegate void VkCmdSetScissor(VkCommandBuffer commandBuffer, uint firstScissor, uint scissorCount, VkRect2D* pScissors);
     public delegate void VkCmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint firstBinding, uint bindingCount, VkBuffer* pBuffers, ulong* pOffsets);
     public delegate void VkCmdDraw(VkCommandBuffer commandBuffer, uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
+    public delegate void VkCmdDrawIndexed(VkCommandBuffer commandBuffer, uint indexCount, uint instanceCount, uint firstIndex, int vertexOffset, uint firstInstance);
+    public delegate void VkCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, ulong offset, int indexType);
     public delegate void VkCmdBeginRendering(VkCommandBuffer commandBuffer, VkRenderingInfo* pRenderingInfo);
     public delegate void VkCmdEndRendering(VkCommandBuffer commandBuffer);
     public delegate void VkCmdPipelineBarrier2(VkCommandBuffer commandBuffer, VkDependencyInfo* pDependencyInfo);
@@ -133,6 +135,8 @@ internal static unsafe class Vk
     public static VkCmdSetScissor vkCmdSetScissor;
     public static VkCmdBindVertexBuffers vkCmdBindVertexBuffers;
     public static VkCmdDraw vkCmdDraw;
+    public static VkCmdDrawIndexed vkCmdDrawIndexed;
+    public static VkCmdBindIndexBuffer vkCmdBindIndexBuffer;
     public static VkCmdBeginRendering vkCmdBeginRendering;
     public static VkCmdEndRendering vkCmdEndRendering;
     public static VkCmdPipelineBarrier2 vkCmdPipelineBarrier2;
@@ -215,6 +219,8 @@ internal static unsafe class Vk
         vkCmdSetScissor = LoadDev<VkCmdSetScissor>(p, "vkCmdSetScissor");
         vkCmdBindVertexBuffers = LoadDev<VkCmdBindVertexBuffers>(p, "vkCmdBindVertexBuffers");
         vkCmdDraw = LoadDev<VkCmdDraw>(p, "vkCmdDraw");
+        vkCmdDrawIndexed = LoadDev<VkCmdDrawIndexed>(p, "vkCmdDrawIndexed");
+        vkCmdBindIndexBuffer = LoadDev<VkCmdBindIndexBuffer>(p, "vkCmdBindIndexBuffer");
         vkCmdBeginRendering = LoadDev<VkCmdBeginRendering>(p, "vkCmdBeginRendering");
         vkCmdEndRendering = LoadDev<VkCmdEndRendering>(p, "vkCmdEndRendering");
         vkCmdPipelineBarrier2 = LoadDev<VkCmdPipelineBarrier2>(p, "vkCmdPipelineBarrier2");

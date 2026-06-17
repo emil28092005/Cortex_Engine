@@ -1,6 +1,7 @@
 using System.Numerics;
 using Engine.Core;
 using Engine.Core.Components;
+using Engine.Graphics.Loaders;
 using Flecs.NET.Core;
 using System.Runtime.InteropServices;
 
@@ -13,6 +14,8 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private readonly VulkanPipeline _pipeline;
     private readonly VulkanFrameResources _frameResources;
     private readonly VulkanVertexBuffer _vertexBuffer;
+    private readonly VulkanIndexBuffer _indexBuffer;
+    private readonly uint _indexCount;
 
     private int _frameIndex;
     private bool _disposed;
@@ -36,15 +39,30 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
 
-        var vertices = new Vertex[]
-        {
-            new(new Vector3( 0.0f, -0.5f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0, 0, 1)),
-            new(new Vector3( 0.5f,  0.5f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0, 0, 1)),
-            new(new Vector3(-0.5f,  0.5f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0, 0, 1)),
-        };
+        var mesh = LoadMesh("Content/cube.obj");
+        _indexCount = (uint)mesh.Indices.Length;
 
         _vertexBuffer = new VulkanVertexBuffer(ctx.Device, ctx.PhysicalDevice,
-            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, vertices);
+            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, mesh.Vertices);
+
+        _indexBuffer = new VulkanIndexBuffer(ctx.Device, _frameResources.CommandPool,
+            ctx.GraphicsQueue, ctx, mesh.Indices);
+    }
+
+    private static Mesh LoadMesh(string path)
+    {
+        if (!File.Exists(path))
+        {
+            var altPath = Path.Combine(AppContext.BaseDirectory, path);
+            if (!File.Exists(altPath))
+            {
+                altPath = Path.Combine(AppContext.BaseDirectory, "Content", Path.GetFileName(path));
+                if (!File.Exists(altPath))
+                    throw new FileNotFoundException($"Mesh file not found: {path}");
+            }
+            return ObjLoader.Load(altPath, new Vector3(0.8f, 0.6f, 0.3f));
+        }
+        return ObjLoader.Load(path, new Vector3(0.8f, 0.6f, 0.3f));
     }
 
     public void RenderWorld(World world)
@@ -147,10 +165,12 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         ulong offset = 0;
         Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &bufferHandle, &offset);
 
+        Vk.vkCmdBindIndexBuffer(cmd, _indexBuffer.Buffer, 0, 0);
+
         var angle = _totalTime;
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 4, &angle);
 
-        Vk.vkCmdDraw(cmd, 3, 1, 0, 0);
+        Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
 
         Vk.vkCmdEndRendering(cmd);
 
@@ -305,6 +325,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         Vk.vkDeviceWaitIdle(_ctx.Device);
 
         _vertexBuffer?.Dispose();
+        _indexBuffer?.Dispose();
         _frameResources?.Dispose();
         _pipeline?.Dispose();
     }
