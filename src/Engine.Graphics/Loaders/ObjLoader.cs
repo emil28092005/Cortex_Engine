@@ -1,60 +1,54 @@
-using System.Globalization;
 using System.Numerics;
 using Engine.Core;
 using Engine.Core.Components;
 
 namespace Engine.Graphics.Loaders;
 
+/// <summary>
+/// Minimal OBJ loader.
+/// </summary>
 public static class ObjLoader
 {
-    private static readonly Vector3 DefaultColor = new(0.7f, 0.6f, 0.5f);
-
-    public static Mesh Load(string path, Vector3? color = null)
+    public static Mesh Load(string path, Vector3? defaultColor = null)
     {
-        var tint = color ?? DefaultColor;
-        var lines = File.ReadAllLines(path);
+        if (!File.Exists(path))
+            throw new FileNotFoundException($"OBJ file not found: {path}", path);
 
+        var color = defaultColor ?? new Vector3(0.7f, 0.6f, 0.5f);
         var positions = new List<Vector3>();
         var normals = new List<Vector3>();
-
+        var texcoords = new List<Vector2>();
         var vertices = new List<Vertex>();
         var indices = new List<uint>();
+        var faceNormals = new List<Vector3>();
 
-        foreach (var rawLine in lines)
+        foreach (var line in File.ReadLines(path))
         {
-            var line = rawLine.Trim();
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
 
-            if (line.Length == 0 || line.StartsWith('#'))
-                continue;
-
-            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0)
-                continue;
+            var parts = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) continue;
 
             switch (parts[0])
             {
                 case "v":
-                    positions.Add(new Vector3(
-                        float.Parse(parts[1], CultureInfo.InvariantCulture),
-                        float.Parse(parts[2], CultureInfo.InvariantCulture),
-                        float.Parse(parts[3], CultureInfo.InvariantCulture)));
+                    positions.Add(ParseVector3(parts));
                     break;
-
                 case "vn":
-                    normals.Add(new Vector3(
-                        float.Parse(parts[1], CultureInfo.InvariantCulture),
-                        float.Parse(parts[2], CultureInfo.InvariantCulture),
-                        float.Parse(parts[3], CultureInfo.InvariantCulture)));
+                    normals.Add(ParseVector3(parts));
                     break;
-
+                case "vt":
+                    texcoords.Add(ParseVector2(parts));
+                    break;
                 case "f":
-                    ParseFace(parts, positions, normals, vertices, indices, tint);
+                    ParseFace(parts, positions, normals, texcoords, color, vertices, indices, faceNormals);
                     break;
             }
         }
 
         if (vertices.Count == 0)
-            throw new InvalidOperationException($"OBJ file '{path}' contains no faces.");
+            throw new InvalidOperationException($"OBJ file contains no geometry: {path}");
 
         return new Mesh(vertices.ToArray(), indices.ToArray());
     }
@@ -63,47 +57,52 @@ public static class ObjLoader
         string[] parts,
         List<Vector3> positions,
         List<Vector3> normals,
+        List<Vector2> texcoords,
+        Vector3 color,
         List<Vertex> vertices,
         List<uint> indices,
-        Vector3 tint)
+        List<Vector3> faceNormals)
     {
-        var faceData = new List<(int posIdx, int normIdx)>();
+        var faceIndices = new List<uint>();
+        faceNormals.Clear();
 
-        for (var i = 1; i < parts.Length; i++)
+        for (int i = 1; i < parts.Length; i++)
         {
-            var vertexData = parts[i].Split('/');
-            var posIdx = int.Parse(vertexData[0]) - 1;
-            var normIdx = vertexData.Length > 2 && !string.IsNullOrEmpty(vertexData[2])
-                ? int.Parse(vertexData[2]) - 1
-                : -1;
+            var sub = parts[i].Split('/');
+            var posIndex = int.Parse(sub[0]) - 1;
+            var pos = positions[posIndex];
 
-            faceData.Add((posIdx, normIdx));
+            Vector3 normal = Vector3.UnitY;
+            if (sub.Length > 2 && !string.IsNullOrEmpty(sub[2]))
+            {
+                normal = normals[int.Parse(sub[2]) - 1];
+            }
+
+            vertices.Add(new Vertex(pos, color, normal));
+            faceIndices.Add((uint)(vertices.Count - 1));
         }
 
-        if (faceData.Count < 3) return;
-
-        for (var i = 1; i < faceData.Count - 1; i++)
+        // Triangulate as a fan.
+        for (int i = 2; i < faceIndices.Count; i++)
         {
-            var d0 = faceData[0];
-            var d1 = faceData[i];
-            var d2 = faceData[i + 1];
-
-            var p0 = positions[d0.posIdx];
-            var p1 = positions[d1.posIdx];
-            var p2 = positions[d2.posIdx];
-
-            var normal = d0.normIdx >= 0 && d0.normIdx < normals.Count
-                ? normals[d0.normIdx]
-                : MeshMath.ComputeFaceNormal(p0, p1, p2);
-
-            var i0 = (uint)vertices.Count;
-            vertices.Add(new Vertex(p0, tint, normal));
-            var i1 = (uint)vertices.Count;
-            vertices.Add(new Vertex(p1, tint, normal));
-            var i2 = (uint)vertices.Count;
-            vertices.Add(new Vertex(p2, tint, normal));
-
-            indices.Add(i0); indices.Add(i1); indices.Add(i2);
+            indices.Add(faceIndices[0]);
+            indices.Add(faceIndices[i - 1]);
+            indices.Add(faceIndices[i]);
         }
+    }
+
+    private static Vector3 ParseVector3(string[] parts)
+    {
+        return new Vector3(
+            float.Parse(parts[1]),
+            float.Parse(parts[2]),
+            float.Parse(parts[3]));
+    }
+
+    private static Vector2 ParseVector2(string[] parts)
+    {
+        return new Vector2(
+            float.Parse(parts[1]),
+            parts.Length > 2 ? float.Parse(parts[2]) : 0);
     }
 }

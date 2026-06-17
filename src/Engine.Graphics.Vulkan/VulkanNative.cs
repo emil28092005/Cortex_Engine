@@ -2,98 +2,57 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-public static unsafe partial class VulkanNative
+internal static unsafe class VulkanNative
 {
-    private const string VulkanLib = "vulkan-1.dll";
-    private const string VulkanLibLinux = "libvulkan.so.1";
+    private static readonly nint _handle;
+    public static readonly nint NullHandle = 0;
 
-    private static nint _libHandle;
-
-    public static nint LoadLibrary()
+    static VulkanNative()
     {
-        if (_libHandle != 0) return _libHandle;
+        var libName = OperatingSystem.IsWindows() ? "vulkan-1.dll" : "libvulkan.so.1";
+        _handle = NativeLibrary.Load(libName);
+        if (_handle == 0)
+            throw new DllNotFoundException($"Failed to load Vulkan loader: {libName}");
 
-        if (OperatingSystem.IsWindows())
-            _libHandle = NativeLibrary.Load(VulkanLib);
-        else
-            _libHandle = NativeLibrary.Load(VulkanLibLinux);
-
-        if (_libHandle == 0)
-            throw new InvalidOperationException("Failed to load Vulkan library.");
-
-        return _libHandle;
+        vkGetInstanceProcAddr = GetExport<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     }
 
-    public static void* GetInstanceProcAddr(VkInstance instance, byte* pName)
+    public static T GetExport<T>(string name) where T : Delegate
     {
-        LoadLibrary();
-        var ptr = NativeLibrary.GetExport(_libHandle, "vkGetInstanceProcAddr");
-        var func = Marshal.GetDelegateForFunctionPointer<PFN_vkGetInstanceProcAddr>(ptr);
-        return func(instance, pName);
+        if (!NativeLibrary.TryGetExport(_handle, name, out var address))
+            throw new EntryPointNotFoundException($"Vulkan export not found: {name}");
+        return Marshal.GetDelegateForFunctionPointer<T>(address);
     }
 
-    public static void* GetDeviceProcAddr(VkDevice device, byte* pName)
+    public static nint GetExportPointer(string name)
     {
-        var ptr = NativeLibrary.GetExport(_libHandle, "vkGetDeviceProcAddr");
-        var func = Marshal.GetDelegateForFunctionPointer<PFN_vkGetDeviceProcAddr>(ptr);
-        return func(device, pName);
+        NativeLibrary.TryGetExport(_handle, name, out var address);
+        return address;
     }
 
-    public static T LoadInstanceFunction<T>(VkInstance instance, string name) where T : Delegate
+    public static PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+
+    public delegate nint PFN_vkGetInstanceProcAddr(nint instance, byte* pName);
+}
+
+internal static unsafe class VulkanString
+{
+    public static byte[] ToUtf8Terminated(string s)
     {
-        var nameBytes = System.Text.Encoding.UTF8.GetBytes(name + "\0");
-        fixed (byte* pName = nameBytes)
-        {
-            var addr = GetInstanceProcAddr(instance, pName);
-            if (addr == null)
-                throw new InvalidOperationException($"Failed to load Vulkan instance function: {name}");
-            return Marshal.GetDelegateForFunctionPointer<T>((nint)addr);
-        }
+        return System.Text.Encoding.UTF8.GetBytes(s + '\0');
     }
 
-    public static T LoadDeviceFunction<T>(VkDevice device, string name) where T : Delegate
+    public static byte* AllocUtf8(string s)
     {
-        var nameBytes = System.Text.Encoding.UTF8.GetBytes(name + "\0");
-        fixed (byte* pName = nameBytes)
-        {
-            var addr = GetDeviceProcAddr(device, pName);
-            if (addr == null)
-                throw new InvalidOperationException($"Failed to load Vulkan device function: {name}");
-            return Marshal.GetDelegateForFunctionPointer<T>((nint)addr);
-        }
+        var bytes = ToUtf8Terminated(s);
+        var ptr = (byte*)Marshal.AllocHGlobal(bytes.Length);
+        Marshal.Copy(bytes, 0, (nint)ptr, bytes.Length);
+        return ptr;
     }
 
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    public delegate void* PFN_vkGetInstanceProcAddr(VkInstance instance, byte* pName);
-
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    public delegate void* PFN_vkGetDeviceProcAddr(VkDevice device, byte* pName);
-
-    [LibraryImport("vulkan-1.dll", EntryPoint = "vkGetInstanceProcAddr", StringMarshalling = StringMarshalling.Utf8)]
-    public static partial void* vkGetInstanceProcAddr_Win(VkInstance instance, string pName);
-
-    [DllImport("libvulkan.so.1", EntryPoint = "vkGetInstanceProcAddr", CharSet = CharSet.Ansi)]
-    public static extern void* vkGetInstanceProcAddr_Linux(VkInstance instance, string pName);
-
-    public static VkResult vkEnumerateInstanceExtensionProperties(byte* pLayerName, uint* pPropertyCount, VkExtensionProperties* pProperties)
+    public static void FreeUtf8(byte* ptr)
     {
-        LoadLibrary();
-        var ptr = NativeLibrary.GetExport(_libHandle, "vkEnumerateInstanceExtensionProperties");
-        var func = Marshal.GetDelegateForFunctionPointer<PFN_vkEnumerateInstanceExtensionProperties>(ptr);
-        return func(pLayerName, pPropertyCount, pProperties);
+        if (ptr != null)
+            Marshal.FreeHGlobal((nint)ptr);
     }
-
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    public delegate VkResult PFN_vkEnumerateInstanceExtensionProperties(byte* pLayerName, uint* pPropertyCount, VkExtensionProperties* pProperties);
-
-    public static VkResult vkEnumerateInstanceLayerProperties(uint* pPropertyCount, VkLayerProperties* pProperties)
-    {
-        LoadLibrary();
-        var ptr = NativeLibrary.GetExport(_libHandle, "vkEnumerateInstanceLayerProperties");
-        var func = Marshal.GetDelegateForFunctionPointer<PFN_vkEnumerateInstanceLayerProperties>(ptr);
-        return func(pPropertyCount, pProperties);
-    }
-
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    public delegate VkResult PFN_vkEnumerateInstanceLayerProperties(uint* pPropertyCount, VkLayerProperties* pProperties);
 }

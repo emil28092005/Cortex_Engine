@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using SDL;
 
 namespace Engine.Core;
@@ -34,6 +35,8 @@ public sealed unsafe class Sdl3Window : IWindow
         var flags = SDL_WindowFlags.SDL_WINDOW_RESIZABLE;
         if (vulkanSurface)
             flags |= SDL_WindowFlags.SDL_WINDOW_VULKAN;
+        // Keep the window on top of the terminal at startup so it is actually visible.
+        flags |= SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP;
 
         var titleBytes = Encoding.UTF8.GetBytes(title + '\0');
         fixed (byte* titlePtr = titleBytes)
@@ -51,6 +54,14 @@ public sealed unsafe class Sdl3Window : IWindow
         // the window. Pump events to flush the show request without blocking.
         SDL_Event flushEvt;
         while (SDL3.SDL_PollEvent(&flushEvt)) { }
+
+        // Release always-on-top after a short delay so the user can focus other windows.
+        var window = _window;
+        Task.Run(() =>
+        {
+            System.Threading.Thread.Sleep(1000);
+            SDL3.SDL_SetWindowAlwaysOnTop(window, false);
+        });
     }
 
     public void PumpEvents()

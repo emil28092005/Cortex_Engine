@@ -4,85 +4,129 @@ using Engine.Core.Components;
 
 namespace Engine.Graphics;
 
+/// <summary>
+/// Procedural mesh generators.
+/// </summary>
 public static class ProceduralMesh
 {
-    public static Mesh CreateSphere(float radius, int slices, int stacks, Vector3 color)
+    public static Mesh CreateCube(float size, Vector3 color)
     {
-        var vertices = new Vertex[(stacks + 1) * (slices + 1)];
-        var indices = new uint[stacks * slices * 6];
-
-        var vi = 0;
-        for (var i = 0; i <= stacks; i++)
+        var s = size * 0.5f;
+        var vertices = new[]
         {
-            var phi = MathF.PI * i / stacks;
-            var y = radius * MathF.Cos(phi);
-            var r = radius * MathF.Sin(phi);
+            // Front
+            new Vertex(new Vector3(-s, -s,  s), color, new Vector3(0, 0, 1)),
+            new Vertex(new Vector3( s, -s,  s), color, new Vector3(0, 0, 1)),
+            new Vertex(new Vector3( s,  s,  s), color, new Vector3(0, 0, 1)),
+            new Vertex(new Vector3(-s,  s,  s), color, new Vector3(0, 0, 1)),
+            // Back
+            new Vertex(new Vector3( s, -s, -s), color, new Vector3(0, 0, -1)),
+            new Vertex(new Vector3(-s, -s, -s), color, new Vector3(0, 0, -1)),
+            new Vertex(new Vector3(-s,  s, -s), color, new Vector3(0, 0, -1)),
+            new Vertex(new Vector3( s,  s, -s), color, new Vector3(0, 0, -1)),
+            // Top
+            new Vertex(new Vector3(-s,  s,  s), color, new Vector3(0, 1, 0)),
+            new Vertex(new Vector3( s,  s,  s), color, new Vector3(0, 1, 0)),
+            new Vertex(new Vector3( s,  s, -s), color, new Vector3(0, 1, 0)),
+            new Vertex(new Vector3(-s,  s, -s), color, new Vector3(0, 1, 0)),
+            // Bottom
+            new Vertex(new Vector3(-s, -s, -s), color, new Vector3(0, -1, 0)),
+            new Vertex(new Vector3( s, -s, -s), color, new Vector3(0, -1, 0)),
+            new Vertex(new Vector3( s, -s,  s), color, new Vector3(0, -1, 0)),
+            new Vertex(new Vector3(-s, -s,  s), color, new Vector3(0, -1, 0)),
+            // Right
+            new Vertex(new Vector3( s, -s,  s), color, new Vector3(1, 0, 0)),
+            new Vertex(new Vector3( s, -s, -s), color, new Vector3(1, 0, 0)),
+            new Vertex(new Vector3( s,  s, -s), color, new Vector3(1, 0, 0)),
+            new Vertex(new Vector3( s,  s,  s), color, new Vector3(1, 0, 0)),
+            // Left
+            new Vertex(new Vector3(-s, -s, -s), color, new Vector3(-1, 0, 0)),
+            new Vertex(new Vector3(-s, -s,  s), color, new Vector3(-1, 0, 0)),
+            new Vertex(new Vector3(-s,  s,  s), color, new Vector3(-1, 0, 0)),
+            new Vertex(new Vector3(-s,  s, -s), color, new Vector3(-1, 0, 0)),
+        };
 
-            for (var j = 0; j <= slices; j++)
-            {
-                var theta = 2.0f * MathF.PI * j / slices;
-                var x = r * MathF.Cos(theta);
-                var z = r * MathF.Sin(theta);
-
-                var pos = new Vector3(x, y, z);
-                var normal = Vector3.Normalize(pos);
-
-                vertices[vi++] = new Vertex(pos, color, normal);
-            }
-        }
-
-        var ii = 0;
-        for (var i = 0; i < stacks; i++)
+        var indices = new uint[]
         {
-            for (var j = 0; j < slices; j++)
-            {
-                var a = (uint)(i * (slices + 1) + j);
-                var b = a + 1;
-                var c = a + (uint)(slices + 1);
-                var d = c + 1;
-
-                indices[ii++] = a; indices[ii++] = c; indices[ii++] = b;
-                indices[ii++] = b; indices[ii++] = c; indices[ii++] = d;
-            }
-        }
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15,
+            16, 17, 18, 16, 18, 19,
+            20, 21, 22, 20, 22, 23,
+        };
 
         return new Mesh(vertices, indices);
     }
 
-    public static Mesh CreateGrid(int halfSize, float spacing, Vector3 color)
+    public static Mesh CreateSphere(float radius, int sectors, int stacks, Vector3 color)
     {
-        var lines = 2 * halfSize + 1;
-        var vertices = new List<Vertex>(lines * 4 * 2);
-        var indices = new List<uint>(lines * 4 * 2);
-        var extent = halfSize * spacing;
+        var vertices = new List<Vertex>();
+        var indices = new List<uint>();
 
-        for (var i = -halfSize; i <= halfSize; i++)
+        for (int i = 0; i <= stacks; i++)
+        {
+            var stackAngle = MathF.PI / 2 - i * MathF.PI / stacks;
+            var xy = radius * MathF.Cos(stackAngle);
+            var z = radius * MathF.Sin(stackAngle);
+
+            for (int j = 0; j <= sectors; j++)
+            {
+                var sectorAngle = j * 2 * MathF.PI / sectors;
+                var x = xy * MathF.Cos(sectorAngle);
+                var y = xy * MathF.Sin(sectorAngle);
+                var pos = new Vector3(x, y, z);
+                var normal = Vector3.Normalize(pos);
+                vertices.Add(new Vertex(pos, color, normal));
+            }
+        }
+
+        for (int i = 0; i < stacks; i++)
+        {
+            var k1 = (uint)(i * (sectors + 1));
+            var k2 = (uint)(k1 + sectors + 1);
+
+            for (int j = 0; j < sectors; j++, k1++, k2++)
+            {
+                if (i != 0)
+                {
+                    indices.Add(k1);
+                    indices.Add(k2);
+                    indices.Add(k1 + 1);
+                }
+
+                if (i != stacks - 1)
+                {
+                    indices.Add(k1 + 1);
+                    indices.Add(k2);
+                    indices.Add(k2 + 1);
+                }
+            }
+        }
+
+        return new Mesh(vertices.ToArray(), indices.ToArray());
+    }
+
+    public static Mesh CreateGrid(int lines, float spacing, Vector3 color)
+    {
+        var vertices = new List<Vertex>();
+        var indices = new List<uint>();
+        var max = lines * spacing;
+        var normal = Vector3.UnitY;
+
+        for (int i = -lines; i <= lines; i++)
         {
             var pos = i * spacing;
 
-            var i0 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(pos, 0, -extent), color, Vector3.UnitY));
-            var i1 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(pos, 0, extent), color, Vector3.UnitY));
-            indices.Add(i0); indices.Add(i1);
+            vertices.Add(new Vertex(new Vector3(pos, 0, -max), color, normal));
+            vertices.Add(new Vertex(new Vector3(pos, 0,  max), color, normal));
+            indices.Add((uint)(vertices.Count - 2));
+            indices.Add((uint)(vertices.Count - 1));
 
-            var i2 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(pos, 0, -extent), color, Vector3.UnitY));
-            var i3 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(pos, 0, extent), color, Vector3.UnitY));
-            indices.Add(i2); indices.Add(i3);
-
-            var i4 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(-extent, 0, pos), color, Vector3.UnitY));
-            var i5 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(extent, 0, pos), color, Vector3.UnitY));
-            indices.Add(i4); indices.Add(i5);
-
-            var i6 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(-extent, 0, pos), color, Vector3.UnitY));
-            var i7 = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(extent, 0, pos), color, Vector3.UnitY));
-            indices.Add(i6); indices.Add(i7);
+            vertices.Add(new Vertex(new Vector3(-max, 0, pos), color, normal));
+            vertices.Add(new Vertex(new Vector3( max, 0, pos), color, normal));
+            indices.Add((uint)(vertices.Count - 2));
+            indices.Add((uint)(vertices.Count - 1));
         }
 
         return new Mesh(vertices.ToArray(), indices.ToArray());

@@ -18,19 +18,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
-    <PackageReference Include="Flecs.NET.Debug" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Debug'" />
-    <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release' OR '$(Configuration)' == 'ReleaseAOT'" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
     <ProjectReference Include="..\Engine.Graphics\Engine.Graphics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Shaders\*.spv" CopyToOutputDirectory="PreserveNewest">
-      <Link>Shaders\%(Filename)%(Extension)</Link>
+    <Content Include="Shaders\*.spv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 

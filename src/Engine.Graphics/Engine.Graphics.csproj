@@ -18,15 +18,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Flecs.NET.Debug" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Debug'" />
-    <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release' OR '$(Configuration)' == 'ReleaseAOT'" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="SharpGLTF.Core" Version="1.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
   </ItemGroup>
 

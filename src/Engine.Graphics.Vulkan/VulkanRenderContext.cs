@@ -1,40 +1,48 @@
 using Engine.Core;
-using Engine.Graphics;
 
 namespace Engine.Graphics.Vulkan;
 
-public sealed class VulkanRenderContext : IRenderContext
+internal sealed class VulkanRenderContext : IRenderContext
 {
-    private readonly VulkanContext _context;
+    private readonly VulkanContext _ctx;
     private readonly VulkanSwapchain _swapchain;
-    private readonly VulkanPipeline _pipeline;
-    private readonly VulkanRenderer _renderer;
-    private readonly Sdl3Window _window;
+    private readonly IWindow _window;
+    private bool _disposed;
 
     public IWindow Window => _window;
 
-    public VulkanRenderContext(int width, int height, bool enableValidation)
+    public VulkanRenderContext(IWindow window, bool enableValidation)
     {
-        _window = new Sdl3Window("Cortex Engine", width, height, vulkanSurface: true);
-        _context = new VulkanContext(_window, enableValidation);
-        _swapchain = new VulkanSwapchain(_context, width, height);
-        _pipeline = new VulkanPipeline(_context, _swapchain.RenderPass);
-        _renderer = new VulkanRenderer(_context, _swapchain, _pipeline);
+        _window = window;
+        _ctx = new VulkanContext(window, enableValidation);
+
+        var surfaceFormat = new VkSurfaceFormatKHR
+        {
+            format = _ctx.SurfaceFormat,
+            colorSpace = _ctx.SurfaceColorSpace,
+        };
+
+        _swapchain = new VulkanSwapchain(_ctx.Device, _ctx.PhysicalDevice, _ctx.Surface,
+            surfaceFormat, window.Width, window.Height);
     }
 
-    public IRenderer CreateRenderer() => _renderer;
+    public IRenderer CreateRenderer()
+    {
+        return new VulkanRenderer(_ctx, _swapchain);
+    }
 
     public void Resize(int width, int height)
     {
-        _renderer.OnResize();
+        _swapchain.Recreate(width, height);
     }
 
     public void Dispose()
     {
-        _renderer.Dispose();
-        _pipeline.Dispose();
-        _swapchain.Dispose();
-        _context.Dispose();
-        _window.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+
+        _swapchain?.Dispose();
+        _ctx?.Dispose();
+        _window?.Dispose();
     }
 }
