@@ -130,7 +130,7 @@ public sealed class OpenGLRenderer : IRenderer
                 unsafe
                 {
                     fixed (float* p = _matrixBuffer)
-                        _gl.UniformMatrix4(shadowMvpLoc, 1, true, p);
+                        _gl.UniformMatrix4(shadowMvpLoc, 1, false, p);
                 }
                 DrawMeshImmediate(glMesh);
             });
@@ -170,7 +170,7 @@ public sealed class OpenGLRenderer : IRenderer
             unsafe
             {
                 fixed (float* p = _matrixBuffer)
-                    _gl.UniformMatrix4(_uLightViewProj, 1, true, p);
+                    _gl.UniformMatrix4(_uLightViewProj, 1, false, p);
             }
             _gl.ActiveTexture(GLEnum.Texture1);
             _gl.BindTexture(GLEnum.Texture2D, _shadowTexture);
@@ -187,9 +187,9 @@ public sealed class OpenGLRenderer : IRenderer
             var mvp = proj * view * model;
 
             CopyMatrixToBuffer(mvp);
-            unsafe { fixed (float* pmvp = _matrixBuffer) _gl.UniformMatrix4(_uMVP, 1, true, pmvp); }
+            unsafe { fixed (float* pmvp = _matrixBuffer) _gl.UniformMatrix4(_uMVP, 1, false, pmvp); }
             CopyMatrixToBuffer(model);
-            unsafe { fixed (float* pmodel = _matrixBuffer) _gl.UniformMatrix4(_uModel, 1, true, pmodel); }
+            unsafe { fixed (float* pmodel = _matrixBuffer) _gl.UniformMatrix4(_uModel, 1, false, pmodel); }
             _gl.Uniform4(_uMaterialColor, material.Albedo.X, material.Albedo.Y, material.Albedo.Z, 1.0f);
             _gl.Uniform1(_uRoughness, material.Roughness);
             _gl.Uniform1(_uMetallic, material.Metallic);
@@ -336,10 +336,11 @@ public sealed class OpenGLRenderer : IRenderer
 
     private void CopyMatrixToBuffer(Matrix4x4 m)
     {
-        _matrixBuffer[0] = m.M11; _matrixBuffer[1] = m.M12; _matrixBuffer[2] = m.M13; _matrixBuffer[3] = m.M14;
-        _matrixBuffer[4] = m.M21; _matrixBuffer[5] = m.M22; _matrixBuffer[6] = m.M23; _matrixBuffer[7] = m.M24;
-        _matrixBuffer[8] = m.M31; _matrixBuffer[9] = m.M32; _matrixBuffer[10] = m.M33; _matrixBuffer[11] = m.M34;
-        _matrixBuffer[12] = m.M41; _matrixBuffer[13] = m.M42; _matrixBuffer[14] = m.M43; _matrixBuffer[15] = m.M44;
+        // OpenGL expects column-major; System.Numerics is row-major, so transpose during copy
+        _matrixBuffer[0] = m.M11; _matrixBuffer[1] = m.M21; _matrixBuffer[2] = m.M31; _matrixBuffer[3] = m.M41;
+        _matrixBuffer[4] = m.M12; _matrixBuffer[5] = m.M22; _matrixBuffer[6] = m.M32; _matrixBuffer[7] = m.M42;
+        _matrixBuffer[8] = m.M13; _matrixBuffer[9] = m.M23; _matrixBuffer[10] = m.M33; _matrixBuffer[11] = m.M43;
+        _matrixBuffer[12] = m.M14; _matrixBuffer[13] = m.M24; _matrixBuffer[14] = m.M34; _matrixBuffer[15] = m.M44;
     }
 
     public void Dispose()
