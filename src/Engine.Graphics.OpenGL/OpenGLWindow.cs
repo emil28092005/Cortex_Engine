@@ -27,8 +27,10 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
         var options = WindowOptions.Default;
         options.Title = title;
         options.Size = new Silk.NET.Maths.Vector2D<int>(width, height);
-        options.VSync = true;
+        options.VSync = false;
         options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(3, 3));
+        options.WindowState = WindowState.Normal;
+        options.ShouldSwapAutomatically = false;
 
         _silkWindow = Window.Create(options);
         _silkWindow.Closing += () => _shouldClose = true;

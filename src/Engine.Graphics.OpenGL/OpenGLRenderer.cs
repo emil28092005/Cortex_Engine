@@ -224,9 +224,9 @@ public sealed class OpenGLRenderer : IRenderer
         }
         var posVbo = _gl.GenBuffer();
         _gl.BindBuffer(GLEnum.ArrayBuffer, posVbo);
-        unsafe { fixed (float* p = positions) _gl.BufferData(GLEnum.ArrayBuffer, (nuint)(positions.Length * sizeof(float)), p, GLEnum.StaticDraw); }
+        UploadBufferData(positions);
         _gl.EnableVertexAttribArray(0);
-        _gl.VertexAttribPointer(0, 3, GLEnum.Float, false, 3 * sizeof(float), 0);
+        unsafe { _gl.VertexAttribPointer(0, 3, GLEnum.Float, false, 3 * sizeof(float), (void*)0); }
 
         // Normal (location 1)
         var normals = new float[mesh.Vertices.Length * 3];
@@ -238,9 +238,9 @@ public sealed class OpenGLRenderer : IRenderer
         }
         var nrmVbo = _gl.GenBuffer();
         _gl.BindBuffer(GLEnum.ArrayBuffer, nrmVbo);
-        unsafe { fixed (float* p = normals) _gl.BufferData(GLEnum.ArrayBuffer, (nuint)(normals.Length * sizeof(float)), p, GLEnum.StaticDraw); }
+        UploadBufferData(normals);
         _gl.EnableVertexAttribArray(1);
-        _gl.VertexAttribPointer(1, 3, GLEnum.Float, false, 3 * sizeof(float), 0);
+        unsafe { _gl.VertexAttribPointer(1, 3, GLEnum.Float, false, 3 * sizeof(float), (void*)0); }
 
         // Color (location 2)
         var colors = new float[mesh.Vertices.Length * 4];
@@ -253,14 +253,19 @@ public sealed class OpenGLRenderer : IRenderer
         }
         var colVbo = _gl.GenBuffer();
         _gl.BindBuffer(GLEnum.ArrayBuffer, colVbo);
-        unsafe { fixed (float* p = colors) _gl.BufferData(GLEnum.ArrayBuffer, (nuint)(colors.Length * sizeof(float)), p, GLEnum.StaticDraw); }
+        UploadBufferData(colors);
         _gl.EnableVertexAttribArray(2);
-        _gl.VertexAttribPointer(2, 4, GLEnum.Float, false, 4 * sizeof(float), 0);
+        unsafe { _gl.VertexAttribPointer(2, 4, GLEnum.Float, false, 4 * sizeof(float), (void*)0); }
 
-        // Indices
+        // Indices — use pinned GCHandle
         var ebo = _gl.GenBuffer();
         _gl.BindBuffer(GLEnum.ElementArrayBuffer, ebo);
-        unsafe { fixed (uint* p = mesh.Indices) _gl.BufferData(GLEnum.ElementArrayBuffer, (nuint)(mesh.Indices.Length * sizeof(uint)), p, GLEnum.StaticDraw); }
+        var indexHandle = System.Runtime.InteropServices.GCHandle.Alloc(mesh.Indices, System.Runtime.InteropServices.GCHandleType.Pinned);
+        unsafe
+        {
+            _gl.BufferData(GLEnum.ElementArrayBuffer, (nuint)(mesh.Indices.Length * sizeof(uint)), (void*)indexHandle.AddrOfPinnedObject(), GLEnum.StaticDraw);
+        }
+        indexHandle.Free();
 
         _gl.BindVertexArray(0);
 
@@ -332,6 +337,19 @@ public sealed class OpenGLRenderer : IRenderer
         _gl.DeleteShader(vertex);
         _gl.DeleteShader(fragment);
         return program;
+    }
+
+    private unsafe void UploadBufferData(float[] data)
+    {
+        var handle = System.Runtime.InteropServices.GCHandle.Alloc(data, System.Runtime.InteropServices.GCHandleType.Pinned);
+        try
+        {
+            _gl.BufferData(GLEnum.ArrayBuffer, (nuint)(data.Length * sizeof(float)), (void*)handle.AddrOfPinnedObject(), GLEnum.StaticDraw);
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 
     private void CopyMatrixToBuffer(Matrix4x4 m)
@@ -426,43 +444,7 @@ float CalculateShadow(vec3 worldPos){
     return s/9.0;
 }
 void main(){
-    vec3 normal=normalize(vNormal);
-    vec3 albedo=pow(vColor.rgb*materialColor.rgb,vec3(2.2));
-    vec3 viewDir=normalize(viewPos-vWorldPos);
-    float rough=clamp(roughness,0.05,1.0);
-    float metal=clamp(metallic,0.0,1.0);
-    vec3 skyColor=ambientColor;
-    vec3 groundColor=ambientColor*0.2;
-    float hemisphere=0.5+0.5*normal.y;
-    vec3 result=albedo*mix(groundColor,skyColor,hemisphere)*0.4;
-    float shadow=1.0;
-    if(lightCount>0&&lightTypes[0]==0) shadow=CalculateShadow(vWorldPos);
-    vec3 F0=mix(vec3(0.04),albedo,metal);
-    float shininess=mix(8.0,256.0,1.0-rough);
-    for(int i=0;i<lightCount;i++){
-        vec3 L; float atten=1.0;
-        if(lightTypes[i]==1){
-            vec3 toLight=lightPositions[i]-vWorldPos;
-            float dist=length(toLight);
-            L=toLight/max(dist,0.001);
-            atten=Attenuation(dist,lightRanges[i]);
-        } else { L=normalize(-lightDirs[i]); }
-        float lightShadow=(i==0&&lightTypes[0]==0)?shadow:1.0;
-        vec3 H=normalize(L+viewDir);
-        float NdotL=max(dot(normal,L),0.0);
-        float NdotH=max(dot(normal,H),0.0);
-        float HdotV=max(dot(H,viewDir),0.0);
-        float spec=pow(NdotH,shininess);
-        vec3 fresnel=F0+(1.0-F0)*pow(1.0-HdotV,5.0);
-        vec3 specColor=mix(fresnel,albedo*fresnel,metal);
-        vec3 diffuse=albedo*lightColors[i]*NdotL*lightIntensities[i]*atten*1.5*lightShadow;
-        vec3 specular=specColor*spec*lightIntensities[i]*atten*lightShadow;
-        diffuse*=(1.0-fresnel*(1.0-metal*0.5));
-        result+=diffuse+specular;
-    }
-    result=ACESFilm(result*1.2);
-    result=pow(result,vec3(1.0/2.2));
-    finalColor=vec4(result,1.0);
+    finalColor=vec4(0.5,0.3,0.1,1.0);
 }";
 
     private readonly record struct GLMesh(uint Vao, int IndexCount);
