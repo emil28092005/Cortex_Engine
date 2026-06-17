@@ -212,6 +212,12 @@ public enum VkCullModeFlags : uint
     FrontAndBack = 0x00000003,
 }
 
+public enum VkDynamicState : int
+{
+    Viewport = 0,
+    Scissor = 1,
+}
+
 public enum VkFrontFace : int
 {
     CounterClockwise = 0,
@@ -241,10 +247,10 @@ public enum VkBlendOp : int
 
 public enum VkColorComponentFlags : uint
 {
-    R = 0x00000010,
-    G = 0x00000020,
-    B = 0x00000040,
-    A = 0x00000080,
+    R = 0x00000001,
+    G = 0x00000002,
+    B = 0x00000004,
+    A = 0x00000008,
 }
 
 public enum VkCompareOp : int
@@ -1170,6 +1176,16 @@ unsafe public struct VkPipelineColorBlendStateCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
+unsafe public struct VkPipelineDynamicStateCreateInfo
+{
+    public VkStructureType sType;
+    public void* pNext;
+    public uint flags;
+    public uint dynamicStateCount;
+    public VkDynamicState* pDynamicStates;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 unsafe public struct VkGraphicsPipelineCreateInfo
 {
     public VkStructureType sType;
@@ -1310,11 +1326,11 @@ unsafe public struct VkRenderPassBeginInfo
     public VkClearValue* pClearValues;
 }
 
-[StructLayout(LayoutKind.Sequential)]
-unsafe public struct VkClearValue
+[StructLayout(LayoutKind.Explicit)]
+public struct VkClearValue
 {
-    public VkClearColorValue color;
-    public VkClearDepthStencilValue depthStencil;
+    [FieldOffset(0)] public VkClearColorValue color;
+    [FieldOffset(0)] public VkClearDepthStencilValue depthStencil;
 }
 
 [StructLayout(LayoutKind.Sequential)]

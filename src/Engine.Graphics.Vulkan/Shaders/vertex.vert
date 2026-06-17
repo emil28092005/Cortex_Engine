@@ -4,7 +4,7 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
 
-layout(row_major, set = 0, binding = 0) uniform FrameUBO {
+layout(set = 0, binding = 0) uniform FrameUBO {
     vec3 cameraPosition;
     uint lightCount;
     vec3 ambientColor;
@@ -26,6 +26,10 @@ layout(location = 3) out vec3 fragViewDir;
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
     gl_Position = pc.mvp * vec4(inPosition, 1.0);
+
+    // Vulkan clip space: Y-down, Z [0,1] — convert from OpenGL Y-up, Z [-1,1]
+    gl_Position.y = -gl_Position.y;
+    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;
 
     fragColor = inColor;
     fragNormal = normalize(mat3(pc.model) * inNormal);

@@ -475,7 +475,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
         };
         Vk.vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-        VkDescriptorSet ds = _descriptorSets[_currentFrame];
+        var ds = _descriptorSets[_currentFrame];
         Vk.vkCmdBindDescriptorSets(cmd, 0, _pipeline.PipelineLayout, 0, 1, &ds, 0, null);
 
         world.Each((Entity e, ref Transform transform, ref Mesh mesh, ref Material material) =>
@@ -502,7 +502,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, IScreenshotProvider
                 proj = cam.GetProjectionMatrix();
             });
 
-            var mvp = model * view * proj;
+            var mvp = proj * view * model;
 
             var pushData = new byte[VulkanPipeline.PushConstantSize];
             fixed (byte* pPush = pushData)

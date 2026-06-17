@@ -14,7 +14,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
     private readonly VulkanContext _ctx;
     private bool _disposed;
 
-    public const int PushConstantSize = 128;
+    public const int PushConstantSize = 144;
     public const int FrameUboSize = 16 + 16 + 16 * 4 * 8;
 
     public VulkanPipeline(VulkanContext ctx, VkRenderPass renderPass)
@@ -84,8 +84,8 @@ public sealed unsafe class VulkanPipeline : IDisposable
             primitiveRestartEnable = 0
         };
 
-        var viewport = new VkViewport { x = 0, y = 0, width = 0, height = 0, minDepth = 0, maxDepth = 1 };
-        var scissor = new VkRect2D { offset = new VkOffset2D { x = 0, y = 0 }, extent = new VkExtent2D { width = 0, height = 0 } };
+        var viewport = new VkViewport { x = 0, y = 0, width = 1280, height = 720, minDepth = 0, maxDepth = 1 };
+        var scissor = new VkRect2D { offset = new VkOffset2D { x = 0, y = 0 }, extent = new VkExtent2D { width = 1280, height = 720 } };
 
         VkPipelineViewportStateCreateInfo viewportState;
         viewportState.sType = VkStructureType.PipelineViewportStateCreateInfo;
@@ -163,6 +163,15 @@ public sealed unsafe class VulkanPipeline : IDisposable
         colorBlendState.attachmentCount = 1;
         colorBlendState.pAttachments = &blendAttachment;
 
+        var dynamicStates = stackalloc VkDynamicState[2];
+        dynamicStates[0] = VkDynamicState.Viewport;
+        dynamicStates[1] = VkDynamicState.Scissor;
+
+        VkPipelineDynamicStateCreateInfo dynamicState = default;
+        dynamicState.sType = VkStructureType.PipelineDynamicStateCreateInfo;
+        dynamicState.dynamicStateCount = 2;
+        dynamicState.pDynamicStates = dynamicStates;
+
         var uboBinding = new VkDescriptorSetLayoutBinding
         {
             binding = 0,
@@ -226,7 +235,7 @@ public sealed unsafe class VulkanPipeline : IDisposable
             pipelineInfo.pMultisampleState = &multisampleState;
             pipelineInfo.pDepthStencilState = &depthStencilState;
             pipelineInfo.pColorBlendState = &colorBlendState;
-            pipelineInfo.pDynamicState = null;
+            pipelineInfo.pDynamicState = &dynamicState;
             pipelineInfo.layout = pipeLayout;
             pipelineInfo.renderPass = renderPass;
             pipelineInfo.subpass = 0;

@@ -5,7 +5,7 @@ layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragWorldPos;
 layout(location = 3) in vec3 fragViewDir;
 
-layout(row_major, set = 0, binding = 0) uniform FrameUBO {
+layout(set = 0, binding = 0) uniform FrameUBO {
     vec3 cameraPosition;
     uint lightCount;
     vec3 ambientColor;
@@ -47,11 +47,9 @@ void main() {
         float attenuation;
 
         if (dirIntensity.w < 0.0) {
-            // Directional light: direction stored as xyz, w = intensity (negative marks directional)
             lightDir = normalize(-dirIntensity.xyz);
             attenuation = abs(dirIntensity.w);
         } else {
-            // Point light: position stored as xyz, w = intensity (positive marks point)
             vec3 toLight = dirIntensity.xyz - fragWorldPos;
             float dist = length(toLight);
             lightDir = toLight / max(dist, 0.001);
@@ -63,7 +61,6 @@ void main() {
         vec3 H = normalize(V + lightDir);
         float NdotL = max(dot(N, lightDir), 0.0);
         float NdotH = max(dot(N, H), 0.0);
-        float VdotH = max(dot(V, H), 0.0);
 
         float specPower = mix(128.0, 4.0, roughness);
         float specIntensity = pow(NdotH, specPower);
