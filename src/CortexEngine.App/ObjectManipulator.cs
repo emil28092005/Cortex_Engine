@@ -28,10 +28,14 @@ public sealed class ObjectManipulator
     /// Process input for object picking and dragging.
     /// Returns true if input was consumed (ImGui should be ignored).
     /// </summary>
+    private bool _imGuiAvailable;
+
+    public void SetImGuiAvailable(bool available) => _imGuiAvailable = available;
+
     public bool ProcessInput(World world, Camera camera, IInputState input)
     {
         // Skip if ImGui is capturing mouse
-        if (ImGuiNET.ImGui.GetIO().WantCaptureMouse)
+        if (_imGuiAvailable && ImGuiNET.ImGui.GetIO().WantCaptureMouse)
         {
             _isDragging = false;
             return false;

@@ -11,6 +11,7 @@ using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
 using Engine.Graphics.Loaders;
+using Engine.Graphics.OpenGL;
 using Engine.Graphics.RaylibBackend;
 using Engine.Graphics.Vulkan;
 using Engine.Physics;
@@ -43,19 +44,22 @@ class Program
 
             RaylibBackendRegistrar.EnsureRegistered();
             VulkanBackendRegistrar.EnsureRegistered();
-            using var renderContext = RenderBackendFactory.Create("raylib", 1280, 720, enableValidation: false);
+            OpenGLBackendRegistrar.EnsureRegistered();
+            using var renderContext = RenderBackendFactory.Create("opengl", 1280, 720, enableValidation: false);
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
 
-            // ImGui editor layer
-            var imGuiLayer = new ImGuiLayer();
+            // ImGui editor layer (Raylib only)
+            ImGuiLayer? imGuiLayer = null;
             var objectManipulator = new ObjectManipulator();
-            if (!cameraTour)
+            objectManipulator.SetImGuiAvailable(false);
+            if (!cameraTour && renderer is RaylibRenderer rlRenderer)
             {
+                imGuiLayer = new ImGuiLayer();
                 imGuiLayer.Initialize();
-                if (renderer is RaylibRenderer rlRenderer)
-                    rlRenderer.ImGuiLayer = imGuiLayer;
+                rlRenderer.ImGuiLayer = imGuiLayer;
+                objectManipulator.SetImGuiAvailable(true);
             }
 
             var (modelPath, mcpPort) = ParseArgs(args);
@@ -283,14 +287,17 @@ class Program
                 }
 
                 // Feed frame data to ImGui before rendering.
-                imGuiLayer.SetFrameData(world, timing, currentFps);
+                if (imGuiLayer != null)
+                    imGuiLayer.SetFrameData(world, timing, currentFps);
 
-                // Sync selection between manipulator and ImGui
-                if (objectManipulator.IsDragging && !string.IsNullOrEmpty(objectManipulator.SelectedEntityName))
-                    imGuiLayer.SetSelectedEntity(objectManipulator.SelectedEntityName);
+            objectManipulator.SetImGuiAvailable(imGuiLayer != null);
 
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();
+
+                // Swap buffers for OpenGL backend
+                if (renderContext is OpenGLRenderContext glCtx2)
+                    glCtx2.SwapBuffers();
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
@@ -303,7 +310,7 @@ class Program
             }
 
             Console.WriteLine("Shutting down...");
-            imGuiLayer.Dispose();
+            imGuiLayer?.Dispose();
 #if !RELEASE_AOT
             if (mcpApp != null)
                 await mcpApp.StopAsync();

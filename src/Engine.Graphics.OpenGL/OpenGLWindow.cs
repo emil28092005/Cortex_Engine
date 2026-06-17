@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Engine.Core;
 using Silk.NET.Input;
+using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using SilkWindow = Silk.NET.Windowing.IWindow;
 
@@ -31,6 +32,8 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
 
         _silkWindow = Window.Create(options);
         _silkWindow.Closing += () => _shouldClose = true;
+        // Initialize without Run() — enables non-blocking event loop
+        _silkWindow.Initialize();
     }
 
     public void OnLoad()
@@ -38,6 +41,8 @@ public sealed class OpenGLWindow : Engine.Core.IWindow, IDisposable
         var inputContext = _silkWindow.CreateInput();
         _input.Initialize(inputContext);
     }
+
+    public GL CreateGL() => _silkWindow.CreateOpenGL();
 
     public void PumpEvents() => _silkWindow.DoEvents();
     public void Close() => _shouldClose = true;

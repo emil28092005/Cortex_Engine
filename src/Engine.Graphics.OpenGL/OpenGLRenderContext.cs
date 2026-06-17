@@ -1,7 +1,9 @@
 using Engine.Core;
 using Engine.Graphics;
 using Silk.NET.OpenGL;
+using Silk.NET.Windowing;
 using SilkWindow = Silk.NET.Windowing.IWindow;
+using CoreIWindow = Engine.Core.IWindow;
 
 namespace Engine.Graphics.OpenGL;
 
@@ -12,16 +14,15 @@ public sealed class OpenGLRenderContext : IRenderContext
     private OpenGLRenderer? _renderer;
     private bool _disposed;
 
-    public IWindow Window => _window;
+    public CoreIWindow Window => _window;
 
     public OpenGLRenderContext(int width, int height, bool enableValidation = false)
     {
         _window = new OpenGLWindow("Cortex Engine (OpenGL)", width, height);
-    }
-
-    public void OnLoad()
-    {
-        _gl = _window.SilkView.CreateOpenGL();
+        // Initialize() triggers the Load callback which creates the GL context
+        _window.SilkView.Initialize();
+        // After Initialize, CreateOpenGL should work
+        _gl = _window.CreateGL();
         _window.OnLoad();
     }
 
@@ -31,10 +32,9 @@ public sealed class OpenGLRenderContext : IRenderContext
         return _renderer;
     }
 
-    public void Resize(int width, int height)
-    {
-        _renderer?.SetScreenSize(width, height);
-    }
+    public void Resize(int width, int height) => _renderer?.SetScreenSize(width, height);
+
+    public void SwapBuffers() => _window.SilkView.SwapBuffers();
 
     public void Dispose()
     {
