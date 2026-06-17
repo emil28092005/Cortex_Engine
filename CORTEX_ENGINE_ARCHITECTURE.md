@@ -15,7 +15,7 @@ Cortex Engine is a 3D game engine built from scratch to provide a Unity-like dev
 - **Read** the complete ECS world state through native JSON serialization.
 - **Modify** the running engine via declarative JSON commands and, in Development Mode, via hot-reloaded C# scripts.
 
-The architecture prioritizes **production maturity** over experimental technologies: Vulkan (via Silk.NET.Vulkan), Flecs.NET (C# bindings for the C-based Flecs ECS), SDL3-cs (ppy.SDL3-CS), and Hexa.NET.ImGui with a native Vulkan backend.
+The architecture prioritizes **production maturity** over experimental technologies: a Render HAL with a Raylib-cs default backend and an optional Vulkan (Silk.NET.Vulkan) backend, Flecs.NET (C# bindings for the C-based Flecs ECS), SDL3-cs (ppy.SDL3-CS), and Hexa.NET.ImGui with a native backend.
 
 ---
 
@@ -58,8 +58,10 @@ The final stack was chosen to eliminate experimental dependencies and maximize p
 
 - **C# (.NET 9) with dual-runtime strategy**: JIT for development (Roslyn hot-reload), NativeAOT for release.
 - **SDL3-cs**: `ppy.SDL3-CS` — direct, zero-overhead P/Invoke bindings maintained by the osu! team.
-- **Vulkan**: `Vortice.Vulkan` — mature C# Vulkan bindings, .NET 9/10 support.
-- **MoltenVK**: For macOS/iOS compatibility.
+- **Render HAL**: `Engine.Graphics` abstraction with pluggable backends.
+- **Raylib-cs**: `Raylib-cs` 8.0.0 — default, simple OpenGL-based backend for rapid iteration and screenshot capture.
+- **Vulkan**: `Silk.NET.Vulkan` 2.21.0 — optional high-performance backend retained as a reference implementation.
+- **MoltenVK**: For macOS/iOS compatibility when using the Vulkan backend.
 - **Flecs.NET**: `Flecs.NET.Release` — C# bindings for Flecs with NativeAOT static-link support.
 - **ImGui**: `Hexa.NET.ImGui` — ships pre-built SDL3 + Vulkan native backends.
 - **Jolt Physics**: `JoltPhysicsSharp` — C# bindings for Jolt Physics, .NET 9/10.
@@ -112,25 +114,46 @@ All Roslyn and `AssemblyLoadContext` code is wrapped in `#if DEV_MODE`.
 
 ### 3.3 Graphics HAL
 
-**Vulkan via `Silk.NET.Vulkan`**
+The graphics layer is split into a backend-agnostic **Render HAL** (`Engine.Graphics`) and concrete backend implementations.
 
-- NuGet: `Silk.NET.Vulkan` 2.21.0
-- .NET 9/10 low-level bindings
-- Mature, used by Silk.NET ecosystem
-- MoltenVK provides macOS/iOS support
+**Core abstraction (`Engine.Graphics`)**
 
-**Note:** Initial prototype used Vortice.Vulkan, but its loader segfaulted on the Kubuntu development setup. Silk.NET.Vulkan is the verified working binding.
+- `IRenderContext` — backend lifetime, resize, and surface handling.
+- `IRenderer` — renders the ECS world and exposes screenshot capture.
+- `RenderBackendFactory` — a registry/factory pattern; backend assemblies register themselves.
+- The app depends only on these interfaces.
 
-**Why Vulkan over WebGPU:**
+**Default backend: Raylib-cs**
 
-- Battle-tested in production engines
-- Full compute shader support (mandatory for AI vision pipelines)
-- Mature C# tooling and ImGui integration
-- MoltenVK provides macOS/iOS support
+- NuGet: `Raylib-cs` 8.0.0
+- Simple, mature OpenGL-based renderer
+- Handles window creation, mesh upload, 3D camera, and PNG screenshots internally
+- Owns its GLFW window and input via `RaylibWindow` + `RaylibInputState` (no SDL3 dependency)
+
+**Optional backend: Vulkan via `Silk.NET.Vulkan` — DEFERRED**
+
+- NuGet: `Silk.NET.Vulkan` 2.21.0 and `Silk.NET.Vulkan.Extensions.KHR` 2.21.0
+- The Vulkan backend compiles and implements the same `IRenderContext` / `IRenderer` HAL interfaces
+- Uses `Sdl3Window` internally for Vulkan surface creation (`SDL_Vulkan_CreateSurface`)
+- **Status: deferred to long-term backlog.** The backend is kept compilable and architecturally
+  integrated (via `IWindow`, `IRenderContext`), but is not actively tested or maintained.
+  The Raylib backend is the primary render path for all current development.
+- **Reintegration checklist** (when picked up):
+  1. Test `VulkanRenderContext` with the new `IWindow`-based factory signature
+  2. Verify `SDL_Vulkan_CreateSurface` works through `IWindow.Handle`
+  3. Port improved shading (Fresnel, ACES, gamma, hemisphere ambient) to Vulkan GLSL shaders
+  4. Verify custom mesh upload (spheres, grids) works via Vulkan vertex/index buffers
+  5. Test screenshot capture via `ScreenshotCapture` with the new frame-deferral logic
+
+**Why a HAL + Raylib default?**
+
+- Drastically reduces the code the app, AI commands, and camera tools depend on
+- Raylib-cs provides a fast, stable path for screenshots, 3D drawing, and windowing without custom shader/pipeline work
+- Vulkan remains available as a high-performance, compute-capable backend for future vision pipelines
 
 **macOS/iOS path:**
 
-- MoltenVK 1.4 supports Vulkan 1.4 on macOS, iOS, tvOS, visionOS
+- When using the Vulkan backend: MoltenVK 1.4 supports Vulkan 1.4 on macOS, iOS, tvOS, visionOS
 - `VK_KHR_portability_subset` and `VK_KHR_portability_enumeration` must be enabled
 - Loader and MoltenVK libraries must be bundled with the application
 - KosmicKrisp (via Mesa 3D) is an emerging alternative for Apple Silicon desktops
@@ -304,15 +327,17 @@ When the AI generates a C# script, the engine:
 
 ### 4.5 Rendering & Shading
 
-The renderer uses a simple forward-lit pipeline:
+The renderer uses a simple forward-lit pipeline that is implemented by each backend behind the HAL:
 
 - **Vertex format**: position, color, normal.
 - **Per-entity**: Mesh + Transform + optional Material.
-- **Per-frame constants** via a Vulkan uniform buffer (descriptor set 0): camera position, up to 4 directional lights, ambient color.
-- **Per-entity constants** via push constants: MVP matrix, material albedo/roughness/metallic, texture use flag.
+- **Per-frame constants**: camera position, up to 4 directional lights, ambient color.
+- **Per-entity constants**: MVP matrix, material albedo/roughness/metallic, texture use flag.
 - **Lighting model**: multiple directional lights with ambient + diffuse + Blinn-Phong specular.
 - **Material**: `Material.Albedo` tints vertex color, `Roughness` and `Metallic` control specular falloff and intensity; an optional `TexturePath` enables albedo texture sampling.
-- **Textures**: PNG files are loaded into Vulkan images with a combined image sampler (descriptor set 1). UVs are derived from vertex position XZ for the floor plane; other meshes use world-space XZ as a simple mapping.
+- **Vulkan backend**: uses a uniform buffer (descriptor set 0) and push constants; textures are Vulkan images with a combined image sampler (descriptor set 1).
+- **Raylib backend**: uses a custom GLSL shader with `materialColor`, `useTexture`, `roughness`, `metallic`, and light arrays. Textures are loaded via `Raylib.LoadTexture` and UVs use world-space XZ.
+- **UV mapping**: meshes use world-space XZ as a simple UV mapping for both backends.
 
 ### 4.6 SystemSlotRegistry
 
@@ -474,7 +499,7 @@ Available tools:
 - `delete_entity` — delete an entity by name.
 - `list_entities` — list all named entities with a `Transform`.
 - `get_world_state` — dump the ECS world as JSON (Transform, Camera, Material, Light, Mesh).
-- `capture_screenshot` — save a PNG of the current frame (HTTP/render mode only).
+- `capture_screenshot` — capture the current frame, save it as PNG on disk, and return a JSON envelope `{ "path": "...", "base64": "..." }` with the base64-encoded PNG (HTTP/render mode only).
 
 Commands are queued and executed on the main engine thread so the Flecs world is never touched from a background thread.
 
@@ -529,9 +554,9 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   ├── Sdl3Window.cs                 # SDL3 window wrapper
 │   │   ├── Timing.cs                     # DeltaTime, fixed timestep
 │   │   ├── InputMapping.cs               # Keyboard, mouse, gamepad input
-│   │   ├── ICameraController.cs            # Camera controller interface
-│   │   ├── OrbitCameraController.cs      # Mouse orbit camera
-│   │   ├── FreeFlyCameraController.cs    # WASD + mouse look camera
+    │   │   ├── ICameraController.cs          # Camera controller interface
+    │   │   ├── FreeFlyCameraController.cs    # WASD + mouse look camera
+    │   │   ├── IScreenshotProvider.cs        # Async screenshot capture interface
 │   │   └── Components/                   # Transform, Camera, Light, Material, Mesh
 │   │
 │   ├── Engine.Data/
@@ -541,16 +566,30 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 │   │   └── SystemSlotRegistry.cs         # Named system hot-swap registry
 │   │
 │   ├── Engine.Graphics/
+│   │   ├── IRenderContext.cs             # Backend context abstraction
+│   │   ├── IRenderer.cs                  # ECS world renderer abstraction
+│   │   ├── RenderBackendFactory.cs       # Backend registry and factory
+│   │   └── Loaders/                      # ObjLoader, GltfLoader
+│   │
+│   ├── Engine.Graphics.Raylib/
+│   │   ├── RaylibBackendRegistrar.cs     # Registers the Raylib backend with the factory
+│   │   ├── RaylibRenderContext.cs        # Raylib window/surface context
+│   │   └── RaylibRenderer.cs             # Raylib ECS mesh renderer + screenshot capture
+│   │
+│   ├── Engine.Graphics.Vulkan/
+│   │   ├── VulkanBackendRegistrar.cs     # Registers the Vulkan backend with the factory
+│   │   ├── VulkanRenderContext.cs        # Vulkan instance, device, surface, swapchain
+│   │   ├── VulkanRenderer.cs             # Vulkan ECS mesh renderer
 │   │   ├── VulkanContext.cs              # Device, instance, queues, command pool
 │   │   ├── Swapchain.cs                  # Swapchain + depth buffer
-│   │   ├── MeshRenderer.cs               # ECS mesh rendering
-│   │   ├── ScreenshotCapture.cs          # Vulkan readback → PNG
 │   │   ├── VulkanPipeline.cs             # Graphics pipeline + descriptor layouts
+│   │   ├── ScreenshotCapture.cs          # Vulkan readback → PNG
 │   │   ├── UniformBuffer.cs              # Per-frame uniform buffer
 │   │   ├── Texture.cs                    # Vulkan texture (image, view, sampler)
 │   │   ├── VertexBuffer.cs               # Vertex buffer helpers
 │   │   ├── IndexBuffer.cs                # Index buffer helpers
-│   │   └── Loaders/                      # ObjLoader, GltfLoader
+│   │   ├── ShaderLoader.cs               # Embedded SPIR-V loader
+│   │   └── Shaders/                      # vertex.vert, fragment.frag, *.spv
 │   │
 │   ├── Engine.Diagnostics/
 │   │   ├── DiagnosticsManager.cs         # Orchestrator
@@ -596,60 +635,27 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 
 ---
 
-## 8. FOUNDATIONAL MVP — 3 INITIAL CODE STEPS
+## 8. FOUNDATIONAL MVP — COMPLETED
 
-### Step 1: Engine.Core — Window + Vulkan Context + Clear Screen
+### Step 1: Window + Render HAL + Raylib Backend — DONE
 
-**Goal**: A visible window with a functioning Vulkan device and a frame loop that clears the screen to a solid color.
+- `IWindow` / `IInputState` / `Key` abstractions in `Engine.Core`
+- `Sdl3Window` (SDL3) and `RaylibWindow` (GLFW) both implement `IWindow`
+- `RenderBackendFactory` — backends register by name, each owns its window
+- `RaylibRenderer` — custom GLSL shader, PBR-like lighting, screenshots
+- Vulkan backend compiles but is **deferred** (see §3.3)
 
-**Deliverables**:
+### Step 2: Flecs World + Components + Camera Controllers — DONE
 
-- `EngineApp.cs` — `Init`, `Update`, `Render`, `Shutdown` loop
-- `Sdl3Window.cs` — `ppy.SDL3-CS` wrapper (create window, poll events, resize)
-- `VulkanContext.cs` — Vortice.Vulkan instance, physical device, logical device, queues
-- `Swapchain.cs` — swapchain creation and recreation
-- First frame: `vkCmdClearColorImage` → present
+- `World` (Flecs.NET) with `Transform`, `Mesh`, `Material`, `Light`, `Camera` components
+- `FreeFlyCameraController` and `OrbitCameraController` using `IInputState` + `Key` enum
+- Procedural mesh generation: `CreateGridMesh`, `CreateSphereMesh`
 
-**Dependencies**:
+### Step 3: AI Bridge + MCP Server — DONE
 
-- `ppy.SDL3-CS`
-- `Vortice.Vulkan`
-- `Vortice.VulkanMemoryAllocator` (optional but recommended)
-
-### Step 2: Engine.Data — Flecs World + GameObject + SystemSlotRegistry
-
-**Goal**: A working ECS world with Unity-like access patterns and a hot-swap registry skeleton.
-
-**Deliverables**:
-
-- `GameObject.cs` — readonly struct facade
-- `ComponentTypes.cs` — `Transform`, `MeshRef`, `Camera`, `SemanticClass`
-- `WorldContext.cs` — Flecs world initialization
-- `SystemSlotRegistry.cs` — named system registration and hot-swap
-- Test: create 1000 entities, add `Transform`, iterate, print FPS
-
-**Dependencies**:
-
-- `Flecs.NET.Release`
-
-### Step 3: Engine.Diagnostics — DiagnosticsManager + Flecs JSON Export
-
-**Goal**: The MMLM context loop skeleton — captures world state as JSON plus a placeholder visual capture.
-
-**Deliverables**:
-
-- `DiagnosticsManager.cs` — `CapturePayload()` orchestrator
-- `FlecsJsonExporter.cs` — `ecs_world_to_json()` wrapper
-- `Payload.cs` — unified diagnostic payload structure
-- `SystemGraphSvg.cs` — SVG dependency graph generator
-- `LogBuffer.cs` — circular console log buffer
-- Visual capture stub (placeholder JPEG until Step 1's Vulkan readback is wired)
-- Console test: `CapturePayload()` → print JSON + SVG to stdout
-
-**Dependencies**:
-
-- `Flecs.NET.Release`
-- `SixLabors.ImageSharp`
+- `AiCommandProcessor` — 7 commands: spawn_model, set_transform, set_material, delete_entity, list_entities, capture_screenshot, get_world_state
+- HTTP MCP server (SSE, `--mcp-port`) and stdio MCP server (`--mcp-stdio`)
+- Screenshot capture with 10-frame warm-up for stable GPU output
 
 ---
 
@@ -686,7 +692,44 @@ In Release (NativeAOT), the MCP server and ASP.NET Core are excluded. The AI can
 
 ---
 
-## 11. PROMPT ENGINEERING FOR AI CODING
+## 11. CURRENT ROADMAP (Post-MVP)
+
+### Completed
+
+- [x] Modular window/input HAL (`IWindow`, `IInputState`, `Key` enum)
+- [x] Raylib backend as primary render path (GLFW window, no SDL3 dependency)
+- [x] PBR-like shading: Fresnel (Schlick), hemisphere ambient, ACES tonemapping, gamma correction
+- [x] Procedural mesh generation (spheres, grids) with correct memory management
+- [x] FreeFly + Orbit camera controllers with inverted-yaw and strafe fixes
+- [x] MCP server (HTTP + stdio) with 7 AI commands
+- [x] Demo scene with cubes + spheres showcasing different materials
+
+### Short-term (next)
+
+- [x] Texture loading in RaylibRenderer (`SetMaterialUniforms` now loads/binds textures)
+- [x] Fix `demo.png` screenshot timing (moved to main loop with frame warm-up)
+- [ ] Unit tests (`tests/Engine.Tests/` — planned but never created)
+- [x] `AGENTS.md` — created for opencode integration
+
+### Medium-term
+
+- [ ] Dear ImGui integration (Hexa.NET.ImGui) for editor UI
+- [ ] Model loading from GLTF/OBJ with textures and materials
+- [ ] Scene serialization / deserialization
+- [ ] Multi-light shadow mapping
+
+### Long-term (backlog)
+
+- [ ] **Vulkan backend reintegration** — see §3.3 checklist. Compiles but untested.
+    Kept architecturally compatible via `IWindow` / `IRenderContext` / `IRenderer`.
+    Deferred because Raylib covers all current needs with far less complexity.
+- [ ] Physics (JoltPhysicsSharp)
+- [ ] AI hot-reload of C# scripts (Roslyn — conflicts with NativeAOT)
+- [ ] Semantic segmentation maps for MMLM vision input
+
+---
+
+## 12. PROMPT ENGINEERING FOR AI CODING
 
 When generating code with an MMLM for this engine, always include this context header:
 
@@ -716,7 +759,7 @@ Current file context: [insert path here]
 
 ---
 
-## 12. NEXT DECISION POINTS
+## 13. NEXT DECISION POINTS
 
 1. Add ImGui editor UI (`Hexa.NET.ImGui`) for scene hierarchy and inspector.
 2. Add physics integration (`JoltPhysicsSharp`) with rigid bodies and colliders.
@@ -726,47 +769,80 @@ Current file context: [insert path here]
 
 ---
 
-## 13. RUNTIME NOTES & CRITICAL CONTEXT
+## 14. RUNTIME NOTES & CRITICAL CONTEXT
 
-### 13.1 Building & Running
+### 14.1 Building & Running
 
 ```bash
 export DOTNET_ROOT="$HOME/.dotnet"
 export PATH="$DOTNET_ROOT:$PATH"
 export DISPLAY=:0
 dotnet build CORTEX_ENGINE.sln -c Debug
+
+# Convenience script (handles DOTNET_ROOT/PATH/DISPLAY automatically):
+./scripts/run.sh
+
+# Or run directly:
 dotnet run --project src/CortexEngine.App/CortexEngine.App.csproj
 ```
 
 - `RuntimeIdentifier=linux-x64` is required in Debug to use the bundled native `libSDL3.so` from `ppy.SDL3-CS` (system `libSDL3.so.3.4.2` is ABI-incompatible).
 - AOT builds: `dotnet build CORTEX_ENGINE.sln -c ReleaseAOT`.
 
-### 13.2 CLI Arguments
+### 14.2 CLI Arguments
 
 - `--mcp-port <port>` — start the HTTP MCP server on `http://localhost:<port>/` (SSE).
 - `--mcp-stdio` — run the headless stdio MCP server for Claude Desktop / other stdio clients.
+- `--camera-tour` — capture screenshots from predefined poses and exit.
+- `--test-scene` — enable a calibration scene with colored cubes at known world positions and run a camera tour. Useful for visually verifying perspective and camera movement.
 - Any other positional argument is treated as a model path (`.obj`, `.gltf`, `.glb`).
 
-### 13.3 Vulkan & Shader Pipeline
+### 14.3 Convenience Scripts
 
-- Pipeline layout uses **two descriptor sets**: set 0 = per-frame uniform buffer (camera + lights), set 1 = per-entity combined image sampler.
-- Push constants: 96 bytes (`mat4 mvp` + material albedo/roughness/metallic + texture flag + padding), stages `VertexBit | FragmentBit`.
-- Uniform buffer: std140 224 bytes (`cameraPosition`, `lightCount`, `ambientColor`, up to 4 `Light` structs).
+| Script | Purpose |
+|--------|---------|
+| `./scripts/run.sh` | Run the engine; passes all arguments to the app (e.g., `./scripts/run.sh --mcp-port 5000`). |
+| `./scripts/start_mcp_engine.sh <port>` | Run the engine with MCP enabled on the given port (default 5000). |
+
+### 14.4 Graphics Backends
+
+**Default backend: Raylib-cs**
+
+- The app calls `RenderBackendFactory.Create("raylib", width, height, enableValidation: false)`.
+- `RaylibRenderContext` creates a `RaylibWindow` (GLFW) and `RaylibRenderer` handles the frame.
+- `RaylibRenderer` uploads `Mesh` data to GPU via `LoadModelFromMesh`, sets a custom GLSL 330 core
+  shader with Fresnel, ACES tonemapping, gamma correction, hemisphere ambient, and up to 4
+  directional lights. Renders the ECS world via `DrawModelEx`.
+- Backface culling is disabled (`Rlgl.DisableBackfaceCulling`) for compatibility with mixed-winding meshes.
+- Screenshots are captured via `Raylib.LoadImageFromScreen` with a 10-frame warm-up delay.
+- Custom mesh CPU data is allocated via `NativeMemory.Alloc` (matching Raylib's `RL_FREE` allocator)
+  and kept alive until `UnloadModel` — freeing early caused broken large meshes (spheres, grids).
+
+**Vulkan backend (DEFERRED — not actively tested)**
+
+- Compiles and registers via `VulkanBackendRegistrar`, but is not the active render path.
+- Uses `Sdl3Window` internally for `SDL_Vulkan_CreateSurface`.
+- Pipeline layout uses **two descriptor sets**: set 0 = per-frame uniform buffer (camera + lights),
+  set 1 = per-entity combined image sampler.
+- Push constants: 96 bytes (`mat4 mvp` + material albedo/roughness/metallic + texture flag + padding).
 - Shaders are compiled with `glslangValidator`:
   ```bash
-  /tmp/glslang/bin/glslangValidator -V src/Engine.Graphics/Shaders/vertex.vert -o src/Engine.Graphics/Shaders/vertex.spv
-  /tmp/glslang/bin/glslangValidator -V src/Engine.Graphics/Shaders/fragment.frag -o src/Engine.Graphics/Shaders/fragment.spv
+  /tmp/glslang/bin/glslangValidator -V src/Engine.Graphics.Vulkan/Shaders/vertex.vert -o src/Engine.Graphics.Vulkan/Shaders/vertex.spv
+  /tmp/glslang/bin/glslangValidator -V src/Engine.Graphics.Vulkan/Shaders/fragment.frag -o src/Engine.Graphics.Vulkan/Shaders/fragment.spv
   ```
+- See §3.3 for the reintegration checklist.
 
-### 13.4 SDL3 Input
+### 14.5 Input
 
-- `SDL3 2026.520.0` API: `SDL_Init` returns `SDLBool`, `SDL_PollEvent` returns `SDLBool`, `evt.type` is `uint`.
-- Keyboard: `evt.key.key`; Mouse: `evt.motion.x`, `evt.motion.y`, `evt.wheel.y`.
-- **Orbit camera** (по умолчанию): правый клик + движение мыши — вращать, колесо — zoom.
-- **FreeFly camera** (переключается клавишей `F`): `WASD` — двигаться, `Q`/`E` — вниз/вверх, `Shift` — ускорение, правый клик + мышь — осмотр.
-- `ESC` — выход.
+- Input is backend-agnostic via `IInputState` + `Key` enum (defined in `Engine.Core`).
+- **Raylib backend**: `RaylibInputState` polls Raylib's input functions directly (no SDL3).
+- **Vulkan backend** (deferred): `Sdl3Window` + `InputMapping` polls SDL3 events.
+- **FreeFly camera** (default): `WASD` — move, `Q`/`E` — down/up, `Shift` — boost, right-click + mouse — look.
+- **Orbit camera** (toggle with `F`): right-click + mouse — orbit target `(0, 0.5, 0)`, wheel — zoom, `WASD`/`Q`/`E`/`Shift` — move target.
+- `ESC` — exit.
+- Default camera: `(0, 0.75, -30)`, target `(0, 0.5, 0)`, FOV 15° (vertical), near 0.1, far 100.
 
-### 13.5 MCP Client Config
+### 14.6 MCP Client Config
 
 Sample Claude Desktop config (`claude_desktop_config.json`):
 
@@ -793,7 +869,7 @@ Sample Claude Desktop config (`claude_desktop_config.json`):
 
 For the HTTP MCP server, use the `--mcp-port` argument and connect an SSE MCP client.
 
-### 13.6 Process Cleanup
+### 14.7 Process Cleanup
 
 Background `dotnet run` processes may leave the apphost running. Kill them with:
 

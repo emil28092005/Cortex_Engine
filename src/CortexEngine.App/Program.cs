@@ -3,10 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using Engine.AI;
-using SDL;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 #if !RELEASE_AOT
 using Engine.AI.Mcp;
 using Microsoft.AspNetCore.Builder;
@@ -15,6 +11,8 @@ using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
 using Engine.Graphics.Loaders;
+using Engine.Graphics.RaylibBackend;
+using Engine.Graphics.Vulkan;
 using Flecs.NET.Core;
 
 namespace CortexEngine.App;
@@ -23,7 +21,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine — Materials, Grid, Lighting, Orbit Camera...");
+            Console.WriteLine("Cortex Engine — Materials, Grid, Lighting, FreeFly Camera...");
 
         try
         {
@@ -33,27 +31,34 @@ class Program
                 return;
             }
 
+            var cameraTour = args.Contains("--camera-tour");
+            var testScene = args.Contains("--test-scene");
+            if (testScene)
+                cameraTour = true;
+
             using var world = World.Create();
-            using var window = new Sdl3Window("Cortex Engine", 1280, 720);
             var timing = new Timing();
-            var input = new InputMapping();
-            using var vulkan = new VulkanContext(window, enableValidation: false);
-            using var swapchain = new Swapchain(vulkan);
-            using var renderer = new MeshRenderer(vulkan, swapchain);
+
+            RaylibBackendRegistrar.EnsureRegistered();
+            VulkanBackendRegistrar.EnsureRegistered();
+            using var renderContext = RenderBackendFactory.Create("raylib", 1280, 720, enableValidation: false);
+            var window = renderContext.Window;
+            var input = window.Input;
+            using var renderer = renderContext.CreateRenderer();
 
             var (modelPath, mcpPort) = ParseArgs(args);
             var mesh = LoadModel(modelPath);
 
             var processor = new AiCommandProcessor(world, LoadModel, path => renderer.RequestScreenshot(path));
-            var queue = new AiCommandQueue(processor);
+            var queue = new AiCommandQueue(processor, renderer.ScreenshotProvider);
 
             var cameraEntity = world.Entity("Camera")
-                .Set(new Transform(new Vector3(0.0f, 2.5f, -4.0f), Quaternion.Identity, Vector3.One))
+                .Set(new Transform(new Vector3(0.0f, 0.75f, -30.0f), Quaternion.Identity, Vector3.One))
                 .Set(new Camera(
-                    new Vector3(0.0f, 2.5f, -4.0f),
+                    new Vector3(0.0f, 0.75f, -30.0f),
                     new Vector3(0.0f, 0.5f, 0.0f),
                     Vector3.UnitY,
-                    MathF.PI / 4.0f,
+                    MathF.PI / 12.0f,
                     1280.0f / 720.0f,
                     0.1f,
                     100.0f));
@@ -75,42 +80,23 @@ class Program
                 .Set(new Light(new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0.15f, 0.15f, 0.2f), 0.3f));
 
             ICameraController[] cameraControllers =
-            [
-                new OrbitCameraController(cameraEntity, new Vector3(0.0f, 0.5f, 0.0f)),
-                new FreeFlyCameraController(cameraEntity)
-            ];
+            {
+                new FreeFlyCameraController(cameraEntity),
+                new OrbitCameraController(cameraEntity, new Vector3(0.0f, 0.5f, 0.0f))
+            };
             var activeControllerIndex = 0;
+            var cameraController = cameraControllers[activeControllerIndex];
+            Console.WriteLine($"Active camera controller: {cameraController.Name} (press F to toggle)");
 
-            var texturePath = GenerateCheckerboardTexture("Content/checkerboard.png", 256);
-
-            var model = world.Entity("Model")
-                .Set(new Transform(new Vector3(0.0f, 0.5f, 0.0f), Quaternion.Identity, new Vector3(0.5f)))
-                .Set(mesh)
-                .Set(new Material(new Vector3(0.9f, 0.6f, 0.3f), roughness: 0.4f, metallic: 0.1f));
-
-            var floor = world.Entity("Floor")
-                .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(CreateFloorMesh(20.0f, new Vector3(0.8f, 0.8f, 0.85f)))
-                .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.9f, metallic: 0.0f, texturePath: texturePath));
-
-            var grid = world.Entity("Grid")
-                .Set(new Transform(new Vector3(0.0f, 0.01f, 0.0f), Quaternion.Identity, Vector3.One))
-                .Set(CreateGridMesh(20, 0.5f, new Vector3(0.5f, 0.5f, 0.55f)))
-                .Set(new Material(new Vector3(0.5f, 0.5f, 0.55f), roughness: 0.9f, metallic: 0.0f));
-
-            // Demo: local AI commands processed on the main thread.
-            Console.WriteLine("AI demo commands:");
-            Console.WriteLine(processor.Process("""{ "type": "list_entities" }""").Message);
-            Console.WriteLine(processor.Process("""{ "type": "spawn_model", "name": "SecondCube", "modelPath": "Content/cube.obj", "position": [0.8, 0, 0], "scale": [0.3, 0.3, 0.3] }""").Message);
-            Console.WriteLine(processor.Process("""{ "type": "set_transform", "name": "SecondCube", "position": [0.8, 0.5, 0], "rotation": [0, 0, 0, 1], "scale": [0.3, 0.3, 0.3] }""").Message);
-
-            var secondCube = world.Lookup("SecondCube");
-            if ((ulong)secondCube.Id != 0)
-                secondCube.Set(new Material(new Vector3(0.3f, 0.7f, 0.9f), roughness: 0.3f, metallic: 0.2f));
-
-            Console.WriteLine(processor.Process("""{ "type": "list_entities" }""").Message);
-            Console.WriteLine(processor.Process("""{ "type": "get_world_state" }""").Message);
-            Console.WriteLine(processor.Process("""{ "type": "capture_screenshot", "outputPath": "Screenshots/demo.png" }""").Message);
+            if (testScene)
+            {
+                Console.WriteLine("Calibration test scene enabled.");
+                CreateCalibrationScene(world, mesh);
+            }
+            else
+            {
+                CreateDemoScene(world, mesh);
+            }
 
 #if !RELEASE_AOT
             WebApplication? mcpApp = null;
@@ -144,11 +130,46 @@ class Program
             var lastFpsTime = 0.0;
             var lastWidth = window.Width;
             var lastHeight = window.Height;
+            var demoScreenshotRequested = false;
+
+            var tourPoses = testScene
+                ? new CameraPose[]
+                {
+                    new("test_front", new Vector3(0.0f, 0.75f, -30.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_back", new Vector3(0.0f, 0.75f, 30.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_left", new Vector3(-30.0f, 0.75f, 0.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_right", new Vector3(30.0f, 0.75f, 0.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_top", new Vector3(0.0f, 30.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f), -Vector3.UnitZ),
+                    new("test_shifted", new Vector3(15.0f, 0.75f, -22.5f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_rotated", new Vector3(0.0f, 0.75f, -30.0f), new Vector3(2.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_yaw_15", new Vector3(7.76f, 0.75f, -28.98f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_yaw_30", new Vector3(15.0f, 0.75f, -25.98f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_yaw_45", new Vector3(21.21f, 0.75f, -21.21f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_yaw_90", new Vector3(30.0f, 0.75f, 0.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_pitch_45", new Vector3(0.0f, 21.96f, -21.21f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_close", new Vector3(0.0f, 0.75f, -15.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_far", new Vector3(0.0f, 0.75f, -60.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_farther", new Vector3(0.0f, 0.75f, -120.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("test_toward", new Vector3(0.0f, 0.75f, -20.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY)
+                }
+                : new CameraPose[]
+                {
+                    new("front", new Vector3(0.0f, 0.75f, -30.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("top", new Vector3(0.0f, 30.0f, 0.0f), new Vector3(0.0f, 0.0f, 0.0f), -Vector3.UnitZ),
+                    new("side", new Vector3(30.0f, 0.75f, 4.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("close", new Vector3(1.0f, 0.75f, -5.0f), new Vector3(0.5f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("low", new Vector3(0.0f, 0.25f, -6.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY),
+                    new("back", new Vector3(0.0f, 0.75f, 30.0f), new Vector3(0.0f, 0.5f, 0.0f), Vector3.UnitY)
+                };
+            var tourIndex = -1;
+            var tourSettleFrames = 0;
+            var tourScreenshotPending = false;
+            var tourDone = false;
 
             while (!window.ShouldClose)
             {
                 timing.Tick();
-                window.PumpEvents(input);
+                window.PumpEvents();
                 input.BeginFrame();
 
                 // Drain any commands that arrived from the MCP server.
@@ -160,27 +181,85 @@ class Program
                 {
                     lastWidth = window.Width;
                     lastHeight = window.Height;
-                    swapchain.Recreate(lastWidth, lastHeight);
+                    renderContext.Resize(lastWidth, lastHeight);
                     ref var camera = ref cameraEntity.Ensure<Camera>();
                     camera.AspectRatio = (float)lastWidth / lastHeight;
                 }
 
-                // Toggle camera controller with F.
-                if (input.IsKeyPressed(SDL_Keycode.SDLK_F))
+                // Toggle camera controller on F key press.
+                if (input.IsKeyPressed(Key.F))
                 {
                     activeControllerIndex = (activeControllerIndex + 1) % cameraControllers.Length;
-                    Console.WriteLine($"Camera controller: {cameraControllers[activeControllerIndex].Name}");
+                    cameraController = cameraControllers[activeControllerIndex];
+                    Console.WriteLine($"Active camera controller: {cameraController.Name}");
                 }
 
-                // Update active camera controller from input.
-                cameraControllers[activeControllerIndex].Update(input, (float)timing.DeltaTime);
+                // Update the active camera controller from input, unless the camera tour is driving the pose.
+                if (!cameraTour)
+                    cameraController.Update(input, (float)timing.DeltaTime);
 
-                // Slowly rotate the model so we can see it in 3D.
-                ref var modelTransform = ref model.Ensure<Transform>();
-                modelTransform.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, (float)timing.TotalTime * 0.5f)
-                                      * Quaternion.CreateFromAxisAngle(Vector3.UnitX, (float)timing.TotalTime * 0.25f);
+                if (cameraTour && !tourDone)
+                {
+                    if (tourIndex < 0)
+                    {
+                        tourIndex = 0;
+                        SetCameraPose(cameraEntity, tourPoses[tourIndex]);
+                        tourSettleFrames = 0;
+                        tourScreenshotPending = true;
+                    }
+
+                    // Hold the pose for a few frames to let the GPU settle, then screenshot.
+                    if (tourScreenshotPending)
+                    {
+                        tourSettleFrames++;
+                        if (tourSettleFrames >= 5)
+                        {
+                            var path = $"Screenshots/tour_{tourPoses[tourIndex].Name}.png";
+                            renderer.RequestScreenshot(path);
+                            Console.WriteLine($"Tour screenshot: {path}");
+                            tourScreenshotPending = false;
+                        }
+                    }
+
+                    // After the screenshot has been saved, advance to the next pose.
+                    if (!tourScreenshotPending && !renderer.IsScreenshotRequested)
+                    {
+                        tourIndex++;
+                        if (tourIndex >= tourPoses.Length)
+                        {
+                            tourDone = true;
+                            Console.WriteLine("Camera tour complete.");
+                            window.Close();
+                        }
+                        else
+                        {
+                            SetCameraPose(cameraEntity, tourPoses[tourIndex]);
+                            tourSettleFrames = 0;
+                            tourScreenshotPending = true;
+                        }
+                    }
+                }
+
+                // Slowly rotate the model so we can see it in 3D, unless the camera tour or test scene is active.
+                if (!cameraTour && !testScene)
+                {
+                    var modelEntity = world.Lookup("CubeCenter");
+                    if (modelEntity.Id != 0)
+                    {
+                        ref var modelTransform = ref modelEntity.Ensure<Transform>();
+                        modelTransform.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, (float)timing.TotalTime * 0.5f);
+                    }
+                }
+
+                // Capture a demo screenshot after the scene warms up (non-tour mode only).
+                if (!demoScreenshotRequested && !cameraTour && frames >= 15)
+                {
+                    renderer.RequestScreenshot("Screenshots/demo.png");
+                    demoScreenshotRequested = true;
+                }
 
                 renderer.RenderWorld(world);
+                queue.CompletePendingScreenshots();
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
@@ -206,63 +285,104 @@ class Program
         }
     }
 
+    private static void CreateDemoScene(World world, Mesh mesh)
+    {
+        var sphere = ProceduralMesh.CreateSphere(0.5f, 32, 16, new Vector3(0.8f, 0.8f, 0.8f));
+        var torusKnot = ObjLoader.Load("Content/torusknot.obj", new Vector3(0.8f, 0.8f, 0.8f));
+
+        var cubes = new (string name, Vector3 pos, Vector3 color, float scale, float rough, float metal)[]
+        {
+            ("CubeCenter", new Vector3(0, 0.5f, 0), new Vector3(0.9f, 0.6f, 0.3f), 0.5f, 0.3f, 0.1f),
+            ("CubeRed", new Vector3(2, 0.5f, 0), new Vector3(0.85f, 0.15f, 0.15f), 0.5f, 0.4f, 0.2f),
+            ("CubeGreen", new Vector3(-2, 0.5f, 0), new Vector3(0.2f, 0.8f, 0.3f), 0.5f, 0.5f, 0.0f),
+            ("CubeBlue", new Vector3(0, 0.5f, 3), new Vector3(0.2f, 0.4f, 0.9f), 0.6f, 0.2f, 0.3f),
+            ("CubeYellow", new Vector3(0, 0.5f, -3), new Vector3(0.95f, 0.85f, 0.2f), 0.5f, 0.6f, 0.0f),
+            ("CubeOrange", new Vector3(-3, 0.5f, 3), new Vector3(0.95f, 0.5f, 0.1f), 0.45f, 0.5f, 0.1f),
+            ("CubeWide", new Vector3(-1.5f, 0.5f, -1.5f), new Vector3(0.5f, 0.5f, 0.6f), 0.8f, 0.8f, 0.0f),
+            ("CubeSmallGold", new Vector3(5, 0.3f, -2), new Vector3(1.0f, 0.8f, 0.3f), 0.3f, 0.15f, 1.0f),
+        };
+
+        foreach (var (name, pos, color, scale, rough, metal) in cubes)
+        {
+            world.Entity(name)
+                .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
+                .Set(mesh)
+                .Set(new Material(color, roughness: rough, metallic: metal));
+        }
+
+        var spheres = new (string name, Vector3 pos, Vector3 color, float scale, float rough, float metal)[]
+        {
+            ("SphereGold",   new Vector3(-5, 0.5f, -2), new Vector3(1.0f, 0.85f, 0.4f),  1.0f, 0.1f, 1.0f),
+            ("SphereChrome", new Vector3(-6, 0.5f, 0),  new Vector3(0.9f, 0.9f, 0.95f), 1.0f, 0.05f, 1.0f),
+            ("SphereRed",    new Vector3(-5, 0.5f, 2),  new Vector3(0.9f, 0.1f, 0.1f),  1.0f, 0.4f, 0.0f),
+            ("SphereBlue",   new Vector3(5, 0.5f, 2),   new Vector3(0.1f, 0.3f, 0.9f),  1.0f, 0.2f, 0.5f),
+            ("SphereGreen",  new Vector3(6, 0.5f, 0),   new Vector3(0.1f, 0.8f, 0.3f),  1.0f, 0.7f, 0.0f),
+            ("SphereWhite",  new Vector3(5, 0.5f, -4),  new Vector3(0.95f, 0.95f, 0.95f), 1.0f, 0.3f, 0.0f),
+            ("SphereRough",  new Vector3(3, 0.5f, 5),   new Vector3(0.6f, 0.4f, 0.2f),  1.0f, 0.9f, 0.0f),
+        };
+
+        foreach (var (name, pos, color, scale, rough, metal) in spheres)
+        {
+            world.Entity(name)
+                .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
+                .Set(sphere)
+                .Set(new Material(color, roughness: rough, metallic: metal));
+        }
+
+        // Torus knot with checker texture
+        world.Entity("TorusKnot")
+            .Set(new Transform(new Vector3(0, 2.0f, 0), Quaternion.Identity, new Vector3(1.5f)))
+            .Set(torusKnot)
+            .Set(new Material(new Vector3(0.9f, 0.9f, 0.9f), roughness: 0.25f, metallic: 0.6f, texturePath: "Content/checker.png"));
+
+        // Textured cube
+        world.Entity("CubeTextured")
+            .Set(new Transform(new Vector3(-4, 0.5f, -3), Quaternion.Identity, new Vector3(0.7f)))
+            .Set(mesh)
+            .Set(new Material(new Vector3(0.8f, 0.8f, 0.85f), roughness: 0.4f, metallic: 0.0f, texturePath: "Content/checker.png"));
+
+        world.Entity("Grid")
+            .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
+            .Set(ProceduralMesh.CreateGrid(20, 1.0f, new Vector3(0.5f, 0.5f, 0.55f)))
+            .Set(new Material(new Vector3(0.5f, 0.5f, 0.55f), roughness: 0.9f, metallic: 0.0f));
+    }
+
+    private static void CreateCalibrationScene(World world, Mesh mesh)
+    {
+        // Colored cubes at known world positions for visual analysis of perspective and camera movement.
+        var positions = new (string name, Vector3 pos, Vector3 color)[]
+        {
+            ("CubeOrigin", new Vector3(0.0f, 0.5f, 0.0f), new Vector3(1.0f, 1.0f, 1.0f)),      // white at origin
+            ("CubeRight", new Vector3(2.0f, 0.5f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f)),       // red +X
+            ("CubeLeft", new Vector3(-2.0f, 0.5f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f)),       // green -X
+            ("CubeFront", new Vector3(0.0f, 0.5f, 2.0f), new Vector3(0.0f, 0.0f, 1.0f)),       // blue +Z
+            ("CubeBack", new Vector3(0.0f, 0.5f, -2.0f), new Vector3(1.0f, 1.0f, 0.0f)),       // yellow -Z
+            ("CubeUp", new Vector3(0.0f, 2.5f, 0.0f), new Vector3(1.0f, 0.0f, 1.0f)),          // magenta +Y
+            ("CubeFar", new Vector3(0.0f, 0.5f, 8.0f), new Vector3(0.0f, 1.0f, 1.0f)),        // cyan far +Z
+            ("CubeFarLeft", new Vector3(-5.0f, 0.5f, 5.0f), new Vector3(0.5f, 0.5f, 1.0f))     // light blue far corner
+        };
+
+        foreach (var (name, pos, color) in positions)
+        {
+            world.Entity(name)
+                .Set(new Transform(pos, Quaternion.Identity, new Vector3(0.5f)))
+                .Set(mesh)
+                .Set(new Material(color, roughness: 0.5f, metallic: 0.1f));
+        }
+
+        // A large reference grid at Y=0.
+        world.Entity("Grid")
+            .Set(new Transform(new Vector3(0.0f, 0.0f, 0.0f), Quaternion.Identity, Vector3.One))
+            .Set(ProceduralMesh.CreateGrid(20, 1.0f, new Vector3(0.5f, 0.5f, 0.55f)))
+            .Set(new Material(new Vector3(0.5f, 0.5f, 0.55f), roughness: 0.9f, metallic: 0.0f));
+    }
+
     private static Mesh LoadModel(string path)
     {
         return path.EndsWith(".gltf", StringComparison.OrdinalIgnoreCase)
             || path.EndsWith(".glb", StringComparison.OrdinalIgnoreCase)
                 ? GltfLoader.Load(path, new Vector3(0.7f, 0.6f, 0.5f))
                 : ObjLoader.Load(path, new Vector3(0.7f, 0.6f, 0.5f));
-    }
-
-    private static Mesh CreateGridMesh(int lines, float spacing, Vector3 color)
-    {
-        var vertices = new List<Vertex>();
-        var indices = new List<uint>();
-        var extent = lines * spacing;
-        var normal = Vector3.UnitY;
-        var halfWidth = 0.02f;
-
-        for (var i = -lines; i <= lines; i++)
-        {
-            var offset = i * spacing;
-
-            // Line parallel to X axis as a thin quad.
-            var baseIndex = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(-extent, 0, offset - halfWidth), color, normal));
-            vertices.Add(new Vertex(new Vector3(extent, 0, offset - halfWidth), color, normal));
-            vertices.Add(new Vertex(new Vector3(extent, 0, offset + halfWidth), color, normal));
-            vertices.Add(new Vertex(new Vector3(-extent, 0, offset + halfWidth), color, normal));
-            indices.Add(baseIndex); indices.Add(baseIndex + 1); indices.Add(baseIndex + 2);
-            indices.Add(baseIndex); indices.Add(baseIndex + 2); indices.Add(baseIndex + 3);
-
-            // Line parallel to Z axis as a thin quad.
-            baseIndex = (uint)vertices.Count;
-            vertices.Add(new Vertex(new Vector3(offset - halfWidth, 0, -extent), color, normal));
-            vertices.Add(new Vertex(new Vector3(offset + halfWidth, 0, -extent), color, normal));
-            vertices.Add(new Vertex(new Vector3(offset + halfWidth, 0, extent), color, normal));
-            vertices.Add(new Vertex(new Vector3(offset - halfWidth, 0, extent), color, normal));
-            indices.Add(baseIndex); indices.Add(baseIndex + 1); indices.Add(baseIndex + 2);
-            indices.Add(baseIndex); indices.Add(baseIndex + 2); indices.Add(baseIndex + 3);
-        }
-
-        return new Mesh(vertices.ToArray(), indices.ToArray());
-    }
-
-    private static Mesh CreateFloorMesh(float size, Vector3 color)
-    {
-        var half = size / 2.0f;
-        var normal = Vector3.UnitY;
-
-        var vertices = new Vertex[]
-        {
-            new(new Vector3(-half, 0, -half), color, normal),
-            new(new Vector3(half, 0, -half), color, normal),
-            new(new Vector3(half, 0, half), color, normal),
-            new(new Vector3(-half, 0, half), color, normal)
-        };
-
-        var indices = new uint[] { 0, 1, 2, 0, 2, 3 };
-        return new Mesh(vertices, indices);
     }
 
     private static (string modelPath, int mcpPort) ParseArgs(string[] args)
@@ -314,28 +434,6 @@ class Program
         throw new FileNotFoundException("No model file found. Pass a .obj/.gltf/.glb path as argument or place Content/cube.obj next to the executable.");
     }
 
-    private static string GenerateCheckerboardTexture(string path, int size)
-    {
-        var tileSize = size / 8;
-        using var image = new Image<Rgba32>(size, size);
-        for (var y = 0; y < size; y++)
-        {
-            for (var x = 0; x < size; x++)
-            {
-                var tileX = x / tileSize;
-                var tileY = y / tileSize;
-                var isDark = (tileX + tileY) % 2 == 0;
-                image[x, y] = isDark
-                    ? new Rgba32(60, 60, 70, 255)
-                    : new Rgba32(160, 160, 170, 255);
-            }
-        }
-
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        image.SaveAsPng(path);
-        return path;
-    }
-
     private static void RunMcpStdioServer()
     {
         Console.WriteLine("Starting headless stdio MCP server...");
@@ -343,5 +441,18 @@ class Program
         var processor = new AiCommandProcessor(world, LoadModel, _ => { });
         var server = new Engine.AI.Stdio.McpStdioServer(processor);
         server.Run();
+    }
+
+    private readonly record struct CameraPose(string Name, Vector3 Position, Vector3 Target, Vector3 Up, float Fov = MathF.PI / 12.0f);
+
+    private static void SetCameraPose(Entity cameraEntity, CameraPose pose)
+    {
+        ref var camera = ref cameraEntity.Ensure<Camera>();
+        camera.Position = pose.Position;
+        camera.Target = pose.Target;
+        camera.Up = pose.Up;
+        camera.FieldOfView = pose.Fov;
+        cameraEntity.Set(camera);
+        Console.WriteLine($"Camera pose '{pose.Name}': pos={pose.Position}, target={pose.Target}, up={pose.Up}, fov={pose.Fov * 180f / MathF.PI:F0}°");
     }
 }

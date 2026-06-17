@@ -33,7 +33,7 @@ public sealed unsafe class VulkanContext : IDisposable
     public uint PresentFamilyIndex { get; private set; }
     public CommandPool CommandPool { get; private set; }
 
-    public VulkanContext(Sdl3Window window, bool enableValidation = true)
+    public VulkanContext(IWindow window, bool enableValidation = true)
     {
         Vk = Vk.GetApi();
         CreateInstance(window, enableValidation);
@@ -62,9 +62,9 @@ public sealed unsafe class VulkanContext : IDisposable
         CommandPool = commandPool;
     }
 
-    private void CreateInstance(Sdl3Window window, bool enableValidation)
+    private void CreateInstance(IWindow window, bool enableValidation)
     {
-        var requiredExtensions = new List<string>(window.GetRequiredInstanceExtensions());
+        var requiredExtensions = new List<string>(window.GetRequiredVulkanExtensions());
         if (enableValidation)
         {
             requiredExtensions.Add("VK_EXT_debug_utils");
@@ -128,7 +128,7 @@ public sealed unsafe class VulkanContext : IDisposable
         KhrSwapchain = khrSwapchain;
     }
 
-    private void CreateSurface(Sdl3Window window)
+    private void CreateSurface(IWindow window)
     {
         var sdlInstance = (SDL.VkInstance_T*)Instance.Handle;
         var sdlSurface = (SDL.VkSurfaceKHR_T*)null;

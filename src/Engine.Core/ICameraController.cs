@@ -1,10 +1,10 @@
 namespace Engine.Core;
 
 /// <summary>
-/// Common interface for camera controllers (orbit, free-fly, etc.).
+/// Common interface for camera controllers (free-fly, etc.).
 /// </summary>
 public interface ICameraController
 {
     string Name { get; }
-    void Update(InputMapping input, float deltaTime);
+    void Update(IInputState input, float deltaTime);
 }

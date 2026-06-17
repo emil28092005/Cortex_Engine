@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Engine.AI.Commands;
+using Engine.Core;
 
 namespace Engine.AI;
 
@@ -12,11 +13,14 @@ public sealed class AiCommandQueue
 {
     private readonly ConcurrentQueue<(string commandJson, TaskCompletionSource<AiCommandResult> tcs)> _queue = new();
     private readonly AiCommandProcessor _processor;
+    private readonly IScreenshotProvider _screenshot;
     private readonly JsonSerializerOptions _jsonOptions;
+    private (TaskCompletionSource<AiCommandResult> tcs, Task<byte[]> screenshotTask, string path)? _pendingScreenshot;
 
-    public AiCommandQueue(AiCommandProcessor processor)
+    public AiCommandQueue(AiCommandProcessor processor, IScreenshotProvider screenshot)
     {
         _processor = processor;
+        _screenshot = screenshot;
         _jsonOptions = processor.JsonOptions;
     }
 
@@ -49,11 +53,55 @@ public sealed class AiCommandQueue
         int processed = 0;
         while (_queue.TryDequeue(out var item))
         {
-            var result = _processor.Process(item.commandJson);
-            item.tcs.TrySetResult(result);
+            var command = JsonSerializer.Deserialize<AiCommand>(item.commandJson, _jsonOptions);
+            if (command is CaptureScreenshotCommand screenshotCommand)
+            {
+                // Screenshot commands are handled asynchronously because the frame must be rendered
+                // before the PNG bytes are available. CompletePendingScreenshots must be called after
+                // the renderer has presented the frame.
+                if (_pendingScreenshot.HasValue)
+                {
+                    item.tcs.TrySetResult(AiCommandResult.Error("Another screenshot request is already pending."));
+                    continue;
+                }
+
+                var path = screenshotCommand.OutputPath ?? $"screenshot_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}.png";
+                var screenshotTask = _screenshot.CaptureAsync(path);
+                _pendingScreenshot = (item.tcs, screenshotTask, path);
+            }
+            else
+            {
+                var result = _processor.Process(item.commandJson);
+                item.tcs.TrySetResult(result);
+            }
             processed++;
         }
         return processed;
+    }
+
+    /// <summary>
+    /// Completes any pending screenshot requests that have finished rendering.
+    /// Must be called on the main engine thread after the frame has been presented.
+    /// </summary>
+    public void CompletePendingScreenshots()
+    {
+        if (_pendingScreenshot == null || !_pendingScreenshot.Value.screenshotTask.IsCompleted)
+            return;
+
+        var (tcs, screenshotTask, path) = _pendingScreenshot.Value;
+        _pendingScreenshot = null;
+
+        try
+        {
+            var bytes = screenshotTask.Result;
+            var base64 = Convert.ToBase64String(bytes);
+            var json = $"{{\"path\":{JsonSerializer.Serialize(path)},\"base64\":{JsonSerializer.Serialize(base64)}}}";
+            tcs.TrySetResult(AiCommandResult.Ok(json));
+        }
+        catch (Exception ex)
+        {
+            tcs.TrySetResult(AiCommandResult.Error($"Screenshot capture failed: {ex.Message}"));
+        }
     }
 
     /// <summary>

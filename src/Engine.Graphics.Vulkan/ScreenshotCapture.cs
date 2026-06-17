@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Engine.Core;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using SixLabors.ImageSharp;
@@ -11,7 +12,7 @@ namespace Engine.Graphics;
 /// Captures the current swapchain image to a PNG file on disk.
 /// Used by AI agents to visually inspect the running engine.
 /// </summary>
-public sealed unsafe class ScreenshotCapture : IDisposable
+public sealed unsafe class ScreenshotCapture : IDisposable, IScreenshotProvider
 {
     private readonly VulkanContext _context;
     private readonly Swapchain _swapchain;
@@ -21,6 +22,9 @@ public sealed unsafe class ScreenshotCapture : IDisposable
     private bool _requested;
     private string _outputPath = string.Empty;
     private bool _ready;
+    private bool _captureToMemory;
+    private MemoryStream? _memoryOutput;
+    private TaskCompletionSource<byte[]>? _captureTcs;
 
     public ScreenshotCapture(VulkanContext context, Swapchain swapchain)
     {
@@ -29,13 +33,31 @@ public sealed unsafe class ScreenshotCapture : IDisposable
     }
 
     /// <summary>
-    /// Request a screenshot to be captured on the next frame.
+    /// Request a screenshot to be captured on the next frame and saved to disk.
     /// </summary>
     public void Request(string outputPath)
     {
         _outputPath = outputPath;
         _requested = true;
         _ready = false;
+        _captureToMemory = false;
+        _memoryOutput = null;
+        _captureTcs = null;
+    }
+
+    /// <summary>
+    /// Request a screenshot of the next rendered frame. The returned task completes once the
+    /// PNG bytes are available. The image is also saved to <paramref name="outputPath"/> on disk.
+    /// </summary>
+    public Task<byte[]> CaptureAsync(string outputPath)
+    {
+        _outputPath = outputPath;
+        _requested = true;
+        _ready = false;
+        _captureToMemory = true;
+        _memoryOutput = new MemoryStream();
+        _captureTcs = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        return _captureTcs.Task;
     }
 
     /// <summary>
@@ -97,6 +119,7 @@ public sealed unsafe class ScreenshotCapture : IDisposable
 
     /// <summary>
     /// Save the captured pixels to disk. Must be called after the command buffer containing the readback has finished.
+    /// If the request was made with <see cref="CaptureAsync"/> the PNG bytes are also written to memory and the task is completed.
     /// </summary>
     public void Save(uint width, uint height, Format format)
     {
@@ -128,65 +151,65 @@ public sealed unsafe class ScreenshotCapture : IDisposable
         Console.WriteLine($"Screenshot saved: {_outputPath}");
         _requested = false;
         _ready = false;
+        _captureToMemory = false;
+        _memoryOutput = null;
+        _captureTcs = null;
     }
 
     private void SavePixels(void* mappedData, uint width, uint height, uint rowPitch, Format format)
     {
+        using var image = CreateImage(mappedData, width, height, rowPitch, format);
+        image.SaveAsPng(_outputPath);
+
+        if (_captureToMemory && _memoryOutput != null)
+        {
+            image.SaveAsPng(_memoryOutput);
+            var bytes = _memoryOutput.ToArray();
+            _captureTcs?.TrySetResult(bytes);
+        }
+    }
+
+    private SixLabors.ImageSharp.Image<Rgba32> CreateImage(void* mappedData, uint width, uint height, uint rowPitch, Format format)
+    {
+        var image = new SixLabors.ImageSharp.Image<Rgba32>((int)width, (int)height);
+        var src = (byte*)mappedData;
+
         if (format == Format.B8G8R8A8Unorm || format == Format.B8G8R8A8Srgb)
         {
-            SaveBgra(mappedData, width, height, rowPitch);
-            return;
+            for (var y = 0; y < height; y++)
+            {
+                var rowStart = src + y * rowPitch;
+                for (var x = 0; x < width; x++)
+                {
+                    var b = rowStart[x * 4 + 0];
+                    var g = rowStart[x * 4 + 1];
+                    var r = rowStart[x * 4 + 2];
+                    var a = rowStart[x * 4 + 3];
+                    image[x, y] = new Rgba32(r, g, b, a);
+                }
+            }
+            return image;
         }
 
         if (format == Format.R8G8B8A8Unorm || format == Format.R8G8B8A8Srgb)
         {
-            SaveRgba(mappedData, width, height, rowPitch);
-            return;
+            for (var y = 0; y < height; y++)
+            {
+                var rowStart = src + y * rowPitch;
+                for (var x = 0; x < width; x++)
+                {
+                    var r = rowStart[x * 4 + 0];
+                    var g = rowStart[x * 4 + 1];
+                    var b = rowStart[x * 4 + 2];
+                    var a = rowStart[x * 4 + 3];
+                    image[x, y] = new Rgba32(r, g, b, a);
+                }
+            }
+            return image;
         }
 
+        image.Dispose();
         throw new NotSupportedException($"Screenshot format {format} is not supported.");
-    }
-
-    private void SaveBgra(void* mappedData, uint width, uint height, uint rowPitch)
-    {
-        using var image = new SixLabors.ImageSharp.Image<Rgba32>((int)width, (int)height);
-        var src = (byte*)mappedData;
-
-        for (var y = 0; y < height; y++)
-        {
-            var rowStart = src + y * rowPitch;
-            for (var x = 0; x < width; x++)
-            {
-                var b = rowStart[x * 4 + 0];
-                var g = rowStart[x * 4 + 1];
-                var r = rowStart[x * 4 + 2];
-                var a = rowStart[x * 4 + 3];
-                image[x, y] = new Rgba32(r, g, b, a);
-            }
-        }
-
-        image.SaveAsPng(_outputPath);
-    }
-
-    private void SaveRgba(void* mappedData, uint width, uint height, uint rowPitch)
-    {
-        using var image = new SixLabors.ImageSharp.Image<Rgba32>((int)width, (int)height);
-        var src = (byte*)mappedData;
-
-        for (var y = 0; y < height; y++)
-        {
-            var rowStart = src + y * rowPitch;
-            for (var x = 0; x < width; x++)
-            {
-                var r = rowStart[x * 4 + 0];
-                var g = rowStart[x * 4 + 1];
-                var b = rowStart[x * 4 + 2];
-                var a = rowStart[x * 4 + 3];
-                image[x, y] = new Rgba32(r, g, b, a);
-            }
-        }
-
-        image.SaveAsPng(_outputPath);
     }
 
     private void EnsureStagingBuffer(ulong size)

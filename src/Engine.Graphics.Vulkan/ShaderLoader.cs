@@ -12,7 +12,7 @@ public static class ShaderLoader
     public static byte[] Load(string name)
     {
         var assembly = Assembly.GetExecutingAssembly();
-        var resourceName = $"Engine.Graphics.Shaders.{name}";
+        var resourceName = $"Engine.Graphics.Vulkan.Shaders.{name}";
 
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException($"Embedded shader resource not found: {resourceName}");

@@ -84,14 +84,5 @@ public static class ObjLoader
     }
 
     private static Vector3 ComputeFaceNormal(Vector3 a, Vector3 b, Vector3 c)
-    {
-        var ab = b - a;
-        var ac = c - a;
-        var normal = Vector3.Cross(ab, ac);
-        if (normal.LengthSquared() > 0.00001f)
-            normal = Vector3.Normalize(normal);
-        else
-            normal = Vector3.UnitY;
-        return normal;
-    }
+        => MeshMath.ComputeFaceNormal(a, b, c);
 }

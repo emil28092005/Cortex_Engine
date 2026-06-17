@@ -1,7 +1,6 @@
 using System;
 using System.Numerics;
 using Flecs.NET.Core;
-using SDL;
 using Engine.Core.Components;
 
 namespace Engine.Core;
@@ -37,30 +36,30 @@ public sealed class FreeFlyCameraController : ICameraController
         _yaw = MathF.Atan2(forward.X, forward.Z);
     }
 
-    public void Update(InputMapping input, float deltaTime)
+    public void Update(IInputState input, float deltaTime)
     {
         var move = Vector3.Zero;
         var forward = new Vector3(MathF.Sin(_yaw), 0.0f, MathF.Cos(_yaw));
-        var right = new Vector3(MathF.Cos(_yaw), 0.0f, -MathF.Sin(_yaw));
+        var right = new Vector3(-MathF.Cos(_yaw), 0.0f, MathF.Sin(_yaw));
         var up = Vector3.UnitY;
 
-        if (input.IsKeyDown(SDL_Keycode.SDLK_W))
+        if (input.IsKeyDown(Key.W))
             move += forward;
-        if (input.IsKeyDown(SDL_Keycode.SDLK_S))
+        if (input.IsKeyDown(Key.S))
             move -= forward;
-        if (input.IsKeyDown(SDL_Keycode.SDLK_A))
+        if (input.IsKeyDown(Key.A))
             move -= right;
-        if (input.IsKeyDown(SDL_Keycode.SDLK_D))
+        if (input.IsKeyDown(Key.D))
             move += right;
-        if (input.IsKeyDown(SDL_Keycode.SDLK_E))
+        if (input.IsKeyDown(Key.E))
             move += up;
-        if (input.IsKeyDown(SDL_Keycode.SDLK_Q))
+        if (input.IsKeyDown(Key.Q))
             move -= up;
 
         if (move.LengthSquared() > 0.0f)
         {
             move = Vector3.Normalize(move);
-            var speed = input.IsKeyDown(SDL_Keycode.SDLK_LSHIFT) ? _fastSpeed : _speed;
+            var speed = input.IsKeyDown(Key.LeftShift) ? _fastSpeed : _speed;
             _position += move * speed * deltaTime;
         }
 
@@ -82,7 +81,7 @@ public sealed class FreeFlyCameraController : ICameraController
             {
                 var dx = input.MouseX - _lastMouseX;
                 var dy = input.MouseY - _lastMouseY;
-                _yaw += dx * _mouseSensitivity;
+                _yaw -= dx * _mouseSensitivity;
                 _pitch += dy * _mouseSensitivity;
                 _pitch = Math.Clamp(_pitch, -MathF.PI / 2.0f + 0.01f, MathF.PI / 2.0f - 0.01f);
                 _lastMouseX = input.MouseX;

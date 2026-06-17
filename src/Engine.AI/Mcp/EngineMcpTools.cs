@@ -70,7 +70,7 @@ public sealed class EngineMcpTools
         return EnqueueAndReturnMessage(cmd);
     }
 
-    [McpServerTool, Description("Capture a screenshot of the current rendered frame and save it to disk.")]
+    [McpServerTool, Description("Capture a screenshot of the current rendered frame and return it as a base64-encoded PNG. The image is also saved to disk.")]
     public Task<string> CaptureScreenshot([Description("Optional output file path (default: screenshot_<timestamp>.png)")] string? outputPath = null)
     {
         var cmd = new CaptureScreenshotCommand { OutputPath = outputPath };

@@ -5,7 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <IsAotCompatible>true</IsAotCompatible>
+    <IsAotCompatible>false</IsAotCompatible>
+    <AssemblyName>Engine.Graphics.Raylib</AssemblyName>
+    <RootNamespace>Engine.Graphics.Raylib</RootNamespace>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
@@ -14,16 +16,17 @@
 
   <PropertyGroup Condition="'$(Configuration)' == 'ReleaseAOT'">
     <DefineConstants>RELEASE_AOT</DefineConstants>
-    <PublishAot>true</PublishAot>
+    <PublishAot>false</PublishAot>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Raylib-cs" Version="8.0.0" />
     <PackageReference Include="Flecs.NET.Debug" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="Flecs.NET.Release" Version="4.0.4-build.546" Condition="'$(Configuration)' == 'Release' OR '$(Configuration)' == 'ReleaseAOT'" />
-    <PackageReference Include="SharpGLTF.Core" Version="1.0.6" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Engine.Graphics\Engine.Graphics.csproj" />
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
   </ItemGroup>
 

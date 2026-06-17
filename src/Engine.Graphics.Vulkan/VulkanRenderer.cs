@@ -13,10 +13,10 @@ using Engine.Core.Components;
 namespace Engine.Graphics;
 
 /// <summary>
-/// Renders indexed meshes attached to ECS entities.
+/// Vulkan implementation of the ECS world renderer.
 /// Uses Silk.NET.Vulkan and reads Mesh + Transform components from the ECS world.
 /// </summary>
-public sealed unsafe class MeshRenderer : IDisposable
+public sealed unsafe class VulkanRenderer : IRenderer
 {
     private readonly VulkanContext _context;
     private readonly Swapchain _swapchain;
@@ -89,7 +89,7 @@ public sealed unsafe class MeshRenderer : IDisposable
         }
     }
 
-    public MeshRenderer(VulkanContext context, Swapchain swapchain)
+    public VulkanRenderer(VulkanContext context, Swapchain swapchain)
     {
         _context = context;
         _swapchain = swapchain;
@@ -287,6 +287,11 @@ public sealed unsafe class MeshRenderer : IDisposable
 
     public bool IsScreenshotRequested => _screenshot.IsRequested;
 
+    /// <summary>
+    /// Provider that can asynchronously capture the current frame to a PNG byte array.
+    /// </summary>
+    public IScreenshotProvider ScreenshotProvider => _screenshot;
+
     public void RenderWorld(World world)
     {
         var frame = _currentFrame % 2;
@@ -340,10 +345,13 @@ public sealed unsafe class MeshRenderer : IDisposable
         _context.Vk.CmdSetViewport(cmd, 0, 1, &viewport);
         _context.Vk.CmdSetScissor(cmd, 0, 1, &scissor);
 
-        var camera = GetCamera(world);
-        var view = camera.GetViewMatrix();
-        var proj = camera.GetProjectionMatrix();
-        var drawCmd = cmd;
+            var camera = GetCamera(world);
+            var view = camera.GetViewMatrix();
+            var proj = camera.GetProjectionMatrix();
+            // Vulkan NDC Y points down; .NET's projection matrix assumes Y up, so flip Y.
+            proj.M22 = -proj.M22;
+            var drawCmd = cmd;
+
 
         var frameConstants = BuildFrameConstants(world, camera);
         var frameConstantsBytes = new byte[sizeof(FrameConstants)];

@@ -55,7 +55,7 @@ public sealed class McpStdioServer
                 "List all named entities in the ECS world.",
                 new JsonSchemaBuilder().Build()),
             ["CaptureScreenshot"] = new(
-                "Capture a screenshot of the current rendered frame and save it to disk.",
+                "Capture a screenshot of the current rendered frame and save it to disk. (No graphics context in stdio mode; returns requested path.)",
                 new JsonSchemaBuilder()
                     .AddOptionalString("outputPath")
                     .Build()),
