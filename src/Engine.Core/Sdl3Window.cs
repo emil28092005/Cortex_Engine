@@ -43,6 +43,9 @@ public sealed unsafe class Sdl3Window : IWindow
 
         if (_window == null)
             throw new InvalidOperationException($"SDL_CreateWindow failed: {SDL3.SDL_GetError()}");
+
+        SDL3.SDL_ShowWindow(_window);
+        SDL3.SDL_RaiseWindow(_window);
     }
 
     public void PumpEvents()
