@@ -46,6 +46,11 @@ public sealed unsafe class Sdl3Window : IWindow
 
         SDL3.SDL_ShowWindow(_window);
         SDL3.SDL_RaiseWindow(_window);
+
+        // On Wayland, the compositor needs an event round-trip before mapping
+        // the window. Pump events to flush the show request without blocking.
+        SDL_Event flushEvt;
+        while (SDL3.SDL_PollEvent(&flushEvt)) { }
     }
 
     public void PumpEvents()

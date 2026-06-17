@@ -11,13 +11,9 @@ ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export PATH="$DOTNET_ROOT:$PATH"
 
-# Prefer Wayland if available, fall back to X11
-if [ -n "$WAYLAND_DISPLAY" ]; then
-    export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-wayland}"
-else
-    export DISPLAY="${DISPLAY:-:0}"
-    export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}"
-fi
+# Auto-detect Wayland. SDL3 bundled with ppy.SDL3-CS supports both Wayland and X11;
+# let it choose based on available display servers. Do NOT force DISPLAY here.
+unset SDL_VIDEODRIVER 2>/dev/null
 
 cd "$ENGINE_DIR"
 exec dotnet run --project "$ENGINE_DIR/src/CortexEngine.App/CortexEngine.App.csproj" -c Debug -- "$@"
