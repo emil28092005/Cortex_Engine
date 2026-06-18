@@ -271,8 +271,9 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private Matrix4x4 ComputeViewProjection()
     {
         var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
-        var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
-        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -12), Vector3.Zero, Vector3.UnitY);        return view * proj;
+        var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 3f, aspect, 0.1f, 100f);
+        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY);
+        return view * proj;
     }
 
     private static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image,
