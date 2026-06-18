@@ -266,7 +266,7 @@ class Program
 
         world.Entity("MainLight")
             .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 50.0f, range: 60.0f));
+            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 15.0f, range: 60.0f));
 
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
