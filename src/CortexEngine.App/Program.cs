@@ -81,12 +81,12 @@ class Program
 
 #if !RELEASE_AOT
                 frameCount++;
-                if (mcpPort > 0 && !mcpStarted && frameCount > 3)
+                if (mcpPort > 0 && !mcpStarted && frameCount > 10)
                 {
                     mcpStarted = true;
                     var port = mcpPort;
                     var q = queue;
-                    new Thread(() =>
+                    Task.Run(() =>
                     {
                         try
                         {
@@ -98,7 +98,7 @@ class Program
                         {
                             Console.WriteLine($"[App] MCP server error: {ex.Message}");
                         }
-                    }) { IsBackground = true }.Start();
+                    });
                 }
 #endif
 
