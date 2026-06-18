@@ -57,15 +57,18 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         {
             var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
             cam.AspectRatio = aspect;
-            vp = cam.GetViewMatrix() * cam.GetProjectionMatrix();
+            var proj = cam.GetProjectionMatrix();
+            proj.M22 *= -1;
+            vp = cam.GetViewMatrix() * proj;
             found = true;
         });
 
         if (!found)
         {
             var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
-            vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY)
-                * Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
+            var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
+            proj.M22 *= -1;
+            vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY) * proj;
         }
 
         Render(vp);
