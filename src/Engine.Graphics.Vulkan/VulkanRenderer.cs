@@ -39,14 +39,20 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
 
-        var mesh = LoadMesh("Content/cube.obj");
-        _indexCount = (uint)mesh.Indices.Length;
+        var vertices = new Vertex[]
+        {
+            new(new Vector3(-0.5f, -0.5f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0, 0, 1)),
+            new(new Vector3( 0.5f, -0.5f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0, 0, 1)),
+            new(new Vector3( 0.0f,  0.5f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0, 0, 1)),
+        };
+        var indices = new uint[] { 0, 1, 2 };
+        _indexCount = 3;
 
         _vertexBuffer = new VulkanVertexBuffer(ctx.Device, ctx.PhysicalDevice,
-            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, mesh.Vertices);
+            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, vertices);
 
         _indexBuffer = new VulkanIndexBuffer(ctx.Device, _frameResources.CommandPool,
-            ctx.GraphicsQueue, ctx, mesh.Indices);
+            ctx.GraphicsQueue, ctx, indices);
     }
 
     private static Mesh LoadMesh(string path)
@@ -189,7 +195,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         Vk.vkCmdBindIndexBuffer(cmd, _indexBuffer.Buffer, 0, 0);
 
         var angle = _totalTime;
-        var model = Matrix4x4.CreateRotationY(angle) * Matrix4x4.CreateRotationX(angle * 0.5f);
+        var model = Matrix4x4.CreateRotationZ(angle) * Matrix4x4.CreateRotationX(angle * 0.3f);
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
 
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
@@ -267,7 +273,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     {
         var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
-        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -2), Vector3.Zero, Vector3.UnitY);
+        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -3), Vector3.Zero, Vector3.UnitY);
         return view * proj;
     }
 
