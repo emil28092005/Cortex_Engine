@@ -85,8 +85,7 @@ public sealed class AiCommandProcessor
         Mesh mesh;
         if (isSphere)
         {
-            var r = MathF.Max(MathF.Max(command.Scale.X, command.Scale.Y), command.Scale.Z) * 0.5f;
-            mesh = ProceduralMesh.CreateSphere(r, 24, 12, new Vector3(0.5f, 0.6f, 0.9f));
+            mesh = ProceduralMesh.CreateSphere(0.5f, 24, 12, new Vector3(0.5f, 0.6f, 0.9f));
         }
         else
         {
