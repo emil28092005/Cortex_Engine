@@ -39,7 +39,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
 
-        var mesh = LoadMesh("Content/cube.obj");
+        var mesh = LoadMesh("Content/torusknot.obj");
         _indexCount = (uint)mesh.Indices.Length;
 
         _vertexBuffer = new VulkanVertexBuffer(ctx.Device, ctx.PhysicalDevice,
@@ -190,8 +190,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         var angle = _totalTime * 0.2f;
         var rot = Matrix4x4.CreateRotationY(angle);
-        var offsetX = MathF.Sin(_totalTime * 0.3f) * 2.0f;
-        var model = Matrix4x4.CreateTranslation(offsetX, 0, 0) * rot;
+        var model = rot;
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
 
@@ -268,7 +267,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     {
         var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
-        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -5), Vector3.Zero, Vector3.UnitY);
+        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY);
         return view * proj;
     }
 
