@@ -48,32 +48,29 @@ public class ShadowMapFaceDirectionTests
         for (int face = 0; face < 6; face++)
         {
             var (_, proj) = ComputeFaceViewProj(Vector3.Zero, face);
-            // FOV=90°, aspect=1 → M22 = 1/tan(45°) = 1, then *= -1 → -1... wait
-            // CreatePerspectiveFieldOfView(PI/2, 1, n, f) → M22 = 1/tan(PI/4) = 1
-            // Then M22 *= -1 → M22 = -1
-            Assert.Equal(-1f, proj.M22, 0.001f);
+            // FOV=90°, aspect=1 → M22 = 1/tan(PI/4) = 1 (no M22 flip for shadow cubemap)
+            Assert.Equal(1f, proj.M22, 0.001f);
         }
     }
 
     [Fact]
-    public void Face_2_Uses_Negative_Z_Up()
+    public void Face_2_Uses_Positive_Z_Up()
     {
         var lightPos = new Vector3(0, 5, 0);
         var (view, _) = ComputeFaceViewProj(lightPos, 2);
-        // +Y face: up = -Z
-        var negZ = Vector3.Transform(new Vector3(0, 0, -1), view);
-        // Should have positive Y in view space (up direction)
-        Assert.True(negZ.Y > 0, $"Face 2 up should map -Z to +Y view space, got {negZ}");
+        // +Y face: up = +Z (Vulkan cubemap convention)
+        var posZ = Vector3.Transform(new Vector3(0, 0, 1), view);
+        Assert.True(posZ.Y > 0, $"Face 2 up should map +Z to +Y view space, got {posZ}");
     }
 
     [Fact]
-    public void Face_3_Uses_Positive_Z_Up()
+    public void Face_3_Uses_Negative_Z_Up()
     {
         var lightPos = new Vector3(0, 5, 0);
         var (view, _) = ComputeFaceViewProj(lightPos, 3);
-        // -Y face: up = +Z
-        var posZ = Vector3.Transform(new Vector3(0, 0, 1), view);
-        Assert.True(posZ.Y > 0, $"Face 3 up should map +Z to +Y view space, got {posZ}");
+        // -Y face: up = -Z (Vulkan cubemap convention)
+        var negZ = Vector3.Transform(new Vector3(0, 0, -1), view);
+        Assert.True(negZ.Y > 0, $"Face 3 up should map -Z to +Y view space, got {negZ}");
     }
 
     [Fact]
@@ -82,31 +79,27 @@ public class ShadowMapFaceDirectionTests
         // The shader hardcodes FAR_PLANE = 60.0 and divides by it
         // The projection must use the same far plane
         var (_, proj) = ComputeFaceViewProj(Vector3.Zero, 0);
-        // M33 for perspective with M22 *= -1: should be negative
-        Assert.True(proj.M33 < 0, $"M33 should be negative for Vulkan projection, got {proj.M33}");
+        // M33 for perspective: should be negative (far/near-far)
+        Assert.True(proj.M33 < 0, $"M33 should be negative for perspective projection, got {proj.M33}");
     }
 
     static (Matrix4x4 view, Matrix4x4 proj) ComputeFaceViewProj(Vector3 lightPos, int face)
     {
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 2f, 1.0f, 0.1f, 60f);
-        proj.M22 *= -1;
 
         var target = lightPos;
-        var up = Vector3.UnitY;
+        Vector3 up;
 
-        target += face switch
+        switch (face)
         {
-            0 => Vector3.UnitX,
-            1 => -Vector3.UnitX,
-            2 => Vector3.UnitY,
-            3 => -Vector3.UnitY,
-            4 => Vector3.UnitZ,
-            5 => -Vector3.UnitZ,
-            _ => Vector3.UnitZ,
-        };
-
-        if (face == 2) up = -Vector3.UnitZ;
-        else if (face == 3) up = Vector3.UnitZ;
+            case 0: target += Vector3.UnitX; up = new Vector3(0, -1, 0); break;
+            case 1: target += -Vector3.UnitX; up = new Vector3(0, -1, 0); break;
+            case 2: target += Vector3.UnitY; up = new Vector3(0, 0, 1); break;
+            case 3: target += -Vector3.UnitY; up = new Vector3(0, 0, -1); break;
+            case 4: target += Vector3.UnitZ; up = new Vector3(0, -1, 0); break;
+            case 5: target += -Vector3.UnitZ; up = new Vector3(0, -1, 0); break;
+            default: target += Vector3.UnitZ; up = new Vector3(0, -1, 0); break;
+        }
 
         var view = Matrix4x4.CreateLookAt(lightPos, target, up);
         return (view, proj);

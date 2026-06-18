@@ -173,24 +173,43 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
     public static (Matrix4x4 view, Matrix4x4 proj) GetFaceViewProj(Vector3 lightPos, int face)
     {
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 2f, 1.0f, 0.1f, 60f);
-        proj.M22 *= -1;
+        // No M22 flip for shadow cubemap — Vulkan cubemap sampling handles Y internally
+        // The M22 flip is only for the main render pass (swapchain), not for offscreen cube
 
         var target = lightPos;
-        var up = Vector3.UnitY;
+        Vector3 up;
 
-        target += face switch
+        switch (face)
         {
-            0 => Vector3.UnitX,
-            1 => -Vector3.UnitX,
-            2 => Vector3.UnitY,
-            3 => -Vector3.UnitY,
-            4 => Vector3.UnitZ,
-            5 => -Vector3.UnitZ,
-            _ => Vector3.UnitZ,
-        };
-
-        if (face == 2) up = -Vector3.UnitZ;
-        else if (face == 3) up = Vector3.UnitZ;
+            case 0: // +X
+                target += Vector3.UnitX;
+                up = new Vector3(0, -1, 0);
+                break;
+            case 1: // -X
+                target += -Vector3.UnitX;
+                up = new Vector3(0, -1, 0);
+                break;
+            case 2: // +Y
+                target += Vector3.UnitY;
+                up = new Vector3(0, 0, 1);
+                break;
+            case 3: // -Y
+                target += -Vector3.UnitY;
+                up = new Vector3(0, 0, -1);
+                break;
+            case 4: // +Z
+                target += Vector3.UnitZ;
+                up = new Vector3(0, -1, 0);
+                break;
+            case 5: // -Z
+                target += -Vector3.UnitZ;
+                up = new Vector3(0, -1, 0);
+                break;
+            default:
+                target += Vector3.UnitZ;
+                up = new Vector3(0, -1, 0);
+                break;
+        }
 
         var view = Matrix4x4.CreateLookAt(lightPos, target, up);
         return (view, proj);
