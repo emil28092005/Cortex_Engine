@@ -138,17 +138,8 @@ void main()
     float dist = length(toLight);
     vec3 L = toLight / max(dist, 0.001);
 
-    // Flip normal if it faces away from light (fixes inward normals from bad winding)
-    if (dot(N, L) < 0.0)
-    {
-        N = -N;
-    }
-
-    // Also flip for view direction if needed
-    if (dot(N, V) < 0.0)
-    {
-        N = -N;
-    }
+    // Flip normal to face camera — fixes cubes with bad winding without breaking spheres
+    if (dot(N, V) < 0.0) N = -N;
 
     float attenuation = pow(clamp(1.0 - dist / max(lightRange, 0.001), 0.0, 1.0), 2.0);
     vec3 radiance = lightColor * lightIntensity * attenuation;
