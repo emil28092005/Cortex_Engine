@@ -24,7 +24,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     private string? _screenshotPath;
     private float _totalTime;
 
-    public float ShadowBias { get; set; } = 0.08f;
+    public float ShadowBias { get; set; } = 0.01f;
     public float ShadowSampleRadius { get; set; } = 0.015f;
     public float ShadowFarPlane { get; set; } = 60.0f;
 
