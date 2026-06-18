@@ -138,7 +138,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             }
 
             var name = e.Name();
-            var castShadow = name != "Floor" && name != "Grid";
+            var castShadow = name != "Floor";
             drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix(), castShadow));
         });
 

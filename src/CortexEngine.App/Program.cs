@@ -276,17 +276,11 @@ class Program
 
     static void CreateScene(World world)
     {
-        var grid = ProceduralMesh.CreateGrid(20, 1.0f, new Vector3(0.4f, 0.4f, 0.45f));
-
         // Floor
         world.Entity("Floor")
             .Set(new Transform(new Vector3(0, -0.5f, 0), Quaternion.Identity, new Vector3(20, 0.5f, 20)))
             .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)))
             .Set(RigidBody.StaticBox(new Vector3(20, 0.5f, 20)));
-
-        world.Entity("Grid")
-            .Set(new Transform(Vector3.Zero, Quaternion.Identity, Vector3.One))
-            .Set(grid);
 
         // Central torus knot (floating, no physics)
         var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.9f, 0.7f, 0.3f));
