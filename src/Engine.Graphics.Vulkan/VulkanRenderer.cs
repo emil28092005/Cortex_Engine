@@ -86,6 +86,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             {
                 lightPos = new Vector4(lt.Position, l.Intensity);
                 lightColor = new Vector4(l.Color, l.Range);
+                Console.WriteLine($"[Vulkan] Point light: pos={lt.Position}, intensity={l.Intensity}, range={l.Range}, color={l.Color}");
             }
         });
         if (lightPos.W == 0)
@@ -96,8 +97,13 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
                 {
                     lightPos = new Vector4(l.Position, l.Intensity);
                     lightColor = new Vector4(l.Color, l.Range);
+                    Console.WriteLine($"[Vulkan] Point light (fallback): pos={l.Position}, intensity={l.Intensity}");
                 }
             });
+        }
+        if (lightPos.W == 0)
+        {
+            Console.WriteLine("[Vulkan] WARNING: No point light found in ECS!");
         }
 
         // Pack UBO: mat4 vp (64 bytes) + vec4 lightPos (16) + vec4 lightColor (16) = 96 bytes
