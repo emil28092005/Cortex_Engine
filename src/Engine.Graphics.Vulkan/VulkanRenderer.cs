@@ -190,13 +190,9 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         var angle = _totalTime * 0.2f;
         var rot = Matrix4x4.CreateRotationY(angle);
-
-        var model1 = Matrix4x4.CreateTranslation(-2f, 0, 0) * rot;
-        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model1);
-        Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
-
-        var model2 = Matrix4x4.CreateTranslation(2f, 0, 0) * rot;
-        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model2);
+        var offsetX = MathF.Sin(_totalTime * 0.3f) * 2.0f;
+        var model = Matrix4x4.CreateTranslation(offsetX, 0, 0) * rot;
+        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
 
         Vk.vkCmdEndRendering(cmd);
