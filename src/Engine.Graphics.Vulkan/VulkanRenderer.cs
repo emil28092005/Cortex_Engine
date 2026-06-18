@@ -77,6 +77,24 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY) * proj;
         }
 
+        // Collect point light from ECS (first point light found)
+        var lightPos = new Vector4(0, 5, 0, 0);
+        var lightColor = new Vector4(1, 1, 1, 0);
+        world.Each((Entity e, ref Light l) =>
+        {
+            if (l.IsPoint && lightPos.W == 0)
+            {
+                lightPos = new Vector4(l.Position, l.Intensity);
+                lightColor = new Vector4(l.Color, l.Range);
+            }
+        });
+
+        // Pack UBO: mat4 vp (64 bytes) + vec4 lightPos (16) + vec4 lightColor (16) = 96 bytes
+        var uboData = stackalloc byte[128];
+        Marshal.StructureToPtr(vp, (nint)uboData, false);
+        *(Vector4*)(uboData + 64) = lightPos;
+        *(Vector4*)(uboData + 80) = lightColor;
+
         var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)>();
 
         world.Each((Entity e, ref Transform t, ref Mesh m) =>
@@ -95,10 +113,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix()));
         });
 
-        Render(vp, drawCalls);
+        Render(vp, drawCalls, uboData);
     }
 
-    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)> drawCalls)
+    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)> drawCalls, byte* uboData)
     {
         _frameResources.WaitFrame(_frameIndex);
 
@@ -110,7 +128,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         {
             _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
                                 _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
-            Render(vp, drawCalls);
+            Render(vp, drawCalls, uboData);
             return;
         }
 
@@ -119,7 +137,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         _totalTime += 0.016f;
 
-        _frameResources.UpdateUbo(_frameIndex, &vp, VulkanFrameResources.UboSize);
+        _frameResources.UpdateUbo(_frameIndex, uboData, VulkanFrameResources.UboSize);
 
         var cmd = _frameResources.CommandBuffers[_frameIndex];
         Vk.vkResetCommandBuffer(cmd, 0);

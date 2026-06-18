@@ -10,6 +10,8 @@ layout(location = 2) out vec3 fragAlbedo;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 vp;
+    vec4 pointLightPos;     // xyz = position, w = intensity
+    vec4 pointLightColor;   // xyz = color, w = range
 };
 
 layout(push_constant) uniform PC {

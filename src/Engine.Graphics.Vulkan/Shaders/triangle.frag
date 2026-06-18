@@ -6,9 +6,15 @@ layout(location = 2) in vec3 fragAlbedo;
 
 layout(location = 0) out vec4 outColor;
 
-const vec3 LIGHT_DIR = normalize(vec3(0.5, 0.8, 0.3));
-const vec3 LIGHT_COLOR = vec3(1.0, 0.95, 0.85);
-const vec3 AMBIENT = vec3(0.15, 0.18, 0.22);
+layout(set = 0, binding = 0) uniform CameraUBO {
+    mat4 vp;
+    vec4 pointLightPos;     // xyz = position, w = intensity
+    vec4 pointLightColor;   // xyz = color, w = range
+};
+
+const vec3 DIR_LIGHT_DIR = normalize(vec3(0.5, 0.8, 0.3));
+const vec3 DIR_LIGHT_COLOR = vec3(0.4, 0.38, 0.33);
+const vec3 AMBIENT = vec3(0.08, 0.09, 0.12);
 
 const float PI = 3.14159265359;
 
@@ -35,9 +41,7 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
     float NdotV = max(dot(N, V), 0.0);
     float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = geometrySchlickGGX(NdotV, roughness);
-    float ggx1 = geometrySchlickGGX(NdotL, roughness);
-    return ggx2 * ggx1;
+    return geometrySchlickGGX(NdotV, roughness) * geometrySchlickGGX(NdotL, roughness);
 }
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
@@ -55,19 +59,10 @@ vec3 acesTonemap(vec3 color)
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
 }
 
-void main()
+vec3 calcLight(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float roughness, float metallic)
 {
-    vec3 N = normalize(fragNormal);
-    vec3 V = normalize(-fragWorldPos);
-
-    vec3 albedo = fragAlbedo;
-    float roughness = 0.5;
-    float metallic = 0.1;
-
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-
-    vec3 L = LIGHT_DIR;
     vec3 H = normalize(V + L);
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
     float NDF = distributionGGX(N, H, roughness);
     float G = geometrySmith(N, V, L, roughness);
@@ -81,11 +76,44 @@ void main()
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
     float NdotL = max(dot(N, L), 0.0);
-    vec3 Lo = (kD * albedo / PI + specular) * LIGHT_COLOR * NdotL;
+    return (kD * albedo / PI + specular) * radiance * NdotL;
+}
 
-    vec3 ambient = AMBIENT * albedo;
-    vec3 color = ambient + Lo;
+void main()
+{
+    vec3 N = normalize(fragNormal);
+    vec3 V = normalize(-fragWorldPos);
 
+    vec3 albedo = fragAlbedo;
+    float roughness = 0.5;
+    float metallic = 0.1;
+
+    // Directional light (sun)
+    vec3 color = calcLight(N, V, DIR_LIGHT_DIR, DIR_LIGHT_COLOR, albedo, roughness, metallic);
+
+    // Point light
+    vec3 lightPos = pointLightPos.xyz;
+    float lightIntensity = pointLightPos.w;
+    vec3 lightColor = pointLightColor.xyz;
+    float lightRange = pointLightColor.w;
+
+    vec3 toLight = lightPos - fragWorldPos;
+    float dist = length(toLight);
+    vec3 L = toLight / max(dist, 0.001);
+
+    // Unity-style attenuation: smooth falloff at range edge
+    float attenuation = pow(clamp(1.0 - dist / lightRange, 0.0, 1.0), 2.0);
+    vec3 radiance = lightColor * lightIntensity * attenuation;
+
+    if (lightIntensity > 0.0 && lightRange > 0.0)
+    {
+        color += calcLight(N, V, L, radiance, albedo, roughness, metallic);
+    }
+
+    // Ambient
+    color += AMBIENT * albedo;
+
+    // Tonemap + gamma
     color = acesTonemap(color);
     color = pow(color, vec3(1.0 / 2.2));
 

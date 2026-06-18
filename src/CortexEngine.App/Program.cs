@@ -264,6 +264,10 @@ class Program
             .Set(new Transform(Vector3.Zero, Quaternion.Identity, Vector3.One))
             .Set(grid);
 
+        world.Entity("MainLight")
+            .Set(new Transform(new Vector3(0, 8, 0), Quaternion.Identity, Vector3.One))
+            .Set(Light.Point(new Vector3(0, 8, 0), new Vector3(1.0f, 0.9f, 0.7f), intensity: 15.0f, range: 25.0f));
+
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
         Console.WriteLine($"[Scene] {entityCount} entities: torus knot + 4 dynamic cubes + 3 dynamic spheres + static floor + grid");
