@@ -235,6 +235,22 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             if (!dc.castShadow) continue;
 
             var vertexBuf = dc.vertexBuf;
+            ulong offset = 0;
+            Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
+            Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
+
+            // Pack all push constants for shadow pass
+            var pcData = stackalloc byte[160];
+            var modelCopy = dc.model;
+            System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
+            var lpCopy = lightPos;
+            System.Buffer.MemoryCopy(&lpCopy, pcData + 64, 16, 16);
+            var lcCopy = lightColor;
+            System.Buffer.MemoryCopy(&lcCopy, pcData + 80, 16, 16);
+            var lvpCopy = lightViewProj;
+            System.Buffer.MemoryCopy(&lvpCopy, pcData + 96, 64, 64);
+
+            Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 160, pcData);
 
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
@@ -332,18 +348,18 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
             Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
 
-            var model = dc.model;
-            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
-
-            // Light data as push constants at offset 64 (fragment stage)
+            // Pack all push constants: model(64) + lightPos(16) + lightColor(16) + lightViewProj(64) = 160
+            var pcData = stackalloc byte[160];
+            var modelCopy = dc.model;
+            System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
             var lpCopy = lightPos;
-            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Fragment, 64, 16, &lpCopy);
+            System.Buffer.MemoryCopy(&lpCopy, pcData + 64, 16, 16);
             var lcCopy = lightColor;
-            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Fragment, 80, 16, &lcCopy);
-
-            // Light view-proj at offset 96 (vertex + fragment)
+            System.Buffer.MemoryCopy(&lcCopy, pcData + 80, 16, 16);
             var lvpCopy = lightViewProj;
-            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 96, 64, &lvpCopy);
+            System.Buffer.MemoryCopy(&lvpCopy, pcData + 96, 64, 64);
+
+            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 160, pcData);
 
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
