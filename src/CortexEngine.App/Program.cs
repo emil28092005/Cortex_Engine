@@ -1,4 +1,5 @@
 using System.Numerics;
+using Engine.AI;
 using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
@@ -7,6 +8,10 @@ using Engine.Graphics.Vulkan;
 using Engine.Physics;
 using Flecs.NET.Core;
 using ImGuiNET;
+#if !RELEASE_AOT
+using Engine.AI.Mcp;
+using Microsoft.AspNetCore.Builder;
+#endif
 
 namespace CortexEngine.App;
 
@@ -14,18 +19,50 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine — Vulkan Scene + Physics (pure P/Invoke)...");
+        Console.WriteLine("Cortex Engine — Vulkan + Physics + AI/MCP (pure P/Invoke)...");
 
         try
         {
+            var mcpPort = ParseMcpPort(args);
+
+            using var world = World.Create();
+            using var physicsWorld = new PhysicsWorld();
+
             VulkanBackendRegistrar.EnsureRegistered();
             using var renderContext = RenderBackendFactory.Create("vulkan", 1280, 720, enableValidation: true);
             var window = renderContext.Window;
             var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
 
-            using var world = World.Create();
-            using var physicsWorld = new PhysicsWorld();
+            var processor = new AiCommandProcessor(world, p => LoadMesh(p, new Vector3(0.7f, 0.6f, 0.5f)), path => renderer.RequestScreenshot(path));
+            var queue = new AiCommandQueue(processor, new DummyScreenshotProvider());
+
+#if !RELEASE_AOT
+            WebApplication? mcpApp = null;
+            if (mcpPort > 0)
+            {
+                var mcpThread = new Thread(() =>
+                {
+                    Thread.Sleep(2000);
+                    try
+                    {
+                        mcpApp = McpEngineServerHost.Create(Array.Empty<string>(), queue, port: mcpPort);
+                        mcpApp.Run();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[App] MCP server error: {ex.Message}");
+                    }
+                })
+                { IsBackground = true };
+                mcpThread.Start();
+                Console.WriteLine($"[App] MCP HTTP server starting on http://localhost:{mcpPort}/ (SSE)");
+            }
+            else
+            {
+                Console.WriteLine("[App] MCP server disabled (--mcp-port 0).");
+            }
+#endif
 
             var cameraEntity = world.Entity("Camera")
                 .Set(new Camera(
@@ -91,6 +128,10 @@ class Program
                 physicsWorld.Update((float)timing.DeltaTime);
                 physicsWorld.SyncTransforms(world);
 
+                var processed = queue.ProcessPending();
+                if (processed > 0)
+                    Console.WriteLine($"[App] Processed {processed} AI command(s)");
+
                 if (hasImGui)
                 {
                     renderer.BeginImGuiFrame();
@@ -108,6 +149,7 @@ class Program
                     var entityCount = 0;
                     world.Each((Entity e, ref Transform _) => entityCount++);
                     ImGui.Text($"Entities: {entityCount}");
+                    ImGui.Text($"MCP: {(mcpPort > 0 ? $"port {mcpPort}" : "disabled")}");
                     ImGui.Text("WASD: move | RMB: look | Q/E: up/down | Shift: boost");
                     ImGui.End();
 
@@ -115,6 +157,7 @@ class Program
                 }
 
                 renderer.RenderWorld(world);
+                queue.CompletePendingScreenshots();
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
@@ -126,6 +169,10 @@ class Program
             }
 
             Console.WriteLine("Shutting down...");
+#if !RELEASE_AOT
+            if (mcpApp != null)
+                await mcpApp.StopAsync();
+#endif
         }
         catch (Exception ex)
         {
@@ -134,6 +181,16 @@ class Program
         }
 
         await Task.CompletedTask;
+    }
+
+    static int ParseMcpPort(string[] args)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--mcp-port" && i + 1 < args.Length && int.TryParse(args[i + 1], out var port))
+                return port;
+        }
+        return 0;
     }
 
     static void CreateScene(World world)
@@ -206,5 +263,10 @@ class Program
             return ObjLoader.Load(altPath, color);
         }
         return ObjLoader.Load(path, color);
+    }
+
+    class DummyScreenshotProvider : Engine.Core.IScreenshotProvider
+    {
+        public Task<byte[]> CaptureAsync(string outputPath) => Task.FromResult(Array.Empty<byte>());
     }
 }
