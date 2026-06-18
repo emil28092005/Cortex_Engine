@@ -12,4 +12,5 @@ public sealed record SpawnModelCommand : AiCommand
     public Vector3 Position { get; init; } = Vector3.Zero;
     public Quaternion Rotation { get; init; } = Quaternion.Identity;
     public Vector3 Scale { get; init; } = Vector3.One;
+    public bool Physics { get; init; } = false;
 }

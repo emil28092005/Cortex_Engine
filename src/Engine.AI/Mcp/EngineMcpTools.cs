@@ -24,7 +24,8 @@ public sealed class EngineMcpTools
         string modelPath,
         [Description("Optional position as [x, y, z] (default: 0,0,0)")] IReadOnlyList<double>? position = null,
         [Description("Optional rotation as [x, y, z, w] quaternion (default: identity)")] IReadOnlyList<double>? rotation = null,
-        [Description("Optional scale as [x, y, z] (default: 1,1,1)")] IReadOnlyList<double>? scale = null)
+        [Description("Optional scale as [x, y, z] (default: 1,1,1)")] IReadOnlyList<double>? scale = null,
+        [Description("Optional: enable physics (default: false)")] bool physics = false)
     {
         var cmd = new SpawnModelCommand
         {
@@ -32,7 +33,8 @@ public sealed class EngineMcpTools
             ModelPath = modelPath,
             Position = ToVector3(position, Vector3.Zero),
             Rotation = ToQuaternion(rotation, Quaternion.Identity),
-            Scale = ToVector3(scale, Vector3.One)
+            Scale = ToVector3(scale, Vector3.One),
+            Physics = physics
         };
 
         return EnqueueAndReturnMessage(cmd);

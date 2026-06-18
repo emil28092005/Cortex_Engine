@@ -83,6 +83,13 @@ public sealed class AiCommandProcessor
             .Set(new Transform(command.Position, command.Rotation, command.Scale))
             .Set(mesh);
 
+        if (command.Physics)
+        {
+            var maxScale = MathF.Max(MathF.Max(command.Scale.X, command.Scale.Y), command.Scale.Z);
+            var rb = RigidBody.DynamicBox(new Vector3(maxScale * 0.5f), mass: maxScale * 2f);
+            entity.Set(rb);
+        }
+
         return AiCommandResult.Ok($"Spawned entity '{command.Name}' with model '{command.ModelPath}' (id {(ulong)entity.Id}).");
     }
 
