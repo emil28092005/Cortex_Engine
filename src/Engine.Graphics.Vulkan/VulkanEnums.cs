@@ -340,6 +340,12 @@ public enum VkAccessFlags2 : ulong
     ShaderWrite = 0x200000000,
 }
 
+public enum VkImageCreateFlags : uint
+{
+    None = 0,
+    CubeCompatible = 0x00000010,
+}
+
 public enum VkDynamicState : int
 {
     Viewport = 0,
