@@ -103,12 +103,12 @@ float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
     // Base shadow check (center sample)
     float closestDepth = texture(shadowCube, dirNorm).r;
     float mappedDepth = closestDepth * FAR_PLANE;
-    float bias = 0.15;
+    float bias = 0.3 + 0.5 * (1.0 - max(dot(N, L), 0.0));
     float baseResult = dist - bias < mappedDepth ? 1.0 : 0.0;
 
     // If clearly lit or clearly shadowed, skip PCF
-    if (dist - bias * 4.0 < mappedDepth) return 1.0;
-    if (dist + bias * 4.0 > mappedDepth && baseResult > 0.5) return 1.0;
+    if (dist - bias * 3.0 < mappedDepth) return 1.0;
+    if (dist + bias * 3.0 > mappedDepth && baseResult > 0.5) return 1.0;
 
     // Poisson disk PCF — 16 samples
     float shadow = 0.0;
