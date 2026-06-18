@@ -6,6 +6,7 @@ using Engine.AI.Commands;
 using Engine.AI.Serialization;
 using Engine.Core;
 using Engine.Core.Components;
+using Engine.Graphics;
 using Flecs.NET.Core;
 
 namespace Engine.AI;
@@ -78,7 +79,17 @@ public sealed class AiCommandProcessor
 
     private AiCommandResult SpawnModel(SpawnModelCommand command)
     {
-        var mesh = _modelLoader(command.ModelPath);
+        Mesh mesh;
+        if (command.Shape == "sphere")
+        {
+            var r = MathF.Max(MathF.Max(command.Scale.X, command.Scale.Y), command.Scale.Z) * 0.5f;
+            mesh = ProceduralMesh.CreateSphere(r, 24, 12, new Vector3(0.5f, 0.6f, 0.9f));
+        }
+        else
+        {
+            mesh = _modelLoader(command.ModelPath);
+        }
+
         var entity = _world.Entity(command.Name)
             .Set(new Transform(command.Position, command.Rotation, command.Scale))
             .Set(mesh);
@@ -86,11 +97,17 @@ public sealed class AiCommandProcessor
         if (command.Physics)
         {
             var maxScale = MathF.Max(MathF.Max(command.Scale.X, command.Scale.Y), command.Scale.Z);
-            var rb = RigidBody.DynamicBox(new Vector3(maxScale * 0.5f), mass: maxScale * 2f);
-            entity.Set(rb);
+            if (command.Shape == "sphere")
+            {
+                entity.Set(RigidBody.DynamicSphere(maxScale * 0.5f, mass: maxScale * 2f));
+            }
+            else
+            {
+                entity.Set(RigidBody.DynamicBox(new Vector3(maxScale * 0.5f), mass: maxScale * 2f));
+            }
         }
 
-        return AiCommandResult.Ok($"Spawned entity '{command.Name}' with model '{command.ModelPath}' (id {(ulong)entity.Id}).");
+        return AiCommandResult.Ok($"Spawned entity '{command.Name}' with shape '{command.Shape}' (id {(ulong)entity.Id}).");
     }
 
     private AiCommandResult SetTransform(SetTransformCommand command)

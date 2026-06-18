@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
+    <ProjectReference Include="..\Engine.Graphics\Engine.Graphics.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' != 'ReleaseAOT'">

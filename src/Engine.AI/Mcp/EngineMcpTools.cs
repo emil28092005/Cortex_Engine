@@ -25,7 +25,8 @@ public sealed class EngineMcpTools
         [Description("Optional position as [x, y, z] (default: 0,0,0)")] IReadOnlyList<double>? position = null,
         [Description("Optional rotation as [x, y, z, w] quaternion (default: identity)")] IReadOnlyList<double>? rotation = null,
         [Description("Optional scale as [x, y, z] (default: 1,1,1)")] IReadOnlyList<double>? scale = null,
-        [Description("Optional: enable physics (default: false)")] bool physics = false)
+        [Description("Optional: enable physics (default: false)")] bool physics = false,
+        [Description("Optional: shape type 'cube' or 'sphere' (default: cube)")] string shape = "cube")
     {
         var cmd = new SpawnModelCommand
         {
@@ -34,7 +35,8 @@ public sealed class EngineMcpTools
             Position = ToVector3(position, Vector3.Zero),
             Rotation = ToQuaternion(rotation, Quaternion.Identity),
             Scale = ToVector3(scale, Vector3.One),
-            Physics = physics
+            Physics = physics,
+            Shape = shape
         };
 
         return EnqueueAndReturnMessage(cmd);
