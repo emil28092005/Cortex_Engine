@@ -150,11 +150,18 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 pDynamicStates = dynamicStates,
             };
 
-            var pushConstantRange = new VkPushConstantRange
+            var pushConstantRanges = stackalloc VkPushConstantRange[2];
+            pushConstantRanges[0] = new VkPushConstantRange
             {
-            stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment,
+                stageFlags = VkShaderStageFlags.Vertex,
                 offset = 0,
                 size = 64,
+            };
+            pushConstantRanges[1] = new VkPushConstantRange
+            {
+                stageFlags = VkShaderStageFlags.Fragment,
+                offset = 64,
+                size = 32,
             };
 
             var descLayout = DescriptorSetLayout;
@@ -163,8 +170,8 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 sType = VkStructureType.PipelineLayoutCreateInfo,
                 setLayoutCount = 1,
                 pSetLayouts = &descLayout,
-                pushConstantRangeCount = 1,
-                pPushConstantRanges = (nint)(&pushConstantRange),
+                pushConstantRangeCount = 2,
+                pPushConstantRanges = (nint)pushConstantRanges,
             };
 
             fixed (VkPipelineLayout* layoutPtr = &PipelineLayout)

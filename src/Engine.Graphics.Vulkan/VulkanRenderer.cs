@@ -100,14 +100,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             });
         }
 
-        // Pack UBO: mat4 vp (64 bytes) + vec4 lightPos (16) + vec4 lightColor (16) = 96 bytes
-        var uboData = stackalloc byte[128];
+        // Pack UBO: just mat4 vp (64 bytes)
+        var uboData = stackalloc byte[64];
         var vpCopy = vp;
         System.Buffer.MemoryCopy(&vpCopy, uboData, 64, 64);
-        var lpCopy = lightPos;
-        System.Buffer.MemoryCopy(&lpCopy, uboData + 64, 16, 16);
-        var lcCopy = lightColor;
-        System.Buffer.MemoryCopy(&lcCopy, uboData + 80, 16, 16);
 
         var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)>();
 
@@ -127,10 +123,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix()));
         });
 
-        Render(vp, drawCalls, uboData);
+        Render(vp, drawCalls, uboData, lightPos, lightColor);
     }
 
-    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)> drawCalls, byte* uboData)
+    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)> drawCalls, byte* uboData, Vector4 lightPos, Vector4 lightColor)
     {
         _frameResources.WaitFrame(_frameIndex);
 
@@ -142,7 +138,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         {
             _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
                                 _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
-            Render(vp, drawCalls, uboData);
+            Render(vp, drawCalls, uboData, lightPos, lightColor);
             return;
         }
 
@@ -250,6 +246,13 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
             var model = dc.model;
             Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
+
+            // Light data as push constants at offset 64 (fragment stage)
+            var lpCopy = lightPos;
+            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Fragment, 64, 16, &lpCopy);
+            var lcCopy = lightColor;
+            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Fragment, 80, 16, &lcCopy);
+
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
 

@@ -5,7 +5,7 @@ namespace Engine.Graphics.Vulkan;
 internal sealed unsafe class VulkanFrameResources : IDisposable
 {
     public const int MaxFramesInFlight = 2;
-    public const ulong UboSize = 128;
+    public const ulong UboSize = 64;
 
     public VkCommandPool CommandPool;
     public VkCommandBuffer[] CommandBuffers = new VkCommandBuffer[MaxFramesInFlight];
