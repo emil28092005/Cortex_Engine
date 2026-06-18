@@ -188,7 +188,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         Vk.vkCmdBindIndexBuffer(cmd, _indexBuffer.Buffer, 0, 1);
 
-        float angle = 0.0f;
+        float angle = _totalTime * 0.5f;
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 4, &angle);
 
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
