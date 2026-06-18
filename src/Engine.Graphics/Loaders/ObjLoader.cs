@@ -3,7 +3,6 @@ using Engine.Core;
 using Engine.Core.Components;
 
 namespace Engine.Graphics.Loaders;
-
 /// <summary>
 /// Minimal OBJ loader.
 /// </summary>
@@ -66,6 +65,8 @@ public static class ObjLoader
         var faceIndices = new List<uint>();
         faceNormals.Clear();
 
+        var hasNormals = false;
+
         for (int i = 1; i < parts.Length; i++)
         {
             var sub = parts[i].Split('/');
@@ -76,13 +77,27 @@ public static class ObjLoader
             if (sub.Length > 2 && !string.IsNullOrEmpty(sub[2]))
             {
                 normal = normals[int.Parse(sub[2]) - 1];
+                hasNormals = true;
             }
 
             vertices.Add(new Vertex(pos, color, normal));
             faceIndices.Add((uint)(vertices.Count - 1));
         }
 
-        // Triangulate as a fan.
+        if (!hasNormals && faceIndices.Count >= 3)
+        {
+            var a = vertices[(int)faceIndices[0]].Position;
+            var b = vertices[(int)faceIndices[1]].Position;
+            var c = vertices[(int)faceIndices[2]].Position;
+            var faceNormal = MeshMath.ComputeFaceNormal(a, b, c);
+            for (int i = 0; i < faceIndices.Count; i++)
+            {
+                var v = vertices[(int)faceIndices[i]];
+                v.Normal = faceNormal;
+                vertices[(int)faceIndices[i]] = v;
+            }
+        }
+
         for (int i = 2; i < faceIndices.Count; i++)
         {
             indices.Add(faceIndices[0]);
