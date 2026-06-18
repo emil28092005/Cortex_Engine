@@ -118,7 +118,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         lightProj.M22 *= -1;
         var lightViewProj = lightView * lightProj;
 
-        var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)>();
+        var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)>();
 
         world.Each((Entity e, ref Transform t, ref Mesh m) =>
         {
@@ -133,13 +133,15 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
                 _meshCache[eid] = entry;
             }
 
-            drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix()));
+            var name = e.Name();
+            var castShadow = name != "Floor" && name != "Grid";
+            drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix(), castShadow));
         });
 
         Render(vp, drawCalls, uboData, lightPos, lightColor, lightViewProj);
     }
 
-    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)> drawCalls, byte* uboData, Vector4 lightPos, Vector4 lightColor, Matrix4x4 lightViewProj)
+    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)> drawCalls, byte* uboData, Vector4 lightPos, Vector4 lightColor, Matrix4x4 lightViewProj)
     {
         _frameResources.WaitFrame(_frameIndex);
 
@@ -230,16 +232,9 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         foreach (var dc in drawCalls)
         {
+            if (!dc.castShadow) continue;
+
             var vertexBuf = dc.vertexBuf;
-            ulong offset = 0;
-            Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
-            Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
-
-            var model = dc.model;
-            Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
-
-            var lvpCopy = lightViewProj;
-            Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 96, 64, &lvpCopy);
 
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
