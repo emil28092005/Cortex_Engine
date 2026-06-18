@@ -49,28 +49,29 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             ctx.GraphicsQueue, ctx, mesh.Indices);
     }
 
-    private static Mesh LoadMesh(string path)
-    {
-        if (!File.Exists(path))
-        {
-            var altPath = Path.Combine(AppContext.BaseDirectory, path);
-            if (!File.Exists(altPath))
-            {
-                altPath = Path.Combine(AppContext.BaseDirectory, "Content", Path.GetFileName(path));
-                if (!File.Exists(altPath))
-                    throw new FileNotFoundException($"Mesh file not found: {path}");
-            }
-            return ObjLoader.Load(altPath, new Vector3(0.8f, 0.6f, 0.3f));
-        }
-        return ObjLoader.Load(path, new Vector3(0.8f, 0.6f, 0.3f));
-    }
-
     public void RenderWorld(World world)
     {
-        Render();
+        var vp = Matrix4x4.Identity;
+        var found = false;
+        world.Each((Entity e, ref Camera cam) =>
+        {
+            var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
+            cam.AspectRatio = aspect;
+            vp = cam.GetViewMatrix() * cam.GetProjectionMatrix();
+            found = true;
+        });
+
+        if (!found)
+        {
+            var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
+            vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY)
+                * Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
+        }
+
+        Render(vp);
     }
 
-    private void Render()
+    private void Render(Matrix4x4 vp)
     {
         _frameResources.WaitFrame(_frameIndex);
 
@@ -82,7 +83,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         {
             _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
                                 _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
-            Render();
+            Render(vp);
             return;
         }
 
@@ -91,7 +92,6 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         _totalTime += 0.016f;
 
-        var vp = ComputeViewProjection();
         _frameResources.UpdateUbo(_frameIndex, &vp, VulkanFrameResources.UboSize);
 
         var cmd = _frameResources.CommandBuffers[_frameIndex];
@@ -263,14 +263,6 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         _frameIndex = (_frameIndex + 1) % VulkanFrameResources.MaxFramesInFlight;
     }
 
-    private Matrix4x4 ComputeViewProjection()
-    {
-        var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
-        var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
-        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY);
-        return view * proj;
-    }
-
     private static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image,
         VkImageLayout oldLayout, VkImageLayout newLayout,
         ulong srcStage, ulong srcAccess,
@@ -335,6 +327,22 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         };
 
         Vk.vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
+
+    private static Mesh LoadMesh(string path)
+    {
+        if (!File.Exists(path))
+        {
+            var altPath = Path.Combine(AppContext.BaseDirectory, path);
+            if (!File.Exists(altPath))
+            {
+                altPath = Path.Combine(AppContext.BaseDirectory, "Content", Path.GetFileName(path));
+                if (!File.Exists(altPath))
+                    throw new FileNotFoundException($"Mesh file not found: {path}");
+            }
+            return ObjLoader.Load(altPath, new Vector3(0.8f, 0.6f, 0.3f));
+        }
+        return ObjLoader.Load(path, new Vector3(0.8f, 0.6f, 0.3f));
     }
 
     private static byte[] LoadShader(string path)

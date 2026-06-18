@@ -1,4 +1,6 @@
+using System.Numerics;
 using Engine.Core;
+using Engine.Core.Components;
 using Engine.Graphics;
 using Engine.Graphics.Vulkan;
 using Flecs.NET.Core;
@@ -9,16 +11,30 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine — Vulkan Triangle (pure P/Invoke)...");
+        Console.WriteLine("Cortex Engine — Vulkan (pure P/Invoke)...");
 
         try
         {
             VulkanBackendRegistrar.EnsureRegistered();
             using var renderContext = RenderBackendFactory.Create("vulkan", 1280, 720, enableValidation: true);
             var window = renderContext.Window;
+            var input = window.Input;
             using var renderer = renderContext.CreateRenderer();
 
             using var world = World.Create();
+
+            var cameraEntity = world.Entity("Camera")
+                .Set(new Camera(
+                    new Vector3(0, 0, -6),
+                    new Vector3(0, 0, 0),
+                    Vector3.UnitY,
+                    MathF.PI / 4f,
+                    1280f / 720f,
+                    0.1f,
+                    100f));
+
+            var cameraController = new FreeFlyCameraController(cameraEntity);
+            Console.WriteLine("Camera: FreeFly (WASD + right-click mouse look, Q/E up/down, Shift boost)");
 
             var lastWidth = window.Width;
             var lastHeight = window.Height;
@@ -30,13 +46,19 @@ class Program
             {
                 timing.Tick();
                 window.PumpEvents();
+                input.BeginFrame();
 
                 if (window.Width != lastWidth || window.Height != lastHeight)
                 {
                     lastWidth = window.Width;
                     lastHeight = window.Height;
                     renderContext.Resize(lastWidth, lastHeight);
+                    ref var cam = ref cameraEntity.Ensure<Camera>();
+                    cam.AspectRatio = (float)lastWidth / lastHeight;
+                    cameraEntity.Set(cam);
                 }
+
+                cameraController.Update(input, (float)timing.DeltaTime);
 
                 renderer.RenderWorld(world);
 
