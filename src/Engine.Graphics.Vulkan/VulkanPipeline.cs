@@ -152,7 +152,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
 
             var pushConstantRange = new VkPushConstantRange
             {
-                stageFlags = VkShaderStageFlags.Vertex,
+            stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment,
                 offset = 0,
                 size = 64,
             };
