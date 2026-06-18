@@ -177,7 +177,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         // === SHADOW CUBEMAP PASSES (6 faces) ===
         TransitionImageLayoutDepth(cmd, _shadowMap.DepthImage,
             VkImageLayout.Undefined, VkImageLayout.DepthStencilAttachmentOptimal,
-            0, 0, 0x100, 0x200);
+            0, 0, 0x100, 0x200, 6);
 
         var lightPosVec = new Vector3(lightPos.X, lightPos.Y, lightPos.Z);
 
@@ -267,7 +267,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         // Transition shadow cubemap: depth attachment → shader read
         TransitionImageLayoutDepth(cmd, _shadowMap.DepthImage,
             VkImageLayout.DepthStencilAttachmentOptimal, VkImageLayout.ShaderReadOnlyOptimal,
-            0x100, 0x200, 0x8, 0x20);
+            0x100, 0x200, 0x8, 0x20, 6);
 
         // === MAIN PASS ===
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
@@ -478,7 +478,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private static void TransitionImageLayoutDepth(VkCommandBuffer cmd, VkImage image,
         VkImageLayout oldLayout, VkImageLayout newLayout,
         ulong srcStage, ulong srcAccess,
-        ulong dstStage, ulong dstAccess)
+        ulong dstStage, ulong dstAccess, uint layerCount = 1)
     {
         var barrier = new VkImageMemoryBarrier2
         {
@@ -494,7 +494,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             {
                 AspectMask = VkImageAspectFlags.Depth,
                 LevelCount = 1,
-                LayerCount = 1,
+                LayerCount = layerCount,
             },
         };
 
