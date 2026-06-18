@@ -191,11 +191,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         var angle = _totalTime * 0.2f;
         var rot = Matrix4x4.CreateRotationY(angle);
 
-        var model1 = Matrix4x4.CreateTranslation(-3f, 0, 0) * rot;
+        var model1 = Matrix4x4.CreateTranslation(-2f, 0, 0) * rot;
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model1);
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
 
-        var model2 = Matrix4x4.CreateTranslation(3f, 0, 0) * rot;
+        var model2 = Matrix4x4.CreateTranslation(2f, 0, 0) * rot;
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model2);
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
 
@@ -271,8 +271,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private Matrix4x4 ComputeViewProjection()
     {
         var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
-        var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI * 0.4f, aspect, 0.1f, 100f);
-        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -10), Vector3.Zero, Vector3.UnitY);
+        var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
+        proj.M22 *= -1;
+        proj.M33 = proj.M33 * 0.5f + 0.5f;
+        proj.M43 = proj.M43 * 0.5f + 0.5f;
+        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -5), Vector3.Zero, Vector3.UnitY);
         return view * proj;
     }
 
