@@ -323,7 +323,7 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
                 pDynamicStates = dynamicStates,
             };
 
-            var pushConstantRange = new VkPushConstantRange { stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, offset = 0, size = 160 };
+            var pushConstantRange = new VkPushConstantRange { stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, offset = 0, size = 176 };
 
             var layoutInfo = new VkPipelineLayoutCreateInfo
             {

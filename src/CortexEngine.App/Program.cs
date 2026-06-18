@@ -59,6 +59,7 @@ class Program
             CreateScene(world);
 
             var hasImGui = renderer.GetType().Name == "VulkanRenderer";
+            VulkanRenderer? vkRenderer = hasImGui ? (VulkanRenderer)renderer : null;
             if (hasImGui)
             {
                 ImGui.GetIO().DisplaySize = new System.Numerics.Vector2(window.Width, window.Height);
@@ -168,6 +169,62 @@ class Program
                     ImGui.Text($"Entities: {entityCount}");
                     ImGui.Text($"MCP: {(mcpPort > 0 ? $"port {mcpPort}" : "disabled")}");
                     ImGui.Text("WASD: move | RMB: look | Q/E: up/down | Shift: boost");
+                    ImGui.End();
+
+                    // Shadow parameters panel
+                    ImGui.Begin("Shadow Parameters");
+
+                    var lightEntity2 = world.Lookup("MainLight");
+                    if ((ulong)lightEntity2.Id != 0)
+                    {
+                        var lightComp = lightEntity2.Get<Light>();
+                        var intensity = lightComp.Intensity;
+                        var range = lightComp.Range;
+                        var colorR = lightComp.Color.X;
+                        var colorG = lightComp.Color.Y;
+                        var colorB = lightComp.Color.Z;
+
+                        ImGui.SliderFloat("Light Intensity", ref intensity, 0.0f, 100.0f, "%.1f");
+                        ImGui.SliderFloat("Light Range", ref range, 5.0f, 100.0f, "%.1f");
+                        ImGui.SliderFloat("Light R", ref colorR, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("Light G", ref colorG, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("Light B", ref colorB, 0.0f, 1.0f, "%.2f");
+                        ImGui.Separator();
+
+                        lightComp.Intensity = intensity;
+                        lightComp.Range = range;
+                        lightComp.Color = new Vector3(colorR, colorG, colorB);
+                        lightEntity2.Set(lightComp);
+                    }
+
+                    var bias = vkRenderer.ShadowBias;
+                    var sampleRadius = vkRenderer.ShadowSampleRadius;
+                    var farPlane = vkRenderer.ShadowFarPlane;
+
+                    ImGui.SliderFloat("Shadow Bias", ref bias, 0.001f, 0.5f, "%.4f");
+                    ImGui.SliderFloat("Sample Radius", ref sampleRadius, 0.001f, 0.1f, "%.4f");
+                    ImGui.SliderFloat("Far Plane", ref farPlane, 10.0f, 120.0f, "%.1f");
+                    ImGui.Separator();
+
+                    vkRenderer.ShadowBias = bias;
+                    vkRenderer.ShadowSampleRadius = sampleRadius;
+                    vkRenderer.ShadowFarPlane = farPlane;
+
+                    ImGui.Text($"Current: bias={bias:F4} radius={sampleRadius:F4} far={farPlane:F1}");
+
+                    if (ImGui.Button("Copy Parameters to Clipboard"))
+                    {
+                        var paramsText = $"bias={bias:F4}\nsampleRadius={sampleRadius:F4}\nfarPlane={farPlane:F1}\nshadowMapSize=2048";
+                        var lightEntity3 = world.Lookup("MainLight");
+                        if ((ulong)lightEntity3.Id != 0)
+                        {
+                            var lc = lightEntity3.Get<Light>();
+                            paramsText += $"\nlightIntensity={lc.Intensity:F1}\nlightRange={lc.Range:F1}\nlightColor=({lc.Color.X:F2},{lc.Color.Y:F2},{lc.Color.Z:F2})";
+                        }
+                        ImGui.SetClipboardText(paramsText);
+                        Console.WriteLine("[App] Parameters copied to clipboard:\n" + paramsText);
+                    }
+
                     ImGui.End();
 
                     renderer.EndImGuiFrame();

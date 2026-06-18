@@ -17,11 +17,11 @@ layout(push_constant) uniform PC {
     vec4 lightPos;
     vec4 lightColor;
     mat4 lightViewProj;
+    vec4 shadowParams; // x=bias, y=sampleRadius, z=farPlane, w=unused
 } pc;
 
 const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
 const float PI = 3.14159265359;
-const float FAR_PLANE = 60.0;
 
 const vec3 POISSON_DISK[16] = vec3[16](
     vec3( 0.0000,  0.0000,  0.0000),
@@ -94,25 +94,27 @@ mat3 buildTangentBasis(vec3 dir)
 
 float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
 {
+    float bias = pc.shadowParams.x;
+    float sampleRadius = pc.shadowParams.y;
+    float farPlane = pc.shadowParams.z;
+
     vec3 dir = worldPos - lightPos;
     float dist = length(dir);
     vec3 dirNorm = normalize(dir);
 
-    // Slope-dependent bias: small base + larger at grazing angles
     float NdotL = max(dot(N, L), 0.0);
-    float bias = 0.08 + 0.15 * (1.0 - NdotL);
+    float slopeBias = bias + bias * 2.0 * (1.0 - NdotL);
 
-    // 16-tap Poisson disk PCF
     float shadow = 0.0;
     mat3 basis = buildTangentBasis(dirNorm);
-    float sampleRadius = clamp(0.015 * (dist / 20.0), 0.003, 0.05);
+    float radius = clamp(sampleRadius * (dist / 20.0), 0.001, 0.1);
 
     for (int i = 0; i < 16; i++)
     {
-        vec3 sampleDir = normalize(dirNorm + basis * (POISSON_DISK[i] * sampleRadius));
+        vec3 sampleDir = normalize(dirNorm + basis * (POISSON_DISK[i] * radius));
         float sampleDepth = texture(shadowCube, sampleDir).r;
-        float sampleMapped = sampleDepth * FAR_PLANE;
-        shadow += (dist - bias < sampleMapped) ? 1.0 : 0.0;
+        float sampleMapped = sampleDepth * farPlane;
+        shadow += (dist - slopeBias < sampleMapped) ? 1.0 : 0.0;
     }
     shadow /= 16.0;
 

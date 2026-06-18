@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreenshotProvider
+public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreenshotProvider
 {
     private readonly VulkanContext _ctx;
     private readonly VulkanSwapchain _swapchain;
@@ -24,10 +24,14 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private string? _screenshotPath;
     private float _totalTime;
 
+    public float ShadowBias { get; set; } = 0.08f;
+    public float ShadowSampleRadius { get; set; } = 0.015f;
+    public float ShadowFarPlane { get; set; } = 60.0f;
+
     public bool IsScreenshotRequested => _screenshotRequested;
     public IScreenshotProvider ScreenshotProvider => this;
 
-    public VulkanRenderer(VulkanContext ctx, VulkanSwapchain swapchain)
+    internal VulkanRenderer(VulkanContext ctx, VulkanSwapchain swapchain)
     {
         _ctx = ctx;
         _swapchain = swapchain;
@@ -266,7 +270,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
                 Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
                 Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
 
-                var pcData = stackalloc byte[160];
+                var pcData = stackalloc byte[176];
                 var modelCopy = dc.model;
                 System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
                 var lpCopy = lightPos;
@@ -275,8 +279,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
                 System.Buffer.MemoryCopy(&lcCopy, pcData + 80, 16, 16);
                 var lvpCopy = faceViewProj;
                 System.Buffer.MemoryCopy(&lvpCopy, pcData + 96, 64, 64);
+                var sp = new Vector4(ShadowBias, ShadowSampleRadius, ShadowFarPlane, 0);
+                System.Buffer.MemoryCopy(&sp, pcData + 160, 16, 16);
 
-                Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 160, pcData);
+                Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 176, pcData);
 
                 Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
             }
@@ -376,7 +382,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
 
             // Pack all push constants: model(64) + lightPos(16) + lightColor(16) + lightViewProj(64) = 160
-            var pcData = stackalloc byte[160];
+            var pcData = stackalloc byte[176];
             var modelCopy = dc.model;
             System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
             var lpCopy = lightPos;
@@ -385,8 +391,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             System.Buffer.MemoryCopy(&lcCopy, pcData + 80, 16, 16);
             var lvpCopy = lightViewProj;
             System.Buffer.MemoryCopy(&lvpCopy, pcData + 96, 64, 64);
+            var sp = new Vector4(ShadowBias, ShadowSampleRadius, ShadowFarPlane, 0);
+            System.Buffer.MemoryCopy(&sp, pcData + 160, 16, 16);
 
-            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 160, pcData);
+            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 176, pcData);
 
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }

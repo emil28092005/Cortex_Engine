@@ -8,10 +8,11 @@ layout(push_constant) uniform PC {
     vec4 lightPos;
     vec4 lightColor;
     mat4 lightViewProj;
+    vec4 shadowParams;
 } pc;
 
 void main() {
     vec3 toLight = fragPos - pc.lightPos.xyz;
     float dist = length(toLight);
-    outDepth = dist / 60.0;
+    outDepth = dist / pc.shadowParams.z;
 }
