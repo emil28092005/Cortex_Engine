@@ -14,16 +14,11 @@ layout(set = 0, binding = 0) uniform CameraUBO {
 
 void main()
 {
-    vec3 N = normalize(fragNormal);
-    vec3 toLight = pointLightPos.xyz - fragWorldPos;
-    float dist = length(toLight);
-    vec3 L = normalize(toLight);
-
-    float NdotL = max(dot(N, L), 0.0);
-    float atten = 1.0 / (1.0 + dist * dist * 0.1);
+    // Debug: just output the light position as color
+    vec3 lp = pointLightPos.xyz;
     float intensity = pointLightPos.w;
-
-    vec3 color = fragAlbedo * pointLightColor.xyz * NdotL * intensity * atten;
-
-    outColor = vec4(color, 1.0);
+    
+    // Map position to visible range
+    vec3 debugColor = lp * 0.1 + vec3(0.5);
+    outColor = vec4(debugColor * fragAlbedo, 1.0);
 }

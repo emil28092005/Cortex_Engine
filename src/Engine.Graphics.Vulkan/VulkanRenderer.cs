@@ -102,21 +102,13 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         // Pack UBO: mat4 vp (64 bytes) + vec4 lightPos (16) + vec4 lightColor (16) = 96 bytes
         var uboData = stackalloc byte[128];
-        {
-            var vpCopy = vp;
-            var src = &vpCopy;
-            System.Buffer.MemoryCopy(src, uboData, 64, 64);
-        }
-        {
-            var lpCopy = lightPos;
-            var src = &lpCopy;
-            System.Buffer.MemoryCopy(src, uboData + 64, 16, 16);
-        }
-        {
-            var lcCopy = lightColor;
-            var src = &lcCopy;
-            System.Buffer.MemoryCopy(src, uboData + 80, 16, 16);
-        }
+        var pFloat = (float*)uboData;
+        pFloat[0] = vp.M11; pFloat[1] = vp.M12; pFloat[2] = vp.M13; pFloat[3] = vp.M14;
+        pFloat[4] = vp.M21; pFloat[5] = vp.M22; pFloat[6] = vp.M23; pFloat[7] = vp.M24;
+        pFloat[8] = vp.M31; pFloat[9] = vp.M32; pFloat[10] = vp.M33; pFloat[11] = vp.M34;
+        pFloat[12] = vp.M41; pFloat[13] = vp.M42; pFloat[14] = vp.M43; pFloat[15] = vp.M44;
+        pFloat[16] = lightPos.X; pFloat[17] = lightPos.Y; pFloat[18] = lightPos.Z; pFloat[19] = lightPos.W;
+        pFloat[20] = lightColor.X; pFloat[21] = lightColor.Y; pFloat[22] = lightColor.Z; pFloat[23] = lightColor.W;
 
         var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)>();
 
