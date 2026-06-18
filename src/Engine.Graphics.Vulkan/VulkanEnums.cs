@@ -89,6 +89,7 @@ public enum VkFormat : int
     R8G8B8A8Srgb = 43,
     B8G8R8A8Srgb = 50,
     R32G32Sfloat = 103,
+    R32Sfloat = 100,
     R32G32B32Sfloat = 106,
     R32G32B32A32Sfloat = 109,
     D32Sfloat = 126,

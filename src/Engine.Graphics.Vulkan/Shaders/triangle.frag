@@ -21,6 +21,7 @@ layout(push_constant) uniform PC {
 
 const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
 const float PI = 3.14159265359;
+const float FAR_PLANE = 60.0;
 
 float distributionGGX(vec3 N, vec3 H, float roughness)
 {
@@ -67,14 +68,12 @@ float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
 {
     vec3 dir = worldPos - lightPos;
     float dist = length(dir);
-    vec3 dirNorm = dir / max(dist, 0.001);
+    vec3 dirNorm = normalize(dir);
 
-    // Sample cubemap: direction from light to fragment
     float closestDepth = texture(shadowCube, dirNorm).r;
-    // closestDepth is in [0,1], map to world distance
-    float mappedDepth = closestDepth * 60.0;
+    float mappedDepth = closestDepth * FAR_PLANE;
 
-    float bias = max(0.05 * (1.0 - dot(N, L)), 0.005);
+    float bias = 0.05;
     return dist - bias < mappedDepth ? 1.0 : 0.0;
 }
 
@@ -98,7 +97,6 @@ void main()
     float attenuation = pow(clamp(1.0 - dist / max(lightRange, 0.001), 0.0, 1.0), 2.0);
     vec3 radiance = lightColor * lightIntensity * attenuation;
 
-    // Shadow from cubemap
     float shadow = calcShadow(fragWorldPos, lightPos, N, L);
 
     vec3 H = normalize(V + L);

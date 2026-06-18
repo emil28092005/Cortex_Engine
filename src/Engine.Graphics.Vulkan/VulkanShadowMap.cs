@@ -6,11 +6,17 @@ namespace Engine.Graphics.Vulkan;
 internal sealed unsafe class VulkanShadowMap : IDisposable
 {
     public const uint ShadowMapSize = 1024;
+    public const float FarPlane = 60.0f;
+
+    public VkImage ColorImage;
+    public VkDeviceMemory ColorImageMemory;
+    public VkImageView CubeColorView;
+    public VkImageView[] FaceColorViews = new VkImageView[6];
 
     public VkImage DepthImage;
     public VkDeviceMemory DepthImageMemory;
-    public VkImageView CubeImageView;
-    public VkImageView[] FaceImageViews = new VkImageView[6];
+    public VkImageView[] FaceDepthViews = new VkImageView[6];
+
     public VkSampler ShadowSampler;
     public VkPipeline Pipeline;
     public VkPipelineLayout PipelineLayout;
@@ -25,16 +31,78 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
         _device = device;
         _ctx = ctx;
 
-        CreateShadowCubeImage();
+        CreateShadowImages();
         CreateShadowSampler();
         CreateShadowPipeline();
 
-        Console.WriteLine("[Vulkan] Shadow cubemap created (1024x1024x6 D32_SFLOAT)");
+        Console.WriteLine("[Vulkan] Shadow cubemap created (1024x1024x6, R32_SFLOAT + D32_SFLOAT)");
     }
 
-    private void CreateShadowCubeImage()
+    private void CreateShadowImages()
     {
-        var imageInfo = new VkImageCreateInfo
+        // Color cube (R32_SFLOAT) — stores linear distance
+        var colorInfo = new VkImageCreateInfo
+        {
+            sType = VkStructureType.ImageCreateInfo,
+            flags = (uint)VkImageCreateFlags.CubeCompatible,
+            imageType = VkImageType.Type2D,
+            format = VkFormat.R32Sfloat,
+            extent = new VkExtent3D { Width = ShadowMapSize, Height = ShadowMapSize, Depth = 1 },
+            mipLevels = 1,
+            arrayLayers = 6,
+            samples = VkSampleCountFlags.Count1,
+            tiling = VkImageTiling.Optimal,
+            usage = VkImageUsageFlags.ColorAttachment | VkImageUsageFlags.Sampled,
+            sharingMode = VkSharingMode.Exclusive,
+            initialLayout = VkImageLayout.Undefined,
+        };
+
+        var colorImg = VkImage.Null;
+        Vk.vkCreateImage(_device, &colorInfo, 0, &colorImg);
+        ColorImage = colorImg;
+
+        var colorReqs = new VkMemoryRequirements();
+        Vk.vkGetImageMemoryRequirements(_device, ColorImage, &colorReqs);
+        var colorMemType = _ctx.FindMemoryType(colorReqs.memoryTypeBits, VkMemoryPropertyFlags.DeviceLocal);
+        var colorAlloc = new VkMemoryAllocateInfo { sType = VkStructureType.MemoryAllocateInfo, allocationSize = colorReqs.size, memoryTypeIndex = colorMemType };
+        var colorMem = VkDeviceMemory.Null;
+        Vk.vkAllocateMemory(_device, &colorAlloc, 0, &colorMem);
+        ColorImageMemory = colorMem;
+        Vk.vkBindImageMemory(_device, ColorImage, ColorImageMemory, 0);
+
+        // Cube color view for sampling
+        var cubeColorViewInfo = new VkImageViewCreateInfo
+        {
+            sType = VkStructureType.ImageViewCreateInfo,
+            image = ColorImage,
+            viewType = VkImageViewType.TypeCube,
+            format = VkFormat.R32Sfloat,
+            components = new VkComponentMapping { R = VkComponentSwizzle.Identity, G = VkComponentSwizzle.Identity, B = VkComponentSwizzle.Identity, A = VkComponentSwizzle.Identity },
+            subresourceRange = new VkImageSubresourceRange { AspectMask = VkImageAspectFlags.Color, BaseMipLevel = 0, LevelCount = 1, BaseArrayLayer = 0, LayerCount = 6 },
+        };
+        var cubeCV = VkImageView.Null;
+        Vk.vkCreateImageView(_device, &cubeColorViewInfo, 0, &cubeCV);
+        CubeColorView = cubeCV;
+
+        // 6 face color views
+        for (int i = 0; i < 6; i++)
+        {
+            var faceViewInfo = new VkImageViewCreateInfo
+            {
+                sType = VkStructureType.ImageViewCreateInfo,
+                image = ColorImage,
+                viewType = VkImageViewType.Type2D,
+                format = VkFormat.R32Sfloat,
+                components = new VkComponentMapping { R = VkComponentSwizzle.Identity, G = VkComponentSwizzle.Identity, B = VkComponentSwizzle.Identity, A = VkComponentSwizzle.Identity },
+                subresourceRange = new VkImageSubresourceRange { AspectMask = VkImageAspectFlags.Color, BaseMipLevel = 0, LevelCount = 1, BaseArrayLayer = (uint)i, LayerCount = 1 },
+            };
+            var fv = VkImageView.Null;
+            Vk.vkCreateImageView(_device, &faceViewInfo, 0, &fv);
+            FaceColorViews[i] = fv;
+        }
+
+        // Depth cube (D32_SFLOAT) — for depth testing during shadow render
+        var depthInfo = new VkImageCreateInfo
         {
             sType = VkStructureType.ImageCreateInfo,
             flags = (uint)VkImageCreateFlags.CubeCompatible,
@@ -45,50 +113,28 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
             arrayLayers = 6,
             samples = VkSampleCountFlags.Count1,
             tiling = VkImageTiling.Optimal,
-            usage = VkImageUsageFlags.DepthStencilAttachment | VkImageUsageFlags.Sampled,
+            usage = VkImageUsageFlags.DepthStencilAttachment,
             sharingMode = VkSharingMode.Exclusive,
             initialLayout = VkImageLayout.Undefined,
         };
 
-        var img = VkImage.Null;
-        Vk.vkCreateImage(_device, &imageInfo, 0, &img);
-        DepthImage = img;
+        var depthImg = VkImage.Null;
+        Vk.vkCreateImage(_device, &depthInfo, 0, &depthImg);
+        DepthImage = depthImg;
 
-        var reqs = new VkMemoryRequirements();
-        Vk.vkGetImageMemoryRequirements(_device, DepthImage, &reqs);
-        var memTypeIndex = _ctx.FindMemoryType(reqs.memoryTypeBits, VkMemoryPropertyFlags.DeviceLocal);
-
-        var allocInfo = new VkMemoryAllocateInfo
-        {
-            sType = VkStructureType.MemoryAllocateInfo,
-            allocationSize = reqs.size,
-            memoryTypeIndex = memTypeIndex,
-        };
-
-        var mem = VkDeviceMemory.Null;
-        Vk.vkAllocateMemory(_device, &allocInfo, 0, &mem);
-        DepthImageMemory = mem;
+        var depthReqs = new VkMemoryRequirements();
+        Vk.vkGetImageMemoryRequirements(_device, DepthImage, &depthReqs);
+        var depthMemType = _ctx.FindMemoryType(depthReqs.memoryTypeBits, VkMemoryPropertyFlags.DeviceLocal);
+        var depthAlloc = new VkMemoryAllocateInfo { sType = VkStructureType.MemoryAllocateInfo, allocationSize = depthReqs.size, memoryTypeIndex = depthMemType };
+        var depthMem = VkDeviceMemory.Null;
+        Vk.vkAllocateMemory(_device, &depthAlloc, 0, &depthMem);
+        DepthImageMemory = depthMem;
         Vk.vkBindImageMemory(_device, DepthImage, DepthImageMemory, 0);
 
-        // Cube view for sampling
-        var cubeViewInfo = new VkImageViewCreateInfo
-        {
-            sType = VkStructureType.ImageViewCreateInfo,
-            image = DepthImage,
-            viewType = VkImageViewType.TypeCube,
-            format = VkFormat.D32Sfloat,
-            components = new VkComponentMapping { R = VkComponentSwizzle.Identity, G = VkComponentSwizzle.Identity, B = VkComponentSwizzle.Identity, A = VkComponentSwizzle.Identity },
-            subresourceRange = new VkImageSubresourceRange { AspectMask = VkImageAspectFlags.Depth, BaseMipLevel = 0, LevelCount = 1, BaseArrayLayer = 0, LayerCount = 6 },
-        };
-
-        var cubeView = VkImageView.Null;
-        Vk.vkCreateImageView(_device, &cubeViewInfo, 0, &cubeView);
-        CubeImageView = cubeView;
-
-        // 6 face views for rendering
+        // 6 face depth views
         for (int i = 0; i < 6; i++)
         {
-            var faceViewInfo = new VkImageViewCreateInfo
+            var faceDepthViewInfo = new VkImageViewCreateInfo
             {
                 sType = VkStructureType.ImageViewCreateInfo,
                 image = DepthImage,
@@ -97,10 +143,9 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
                 components = new VkComponentMapping { R = VkComponentSwizzle.Identity, G = VkComponentSwizzle.Identity, B = VkComponentSwizzle.Identity, A = VkComponentSwizzle.Identity },
                 subresourceRange = new VkImageSubresourceRange { AspectMask = VkImageAspectFlags.Depth, BaseMipLevel = 0, LevelCount = 1, BaseArrayLayer = (uint)i, LayerCount = 1 },
             };
-
-            var faceView = VkImageView.Null;
-            Vk.vkCreateImageView(_device, &faceViewInfo, 0, &faceView);
-            FaceImageViews[i] = faceView;
+            var fdv = VkImageView.Null;
+            Vk.vkCreateImageView(_device, &faceDepthViewInfo, 0, &fdv);
+            FaceDepthViews[i] = fdv;
         }
     }
 
@@ -233,12 +278,18 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
                 stencilTestEnable = VkBool32.False,
             };
 
+            var blendAttachment = new VkPipelineColorBlendAttachmentState
+            {
+                blendEnable = VkBool32.False,
+                colorWriteMask = VkColorComponentFlags.R,
+            };
+
             var colorBlendState = new VkPipelineColorBlendStateCreateInfo
             {
                 sType = VkStructureType.PipelineColorBlendStateCreateInfo,
                 logicOpEnable = VkBool32.False,
-                attachmentCount = 0,
-                pAttachments = null,
+                attachmentCount = 1,
+                pAttachments = &blendAttachment,
             };
 
             var dynamicStates = stackalloc VkDynamicState[3];
@@ -267,12 +318,13 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
             Vk.vkCreatePipelineLayout(_device, &layoutInfo, 0, &pl);
             PipelineLayout = pl;
 
+            var colorFormat = VkFormat.R32Sfloat;
             var depthFormat = VkFormat.D32Sfloat;
             var renderingInfo = new VkPipelineRenderingCreateInfo
             {
                 sType = VkStructureType.PipelineRenderingCreateInfo,
-                colorAttachmentCount = 0,
-                pColorAttachmentFormats = null,
+                colorAttachmentCount = 1,
+                pColorAttachmentFormats = &colorFormat,
                 depthAttachmentFormat = depthFormat,
             };
 
@@ -344,9 +396,14 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
         if (PipelineLayout.Handle != 0) Vk.vkDestroyPipelineLayout(_device, PipelineLayout, 0);
         if (VertModule.Handle != 0) Vk.vkDestroyShaderModule(_device, VertModule, 0);
         if (ShadowSampler.Handle != 0) Vk.vkDestroySampler(_device, ShadowSampler, 0);
-        if (CubeImageView.Handle != 0) Vk.vkDestroyImageView(_device, CubeImageView, 0);
+        if (CubeColorView.Handle != 0) Vk.vkDestroyImageView(_device, CubeColorView, 0);
         for (int i = 0; i < 6; i++)
-            if (FaceImageViews[i].Handle != 0) Vk.vkDestroyImageView(_device, FaceImageViews[i], 0);
+        {
+            if (FaceColorViews[i].Handle != 0) Vk.vkDestroyImageView(_device, FaceColorViews[i], 0);
+            if (FaceDepthViews[i].Handle != 0) Vk.vkDestroyImageView(_device, FaceDepthViews[i], 0);
+        }
+        if (ColorImage.Handle != 0) Vk.vkDestroyImage(_device, ColorImage, 0);
+        if (ColorImageMemory.Handle != 0) Vk.vkFreeMemory(_device, ColorImageMemory, 0);
         if (DepthImage.Handle != 0) Vk.vkDestroyImage(_device, DepthImage, 0);
         if (DepthImageMemory.Handle != 0) Vk.vkFreeMemory(_device, DepthImageMemory, 0);
     }

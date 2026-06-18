@@ -9,6 +9,10 @@ layout(push_constant) uniform PC {
     mat4 lightViewProj;
 } pc;
 
+layout(location = 0) out vec3 fragPos;
+
 void main() {
-    gl_Position = pc.lightViewProj * pc.model * vec4(inPosition, 1.0);
+    vec4 worldPos = pc.model * vec4(inPosition, 1.0);
+    fragPos = worldPos.xyz;
+    gl_Position = pc.lightViewProj * worldPos;
 }

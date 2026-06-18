@@ -43,7 +43,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         _shadowMap = new VulkanShadowMap(ctx.Device, ctx, _pipeline.DescriptorSetLayout);
 
         for (int i = 0; i < VulkanFrameResources.MaxFramesInFlight; i++)
-            _frameResources.UpdateShadowDescriptor(i, _shadowMap.ShadowSampler, _shadowMap.CubeImageView);
+            _frameResources.UpdateShadowDescriptor(i, _shadowMap.ShadowSampler, _shadowMap.CubeColorView);
 
         _imGui = new VulkanImGui(ctx, _frameResources.CommandPool, swapchain.Format, swapchain.DepthFormat);
     }
@@ -175,6 +175,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         Vk.vkBeginCommandBuffer(cmd, &beginInfo);
 
         // === SHADOW CUBEMAP PASSES (6 faces) ===
+        // Transition color cube: Undefined → ColorAttachmentOptimal
+        TransitionImageLayout(cmd, _shadowMap.ColorImage,
+            VkImageLayout.Undefined, VkImageLayout.ColorAttachmentOptimal,
+            0, 0, 0x400, 0x100, 6);
+        // Transition depth cube: Undefined → DepthStencilAttachmentOptimal
         TransitionImageLayoutDepth(cmd, _shadowMap.DepthImage,
             VkImageLayout.Undefined, VkImageLayout.DepthStencilAttachmentOptimal,
             0, 0, 0x100, 0x200, 6);
@@ -186,6 +191,21 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             var (faceView, faceProj) = VulkanShadowMap.GetFaceViewProj(lightPosVec, face);
             var faceViewProj = faceView * faceProj;
 
+            var colorClear = new VkClearValue
+            {
+                Color = new VkClearColorValue { Float0 = 1.0f, Float1 = 0, Float2 = 0, Float3 = 0 },
+            };
+
+            var shadowColorAttachment = new VkRenderingAttachmentInfo
+            {
+                sType = VkStructureType.RenderingAttachmentInfo,
+                imageView = _shadowMap.FaceColorViews[face],
+                imageLayout = VkImageLayout.ColorAttachmentOptimal,
+                loadOp = VkAttachmentLoadOp.Clear,
+                storeOp = VkAttachmentStoreOp.Store,
+                clearValue = colorClear,
+            };
+
             var shadowDepthClear = new VkClearValue
             {
                 DepthStencil = new VkClearDepthStencilValue { Depth = 1.0f, Stencil = 0 },
@@ -194,7 +214,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             var shadowDepthAttachment = new VkRenderingAttachmentInfo
             {
                 sType = VkStructureType.RenderingAttachmentInfo,
-                imageView = _shadowMap.FaceImageViews[face],
+                imageView = _shadowMap.FaceDepthViews[face],
                 imageLayout = VkImageLayout.DepthStencilAttachmentOptimal,
                 loadOp = VkAttachmentLoadOp.Clear,
                 storeOp = VkAttachmentStoreOp.Store,
@@ -210,8 +230,8 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
                     Extent = new VkExtent2D { Width = VulkanShadowMap.ShadowMapSize, Height = VulkanShadowMap.ShadowMapSize },
                 },
                 layerCount = 1,
-                colorAttachmentCount = 0,
-                pColorAttachments = null,
+                colorAttachmentCount = 1,
+                pColorAttachments = &shadowColorAttachment,
                 pDepthAttachment = &shadowDepthAttachment,
             };
 
@@ -264,10 +284,10 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             Vk.vkCmdEndRendering(cmd);
         }
 
-        // Transition shadow cubemap: depth attachment → shader read
-        TransitionImageLayoutDepth(cmd, _shadowMap.DepthImage,
-            VkImageLayout.DepthStencilAttachmentOptimal, VkImageLayout.ShaderReadOnlyOptimal,
-            0x100, 0x200, 0x8, 0x20, 6);
+        // Transition shadow color cube: ColorAttachmentOptimal → ShaderReadOnlyOptimal
+        TransitionImageLayout(cmd, _shadowMap.ColorImage,
+            VkImageLayout.ColorAttachmentOptimal, VkImageLayout.ShaderReadOnlyOptimal,
+            0x400, 0x100, 0x8, 0x20, 6);
 
         // === MAIN PASS ===
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
@@ -445,7 +465,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image,
         VkImageLayout oldLayout, VkImageLayout newLayout,
         ulong srcStage, ulong srcAccess,
-        ulong dstStage, ulong dstAccess)
+        ulong dstStage, ulong dstAccess, uint layerCount = 1)
     {
         var barrier = new VkImageMemoryBarrier2
         {
@@ -461,7 +481,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             {
                 AspectMask = VkImageAspectFlags.Color,
                 LevelCount = 1,
-                LayerCount = 1,
+                LayerCount = layerCount,
             },
         };
 
