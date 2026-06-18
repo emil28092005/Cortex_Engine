@@ -18,9 +18,9 @@ void main() {
     float c = cos(pc.angle);
     float s = sin(pc.angle);
     vec3 rotated = vec3(
-        inPosition.x * c - inPosition.y * s,
-        inPosition.x * s + inPosition.y * c,
-        inPosition.z
+        inPosition.x * c - inPosition.z * s,
+        inPosition.y,
+        inPosition.x * s + inPosition.z * c
     );
     gl_Position = vp * vec4(rotated, 1.0);
     fragColor = inColor;
