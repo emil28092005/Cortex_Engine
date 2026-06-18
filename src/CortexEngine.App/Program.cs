@@ -70,6 +70,7 @@ class Program
             var frames = 0;
             var lastFpsTime = 0.0;
             var timing = new Timing();
+            var totalTime = 0.0f;
 
             while (!window.ShouldClose)
             {
@@ -111,6 +112,7 @@ class Program
                 }
 
                 cameraController.Update(input, (float)timing.DeltaTime);
+                totalTime += (float)timing.DeltaTime;
 
                 var toInit = new List<(Entity, RigidBody, Transform)>();
                 world.Each((Entity e, ref RigidBody rb, ref Transform t) =>
@@ -129,6 +131,19 @@ class Program
 
                 physicsWorld.Update((float)timing.DeltaTime);
                 physicsWorld.SyncTransforms(world);
+
+                // Move light in a chaotic circle
+                var lightEntity = world.Lookup("MainLight");
+                if ((ulong)lightEntity.Id != 0)
+                {
+                    var t = totalTime;
+                    var lx = MathF.Sin(t * 0.7f) * 8f + MathF.Cos(t * 0.3f) * 3f;
+                    var ly = 12f + MathF.Sin(t * 0.5f) * 5f;
+                    var lz = MathF.Cos(t * 0.6f) * 8f + MathF.Sin(t * 0.4f) * 3f;
+                    var lt = lightEntity.Get<Transform>();
+                    lt.Position = new Vector3(lx, ly, lz);
+                    lightEntity.Set(lt);
+                }
 
                 var processed = queue.ProcessPending();
                 if (processed > 0)
