@@ -102,7 +102,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 depthClampEnable = VkBool32.False,
                 rasterizerDiscardEnable = VkBool32.False,
                 polygonMode = VkPolygonMode.Fill,
-                cullMode = VkCullModeFlags.Back,
+                cullMode = VkCullModeFlags.None,
                 frontFace = VkFrontFace.CounterClockwise,
                 depthBiasEnable = VkBool32.False,
                 lineWidth = 1.0f,

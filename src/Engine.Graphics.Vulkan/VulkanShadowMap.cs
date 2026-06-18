@@ -275,7 +275,7 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
                 depthClampEnable = VkBool32.False,
                 rasterizerDiscardEnable = VkBool32.False,
                 polygonMode = VkPolygonMode.Fill,
-                cullMode = VkCullModeFlags.Back,
+                cullMode = VkCullModeFlags.None,
                 frontFace = VkFrontFace.CounterClockwise,
                 depthBiasEnable = VkBool32.True,
                 lineWidth = 1.0f,
