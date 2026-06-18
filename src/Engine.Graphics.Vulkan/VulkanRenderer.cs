@@ -77,17 +77,28 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY) * proj;
         }
 
-        // Collect point light from ECS (first point light found)
+        // Collect point light from ECS — prefer light attached to a moving entity
         var lightPos = new Vector4(0, 5, 0, 0);
         var lightColor = new Vector4(1, 1, 1, 0);
-        world.Each((Entity e, ref Light l) =>
+        world.Each((Entity e, ref Light l, ref Transform lt) =>
         {
             if (l.IsPoint && lightPos.W == 0)
             {
-                lightPos = new Vector4(l.Position, l.Intensity);
+                lightPos = new Vector4(lt.Position, l.Intensity);
                 lightColor = new Vector4(l.Color, l.Range);
             }
         });
+        if (lightPos.W == 0)
+        {
+            world.Each((Entity e, ref Light l) =>
+            {
+                if (l.IsPoint && lightPos.W == 0)
+                {
+                    lightPos = new Vector4(l.Position, l.Intensity);
+                    lightColor = new Vector4(l.Color, l.Range);
+                }
+            });
+        }
 
         // Pack UBO: mat4 vp (64 bytes) + vec4 lightPos (16) + vec4 lightColor (16) = 96 bytes
         var uboData = stackalloc byte[128];

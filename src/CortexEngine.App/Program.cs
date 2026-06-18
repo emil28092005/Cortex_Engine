@@ -268,6 +268,13 @@ class Program
             .Set(new Transform(new Vector3(0, 8, 0), Quaternion.Identity, Vector3.One))
             .Set(Light.Point(new Vector3(0, 8, 0), new Vector3(1.0f, 0.9f, 0.7f), intensity: 15.0f, range: 25.0f));
 
+        var lightSphere = ProceduralMesh.CreateSphere(0.5f, 24, 12, new Vector3(1.0f, 0.9f, 0.7f));
+        world.Entity("LightBall")
+            .Set(new Transform(new Vector3(0, 15, 0), Quaternion.Identity, Vector3.One))
+            .Set(lightSphere)
+            .Set(RigidBody.DynamicSphere(0.5f, mass: 0.5f))
+            .Set(Light.Point(new Vector3(0, 15, 0), new Vector3(1.0f, 0.9f, 0.7f), intensity: 20.0f, range: 30.0f));
+
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
         Console.WriteLine($"[Scene] {entityCount} entities: torus knot + 4 dynamic cubes + 3 dynamic spheres + static floor + grid");
