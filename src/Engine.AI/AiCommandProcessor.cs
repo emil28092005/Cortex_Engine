@@ -79,8 +79,11 @@ public sealed class AiCommandProcessor
 
     private AiCommandResult SpawnModel(SpawnModelCommand command)
     {
+        var isSphere = command.Shape == "sphere" ||
+                       command.ModelPath.Contains("sphere", StringComparison.OrdinalIgnoreCase);
+
         Mesh mesh;
-        if (command.Shape == "sphere")
+        if (isSphere)
         {
             var r = MathF.Max(MathF.Max(command.Scale.X, command.Scale.Y), command.Scale.Z) * 0.5f;
             mesh = ProceduralMesh.CreateSphere(r, 24, 12, new Vector3(0.5f, 0.6f, 0.9f));
@@ -97,7 +100,7 @@ public sealed class AiCommandProcessor
         if (command.Physics)
         {
             var maxScale = MathF.Max(MathF.Max(command.Scale.X, command.Scale.Y), command.Scale.Z);
-            if (command.Shape == "sphere")
+            if (isSphere)
             {
                 entity.Set(RigidBody.DynamicSphere(maxScale * 0.5f, mass: maxScale * 2f));
             }
@@ -107,7 +110,7 @@ public sealed class AiCommandProcessor
             }
         }
 
-        return AiCommandResult.Ok($"Spawned entity '{command.Name}' with shape '{command.Shape}' (id {(ulong)entity.Id}).");
+        return AiCommandResult.Ok($"Spawned entity '{command.Name}' ({(isSphere ? "sphere" : "cube")}) (id {(ulong)entity.Id}).");
     }
 
     private AiCommandResult SetTransform(SetTransformCommand command)
