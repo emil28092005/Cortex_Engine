@@ -17,6 +17,7 @@ layout(row_major, push_constant) uniform PC {
 
 void main() {
     gl_Position = vp * pc.model * vec4(inPosition, 1.0);
+    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;
     fragColor = inColor;
     fragNormal = mat3(pc.model) * inNormal;
 }

@@ -118,8 +118,8 @@ internal sealed unsafe class VulkanPipeline : IDisposable
             var depthStencilState = new VkPipelineDepthStencilStateCreateInfo
             {
                 sType = VkStructureType.PipelineDepthStencilStateCreateInfo,
-                depthTestEnable = VkBool32.True,
-                depthWriteEnable = VkBool32.True,
+                depthTestEnable = VkBool32.False,
+                depthWriteEnable = VkBool32.False,
                 depthCompareOp = VkCompareOp.Less,
                 depthBoundsTestEnable = VkBool32.False,
                 stencilTestEnable = VkBool32.False,
