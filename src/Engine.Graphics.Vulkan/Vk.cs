@@ -64,6 +64,7 @@ internal static unsafe class Vk
     public delegate void VkCmdDraw(VkCommandBuffer commandBuffer, uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance);
     public delegate void VkCmdDrawIndexed(VkCommandBuffer commandBuffer, uint indexCount, uint instanceCount, uint firstIndex, int vertexOffset, uint firstInstance);
     public delegate void VkCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer, ulong offset, int indexType);
+    public delegate void VkCmdSetDepthBias(VkCommandBuffer commandBuffer, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor);
     public delegate void VkCmdBeginRendering(VkCommandBuffer commandBuffer, VkRenderingInfo* pRenderingInfo);
     public delegate void VkCmdEndRendering(VkCommandBuffer commandBuffer);
     public delegate void VkCmdPipelineBarrier2(VkCommandBuffer commandBuffer, VkDependencyInfo* pDependencyInfo);
@@ -148,6 +149,7 @@ internal static unsafe class Vk
     public static VkCmdDraw vkCmdDraw;
     public static VkCmdDrawIndexed vkCmdDrawIndexed;
     public static VkCmdBindIndexBuffer vkCmdBindIndexBuffer;
+    public static VkCmdSetDepthBias vkCmdSetDepthBias;
     public static VkCmdBeginRendering vkCmdBeginRendering;
     public static VkCmdEndRendering vkCmdEndRendering;
     public static VkCmdPipelineBarrier2 vkCmdPipelineBarrier2;
@@ -239,6 +241,7 @@ internal static unsafe class Vk
         vkCmdDraw = LoadDev<VkCmdDraw>(p, "vkCmdDraw");
         vkCmdDrawIndexed = LoadDev<VkCmdDrawIndexed>(p, "vkCmdDrawIndexed");
         vkCmdBindIndexBuffer = LoadDev<VkCmdBindIndexBuffer>(p, "vkCmdBindIndexBuffer");
+        vkCmdSetDepthBias = LoadDev<VkCmdSetDepthBias>(p, "vkCmdSetDepthBias");
         vkCmdBeginRendering = LoadDev<VkCmdBeginRendering>(p, "vkCmdBeginRendering");
         vkCmdEndRendering = LoadDev<VkCmdEndRendering>(p, "vkCmdEndRendering");
         vkCmdPipelineBarrier2 = LoadDev<VkCmdPipelineBarrier2>(p, "vkCmdPipelineBarrier2");

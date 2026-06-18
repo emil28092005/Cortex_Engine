@@ -7,6 +7,7 @@ layout(location = 2) in vec3 inNormal;
 layout(location = 0) out vec3 fragWorldPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragAlbedo;
+layout(location = 3) out vec4 fragLightSpacePos;
 
 layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 vp;
@@ -16,13 +17,14 @@ layout(push_constant) uniform PC {
     mat4 model;
     vec4 lightPos;
     vec4 lightColor;
+    mat4 lightViewProj;
 } pc;
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
-    gl_Position = pc.model * vec4(inPosition, 1.0);
     gl_Position = vp * worldPos;
     fragWorldPos = worldPos.xyz;
     fragNormal = mat3(pc.model) * inNormal;
     fragAlbedo = inColor;
+    fragLightSpacePos = pc.lightViewProj * worldPos;
 }

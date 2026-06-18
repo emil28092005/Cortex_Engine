@@ -140,9 +140,15 @@ internal sealed unsafe class VulkanFrameResources : IDisposable
 
     private void CreateDescriptorPoolAndSets(VkDescriptorSetLayout layout)
     {
-        var poolSize = new VkDescriptorPoolSize
+        var poolSizes = stackalloc VkDescriptorPoolSize[2];
+        poolSizes[0] = new VkDescriptorPoolSize
         {
             type = VkDescriptorType.UniformBuffer,
+            descriptorCount = MaxFramesInFlight,
+        };
+        poolSizes[1] = new VkDescriptorPoolSize
+        {
+            type = VkDescriptorType.CombinedImageSampler,
             descriptorCount = MaxFramesInFlight,
         };
 
@@ -151,8 +157,8 @@ internal sealed unsafe class VulkanFrameResources : IDisposable
             sType = VkStructureType.DescriptorPoolCreateInfo,
             flags = VkDescriptorPoolCreateFlags.FreeDescriptorSet,
             maxSets = MaxFramesInFlight,
-            poolSizeCount = 1,
-            pPoolSizes = &poolSize,
+            poolSizeCount = 2,
+            pPoolSizes = poolSizes,
         };
 
         var descPool = VkDescriptorPool.Null;
@@ -202,6 +208,29 @@ internal sealed unsafe class VulkanFrameResources : IDisposable
 
             Vk.vkUpdateDescriptorSets(_device, 1, &write, 0, 0);
         }
+    }
+
+    public void UpdateShadowDescriptor(int frameIndex, VkSampler sampler, VkImageView shadowView)
+    {
+        var imageInfo = new VkDescriptorImageInfo
+        {
+            sampler = sampler,
+            imageView = shadowView,
+            imageLayout = VkImageLayout.ShaderReadOnlyOptimal,
+        };
+
+        var write = new VkWriteDescriptorSet
+        {
+            sType = VkStructureType.WriteDescriptorSet,
+            dstSet = DescriptorSets[frameIndex],
+            dstBinding = 1,
+            dstArrayElement = 0,
+            descriptorCount = 1,
+            descriptorType = VkDescriptorType.CombinedImageSampler,
+            pImageInfo = (nint)(&imageInfo),
+        };
+
+        Vk.vkUpdateDescriptorSets(_device, 1, &write, 0, 0);
     }
 
     public void UpdateUbo(int frameIndex, void* data, ulong size)

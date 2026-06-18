@@ -3,6 +3,7 @@
 layout(location = 0) in vec3 fragWorldPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragAlbedo;
+layout(location = 3) in vec4 fragLightSpacePos;
 
 layout(location = 0) out vec4 outColor;
 
@@ -10,10 +11,13 @@ layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 vp;
 };
 
+layout(set = 0, binding = 1) uniform sampler2D shadowMap;
+
 layout(push_constant) uniform PC {
     mat4 model;
     vec4 lightPos;
     vec4 lightColor;
+    mat4 lightViewProj;
 } pc;
 
 const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
@@ -60,6 +64,33 @@ vec3 acesTonemap(vec3 color)
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
 }
 
+float calcShadow(vec4 lightSpacePos, vec3 N, vec3 L)
+{
+    vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
+    projCoords = projCoords * 0.5 + 0.5;
+
+    if (projCoords.x < 0.0 || projCoords.x > 1.0) return 1.0;
+    if (projCoords.y < 0.0 || projCoords.y > 1.0) return 1.0;
+    if (projCoords.z > 1.0) return 1.0;
+
+    float bias = max(0.005 * (1.0 - dot(N, L)), 0.0005);
+    float currentDepth = projCoords.z;
+
+    // PCF 3x3
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / vec2(2048.0, 2048.0);
+    for (int x = -1; x <= 1; x++)
+    {
+        for (int y = -1; y <= 1; y++)
+        {
+            float closestDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > closestDepth ? 0.0 : 1.0;
+        }
+    }
+    shadow /= 9.0;
+    return shadow;
+}
+
 void main()
 {
     vec3 N = normalize(fragNormal);
@@ -67,8 +98,6 @@ void main()
     vec3 albedo = fragAlbedo;
     float roughness = 0.5;
     float metallic = 0.1;
-
-    vec3 color = AMBIENT * albedo;
 
     vec3 lightPos = pc.lightPos.xyz;
     float lightIntensity = pc.lightPos.w;
@@ -81,6 +110,9 @@ void main()
 
     float attenuation = pow(clamp(1.0 - dist / max(lightRange, 0.001), 0.0, 1.0), 2.0);
     vec3 radiance = lightColor * lightIntensity * attenuation;
+
+    // Shadow
+    float shadow = calcShadow(fragLightSpacePos, N, L);
 
     vec3 H = normalize(V + L);
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
@@ -97,7 +129,9 @@ void main()
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
     float NdotL = max(dot(N, L), 0.0);
-    color += (kD * albedo / PI + specular) * radiance * NdotL;
+    vec3 lighting = (kD * albedo / PI + specular) * radiance * NdotL * shadow;
+
+    vec3 color = AMBIENT * albedo + lighting;
 
     color = acesTonemap(color);
     color = pow(color, vec3(1.0 / 2.2));

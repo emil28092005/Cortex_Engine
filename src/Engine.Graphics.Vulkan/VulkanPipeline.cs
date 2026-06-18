@@ -150,7 +150,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 pDynamicStates = dynamicStates,
             };
 
-            var pushConstantRanges = stackalloc VkPushConstantRange[2];
+            var pushConstantRanges = stackalloc VkPushConstantRange[3];
             pushConstantRanges[0] = new VkPushConstantRange
             {
                 stageFlags = VkShaderStageFlags.Vertex,
@@ -163,6 +163,12 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 offset = 64,
                 size = 32,
             };
+            pushConstantRanges[2] = new VkPushConstantRange
+            {
+                stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment,
+                offset = 96,
+                size = 64,
+            };
 
             var descLayout = DescriptorSetLayout;
             var layoutInfo = new VkPipelineLayoutCreateInfo
@@ -170,7 +176,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
                 sType = VkStructureType.PipelineLayoutCreateInfo,
                 setLayoutCount = 1,
                 pSetLayouts = &descLayout,
-                pushConstantRangeCount = 2,
+                pushConstantRangeCount = 3,
                 pPushConstantRanges = (nint)pushConstantRanges,
             };
 
@@ -221,19 +227,27 @@ internal sealed unsafe class VulkanPipeline : IDisposable
 
     private void CreateDescriptorSetLayout()
     {
-        var binding = new VkDescriptorSetLayoutBinding
+        var bindings = stackalloc VkDescriptorSetLayoutBinding[2];
+        bindings[0] = new VkDescriptorSetLayoutBinding
         {
             binding = 0,
             descriptorType = VkDescriptorType.UniformBuffer,
             descriptorCount = 1,
             stageFlags = VkShaderStageFlags.Vertex,
         };
+        bindings[1] = new VkDescriptorSetLayoutBinding
+        {
+            binding = 1,
+            descriptorType = VkDescriptorType.CombinedImageSampler,
+            descriptorCount = 1,
+            stageFlags = VkShaderStageFlags.Fragment,
+        };
 
         var info = new VkDescriptorSetLayoutCreateInfo
         {
             sType = VkStructureType.DescriptorSetLayoutCreateInfo,
-            bindingCount = 1,
-            pBindings = &binding,
+            bindingCount = 2,
+            pBindings = bindings,
         };
 
         var descLayout = VkDescriptorSetLayout.Null;
