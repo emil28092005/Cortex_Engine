@@ -276,64 +276,9 @@ class Program
 
     static void CreateScene(World world)
     {
-        var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.9f, 0.7f, 0.3f));
-        var sphere = ProceduralMesh.CreateSphere(0.7f, 32, 16, new Vector3(0.3f, 0.6f, 0.9f));
         var grid = ProceduralMesh.CreateGrid(20, 1.0f, new Vector3(0.4f, 0.4f, 0.45f));
 
-        world.Entity("TorusKnot")
-            .Set(new Transform(new Vector3(0, 4f, 0), Quaternion.Identity, new Vector3(1.5f)))
-            .Set(torusKnot);
-
-        var cubes = new (string name, Vector3 pos, float scale, Vector3 color)[]
-        {
-            ("CubeLeft",   new(-5, 5, 0),   1.5f, new(0.8f, 0.2f, 0.2f)),
-            ("CubeRight",  new(5, 8, 0),    1.5f, new(0.2f, 0.8f, 0.3f)),
-            ("CubeFront",  new(0, 6, 5),    1.5f, new(0.2f, 0.4f, 0.9f)),
-            ("CubeBack",   new(0, 10, -5),  1.5f, new(0.9f, 0.9f, 0.2f)),
-        };
-
-        foreach (var (name, pos, scale, color) in cubes)
-        {
-            var c = LoadMesh("Content/cube.obj", color);
-            world.Entity(name)
-                .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
-                .Set(c)
-                .Set(RigidBody.DynamicBox(new Vector3(scale * 0.5f), mass: scale * 2f));
-        }
-
-        var spheres = new (string name, Vector3 pos)[]
-        {
-            ("Sphere1", new(-3, 7, -2)),
-            ("Sphere2", new(3, 9, 2)),
-            ("Sphere3", new(-2, 12, 3)),
-        };
-
-        foreach (var (name, pos) in spheres)
-        {
-            world.Entity(name)
-                .Set(new Transform(pos, Quaternion.Identity, Vector3.One))
-                .Set(sphere)
-                .Set(RigidBody.DynamicSphere(0.7f, mass: 1.5f));
-        }
-
-        var rand = new Random(42);
-        for (var i = 0; i < 50; i++)
-        {
-            var x = (float)(rand.NextDouble() * 16 - 8);
-            var y = (float)(rand.NextDouble() * 15 + 5);
-            var z = (float)(rand.NextDouble() * 16 - 8);
-            var r = 0.3f + (float)rand.NextDouble() * 0.5f;
-            var color = new Vector3(
-                0.3f + (float)rand.NextDouble() * 0.7f,
-                0.3f + (float)rand.NextDouble() * 0.7f,
-                0.3f + (float)rand.NextDouble() * 0.7f);
-            var ballMesh = ProceduralMesh.CreateSphere(r, 16, 8, color);
-            world.Entity($"Ball{i}")
-                .Set(new Transform(new Vector3(x, y, z), Quaternion.Identity, Vector3.One))
-                .Set(ballMesh)
-                .Set(RigidBody.DynamicSphere(r, mass: r * 2f));
-        }
-
+        // Floor
         world.Entity("Floor")
             .Set(new Transform(new Vector3(0, -0.5f, 0), Quaternion.Identity, new Vector3(20, 0.5f, 20)))
             .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)))
@@ -343,13 +288,87 @@ class Program
             .Set(new Transform(Vector3.Zero, Quaternion.Identity, Vector3.One))
             .Set(grid);
 
+        // Central torus knot (floating, no physics)
+        var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.9f, 0.7f, 0.3f));
+        world.Entity("TorusKnot")
+            .Set(new Transform(new Vector3(0, 8, 0), Quaternion.Identity, new Vector3(1.5f)))
+            .Set(torusKnot);
+
+        // Sphere pyramid (7 layers, physics)
+        var sphereMesh = LoadMesh("Content/sphere.obj", new Vector3(0.5f, 0.6f, 0.9f));
+        for (var layer = 0; layer < 7; layer++)
+        {
+            var count = 7 - layer;
+            var y = layer * 1.2f + 1;
+            for (var i = 0; i < count; i++)
+            {
+                var x = (i - (count - 1) * 0.5f) * 1.2f;
+                world.Entity($"Pyramid_{layer}_{i}")
+                    .Set(new Transform(new Vector3(x, y, 0), Quaternion.Identity, new Vector3(0.8f)))
+                    .Set(sphereMesh)
+                    .Set(RigidBody.DynamicSphere(0.4f, mass: 0.5f));
+            }
+        }
+
+        // Diamond rain (30 octahedrons, physics)
+        var diamondMesh = LoadMesh("Content/diamond.obj", new Vector3(0.9f, 0.1f, 0.9f));
+        var rand = new Random(123);
+        for (var i = 0; i < 30; i++)
+        {
+            var x = (float)(rand.NextDouble() * 20 - 10);
+            var y = (float)(rand.NextDouble() * 15 + 15);
+            var z = (float)(rand.NextDouble() * 20 - 10);
+            world.Entity($"Diamond{i}")
+                .Set(new Transform(new Vector3(x, y, z), Quaternion.Identity, new Vector3(0.8f)))
+                .Set(diamondMesh)
+                .Set(RigidBody.DynamicBox(new Vector3(0.4f), mass: 0.6f));
+        }
+
+        // Floating torus rings (decorative, no physics)
+        var torusMesh = LoadMesh("Content/torus.obj", new Vector3(0.2f, 0.8f, 0.3f));
+        for (var i = 0; i < 8; i++)
+        {
+            var angle = i * MathF.PI * 2 / 8;
+            var x = MathF.Cos(angle) * 8;
+            var z = MathF.Sin(angle) * 8;
+            var y = (i % 3) + 3;
+            world.Entity($"Torus{i}")
+                .Set(new Transform(new Vector3(x, y, z), Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle), new Vector3(2f)))
+                .Set(torusMesh);
+        }
+
+        // Pyramid decorations (4 corners, static)
+        var pyramidMesh = LoadMesh("Content/pyramid.obj", new Vector3(0.8f, 0.5f, 0.2f));
+        for (var i = 0; i < 4; i++)
+        {
+            var angle = i * MathF.PI * 2 / 4;
+            var x = MathF.Cos(angle) * 12;
+            var z = MathF.Sin(angle) * 12;
+            world.Entity($"Pyramid{i}")
+                .Set(new Transform(new Vector3(x, 0, z), Quaternion.Identity, new Vector3(2.5f)))
+                .Set(pyramidMesh);
+        }
+
+        // Cone pillars (4 diagonals, static)
+        var coneMesh = LoadMesh("Content/cone.obj", new Vector3(0.2f, 0.3f, 0.8f));
+        for (var i = 0; i < 4; i++)
+        {
+            var angle = i * MathF.PI * 2 / 4 + MathF.PI / 4;
+            var x = MathF.Cos(angle) * 10;
+            var z = MathF.Sin(angle) * 10;
+            world.Entity($"Cone{i}")
+                .Set(new Transform(new Vector3(x, 0, z), Quaternion.Identity, new Vector3(2f, 3f, 2f)))
+                .Set(coneMesh);
+        }
+
+        // Light
         world.Entity("MainLight")
             .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
             .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 15.0f, range: 60.0f));
 
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
-        Console.WriteLine($"[Scene] {entityCount} entities: torus knot + 4 dynamic cubes + 3 dynamic spheres + static floor + grid");
+        Console.WriteLine($"[Scene] {entityCount} entities: sphere pyramid + diamond rain + 8 torus rings + 4 pyramids + 4 cones + floor + grid + light");
     }
 
     static Mesh LoadMesh(string path, Vector3 color)
