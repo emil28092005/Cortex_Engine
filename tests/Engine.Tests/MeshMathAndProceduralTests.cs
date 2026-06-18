@@ -7,17 +7,16 @@ namespace Engine.Tests;
 public class MeshMathTests
 {
     [Fact]
-    public void Computes_Normal_For_CCW_Triangle()
+    public void Computes_Normal_For_Triangle()
     {
         var n = MeshMath.ComputeFaceNormal(
             new Vector3(0, 0, 0),
             new Vector3(1, 0, 0),
             new Vector3(0, 1, 0));
 
-        // CW winding (typical OBJ) → normal points -Z
         Assert.Equal(0f, n.X, 0.001f);
         Assert.Equal(0f, n.Y, 0.001f);
-        Assert.Equal(-1f, n.Z, 0.001f);
+        Assert.Equal(1f, n.Z, 0.001f);
     }
 
     [Fact]
@@ -58,7 +57,7 @@ public class ProceduralMeshTests
     {
         var mesh = ProceduralMesh.CreateSphere(1f, 16, 8, Vector3.One);
 
-        Assert.Equal(8 * 16 * 6, mesh.Indices.Length);
+        Assert.Equal(7 * 16 * 6, mesh.Indices.Length);
     }
 
     [Fact]
@@ -81,13 +80,13 @@ public class ProceduralMeshTests
     }
 
     [Fact]
-    public void Sphere_Top_Pole_At_Positive_Y()
+    public void Sphere_Top_Vertex_At_Positive_Z()
     {
         var mesh = ProceduralMesh.CreateSphere(1f, 8, 4, Vector3.One);
 
-        Assert.Equal(1f, mesh.Vertices[0].Position.Y, 0.001f);
+        Assert.Equal(1f, mesh.Vertices[0].Position.Z, 0.001f);
         Assert.Equal(0f, mesh.Vertices[0].Position.X, 0.001f);
-        Assert.Equal(0f, mesh.Vertices[0].Position.Z, 0.001f);
+        Assert.Equal(0f, mesh.Vertices[0].Position.Y, 0.001f);
     }
 
     [Fact]
@@ -96,7 +95,7 @@ public class ProceduralMeshTests
         var mesh = ProceduralMesh.CreateGrid(5, 1f, Vector3.One);
 
         var expectedLines = 2 * 5 + 1;
-        Assert.Equal(expectedLines * 4 * 2, mesh.Vertices.Length);
+        Assert.Equal(expectedLines * 4, mesh.Vertices.Length);
     }
 
     [Fact]

@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Engine.Core\Engine.Core.csproj" />
     <ProjectReference Include="..\..\src\Engine.Graphics\Engine.Graphics.csproj" />
+    <ProjectReference Include="..\..\src\Engine.Graphics.Vulkan\Engine.Graphics.Vulkan.csproj" />
     <ProjectReference Include="..\..\src\Engine.AI\Engine.AI.csproj" />
   </ItemGroup>
 
