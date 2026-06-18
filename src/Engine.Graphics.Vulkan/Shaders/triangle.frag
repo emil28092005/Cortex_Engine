@@ -17,7 +17,7 @@ layout(push_constant) uniform PC {
     vec4 lightPos;
     vec4 lightColor;
     mat4 lightViewProj;
-    vec4 shadowParams; // x=bias, y=sampleRadius, z=farPlane, w=unused
+    vec4 shadowParams;
 } pc;
 
 const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
@@ -137,6 +137,18 @@ void main()
     vec3 toLight = lightPos - fragWorldPos;
     float dist = length(toLight);
     vec3 L = toLight / max(dist, 0.001);
+
+    // Flip normal if it faces away from light (fixes inward normals from bad winding)
+    if (dot(N, L) < 0.0)
+    {
+        N = -N;
+    }
+
+    // Also flip for view direction if needed
+    if (dot(N, V) < 0.0)
+    {
+        N = -N;
+    }
 
     float attenuation = pow(clamp(1.0 - dist / max(lightRange, 0.001), 0.0, 1.0), 2.0);
     vec3 radiance = lightColor * lightIntensity * attenuation;
