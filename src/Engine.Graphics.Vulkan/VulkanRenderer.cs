@@ -34,25 +34,19 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         var vertSpv = LoadShader("Shaders/triangle.vert.spv");
         var fragSpv = LoadShader("Shaders/triangle.frag.spv");
 
-        _pipeline = new VulkanPipeline(ctx.Device, swapchain.Format, vertSpv, fragSpv);
+        _pipeline = new VulkanPipeline(ctx.Device, swapchain.Format, swapchain.DepthFormat, vertSpv, fragSpv);
 
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
 
-        var vertices = new Vertex[]
-        {
-            new(new Vector3(-0.5f, -0.5f, 0.0f), new Vector3(1.0f, 0.0f, 0.0f), new Vector3(0, 0, 1)),
-            new(new Vector3( 0.5f, -0.5f, 0.0f), new Vector3(0.0f, 1.0f, 0.0f), new Vector3(0, 0, 1)),
-            new(new Vector3( 0.0f,  0.5f, 0.0f), new Vector3(0.0f, 0.0f, 1.0f), new Vector3(0, 0, 1)),
-        };
-        var indices = new uint[] { 0, 1, 2 };
-        _indexCount = 3;
+        var mesh = LoadMesh("Content/cube.obj");
+        _indexCount = (uint)mesh.Indices.Length;
 
         _vertexBuffer = new VulkanVertexBuffer(ctx.Device, ctx.PhysicalDevice,
-            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, vertices);
+            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, mesh.Vertices);
 
         _indexBuffer = new VulkanIndexBuffer(ctx.Device, _frameResources.CommandPool,
-            ctx.GraphicsQueue, ctx, indices);
+            ctx.GraphicsQueue, ctx, mesh.Indices);
     }
 
     private static Mesh LoadMesh(string path)
@@ -115,6 +109,11 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             0, 0,
             0x400, 0x100);
 
+        TransitionImageLayoutDepth(cmd, _swapchain.DepthImage,
+            VkImageLayout.Undefined, VkImageLayout.DepthStencilAttachmentOptimal,
+            0, 0,
+            0x100, 0x200);
+
         var clearValue = new VkClearValue
         {
             Color = new VkClearColorValue { Float0 = 0.02f, Float1 = 0.02f, Float2 = 0.02f, Float3 = 1.0f },
@@ -135,6 +134,16 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             clearValue = clearValue,
         };
 
+        var depthAttachment = new VkRenderingAttachmentInfo
+        {
+            sType = VkStructureType.RenderingAttachmentInfo,
+            imageView = _swapchain.DepthImageView,
+            imageLayout = VkImageLayout.DepthStencilAttachmentOptimal,
+            loadOp = VkAttachmentLoadOp.Clear,
+            storeOp = VkAttachmentStoreOp.Store,
+            clearValue = depthClearValue,
+        };
+
         var renderingInfo = new VkRenderingInfo
         {
             sType = VkStructureType.RenderingInfo,
@@ -146,6 +155,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             layerCount = 1,
             colorAttachmentCount = 1,
             pColorAttachments = &colorAttachment,
+            pDepthAttachment = &depthAttachment,
         };
 
         Vk.vkCmdBeginRendering(cmd, &renderingInfo);
@@ -178,7 +188,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         Vk.vkCmdBindIndexBuffer(cmd, _indexBuffer.Buffer, 0, 1);
 
-        var angle = _totalTime;
+        float angle = 0.0f;
         Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 4, &angle);
 
         Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
@@ -256,8 +266,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     {
         var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
-        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -2), Vector3.Zero, Vector3.UnitY);
-        return view * proj;
+        var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -2), Vector3.Zero, Vector3.UnitY);        return view * proj;
     }
 
     private static void TransitionImageLayout(VkCommandBuffer cmd, VkImage image,
