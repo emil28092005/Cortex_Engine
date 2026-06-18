@@ -2,6 +2,7 @@ using System.Numerics;
 using Engine.Core;
 using Engine.Core.Components;
 using Engine.Graphics;
+using Engine.Graphics.Loaders;
 using Engine.Graphics.Vulkan;
 using Flecs.NET.Core;
 
@@ -11,7 +12,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine — Vulkan (pure P/Invoke)...");
+        Console.WriteLine("Cortex Engine — Vulkan ECS Scene (pure P/Invoke)...");
 
         try
         {
@@ -25,7 +26,7 @@ class Program
 
             var cameraEntity = world.Entity("Camera")
                 .Set(new Camera(
-                    new Vector3(0, 0, -6),
+                    new Vector3(0, 2, -8),
                     new Vector3(0, 0, 0),
                     Vector3.UnitY,
                     MathF.PI / 4f,
@@ -36,11 +37,38 @@ class Program
             var cameraController = new FreeFlyCameraController(cameraEntity);
             Console.WriteLine("Camera: FreeFly (WASD + right-click mouse look, Q/E up/down, Shift boost)");
 
+            var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.8f, 0.6f, 0.3f));
+            var cube = LoadMesh("Content/cube.obj", new Vector3(0.5f, 0.7f, 0.9f));
+
+            world.Entity("TorusKnot")
+                .Set(new Transform(Vector3.Zero, Quaternion.Identity, new Vector3(1.5f)))
+                .Set(torusKnot);
+
+            var cubePositions = new Vector3[]
+            {
+                new(-4, 0, 0),
+                new(4, 0, 0),
+                new(0, -3, 0),
+                new(0, 3, 0),
+                new(-3, 2, 3),
+                new(3, -2, -3),
+            };
+
+            for (var i = 0; i < cubePositions.Length; i++)
+            {
+                world.Entity($"Cube{i}")
+                    .Set(new Transform(cubePositions[i], Quaternion.Identity, new Vector3(1.5f)))
+                    .Set(cube);
+            }
+
+            Console.WriteLine($"[Scene] 1 torus knot + {cubePositions.Length} cubes");
+
             var lastWidth = window.Width;
             var lastHeight = window.Height;
             var frames = 0;
             var lastFpsTime = 0.0;
             var timing = new Timing();
+            var totalTime = 0.0f;
 
             while (!window.ShouldClose)
             {
@@ -59,6 +87,28 @@ class Program
                 }
 
                 cameraController.Update(input, (float)timing.DeltaTime);
+
+                totalTime += (float)timing.DeltaTime;
+                var angle = totalTime * 0.3f;
+
+                var torusEntity = world.Lookup("TorusKnot");
+                if ((ulong)torusEntity.Id != 0)
+                {
+                    var t = torusEntity.Get<Transform>();
+                    t.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle);
+                    torusEntity.Set(t);
+                }
+
+                for (var i = 0; i < cubePositions.Length; i++)
+                {
+                    var cubeEntity = world.Lookup($"Cube{i}");
+                    if ((ulong)cubeEntity.Id != 0)
+                    {
+                        var t = cubeEntity.Get<Transform>();
+                        t.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle * (1f + i * 0.2f));
+                        cubeEntity.Set(t);
+                    }
+                }
 
                 renderer.RenderWorld(world);
 
@@ -80,5 +130,21 @@ class Program
         }
 
         await Task.CompletedTask;
+    }
+
+    static Mesh LoadMesh(string path, Vector3 color)
+    {
+        if (!File.Exists(path))
+        {
+            var altPath = Path.Combine(AppContext.BaseDirectory, path);
+            if (!File.Exists(altPath))
+            {
+                altPath = Path.Combine(AppContext.BaseDirectory, "Content", Path.GetFileName(path));
+                if (!File.Exists(altPath))
+                    throw new FileNotFoundException($"Mesh file not found: {path}");
+            }
+            return ObjLoader.Load(altPath, color);
+        }
+        return ObjLoader.Load(path, color);
     }
 }

@@ -13,9 +13,8 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private readonly VulkanSwapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
     private readonly VulkanFrameResources _frameResources;
-    private readonly VulkanVertexBuffer _vertexBuffer;
-    private readonly VulkanIndexBuffer _indexBuffer;
-    private readonly uint _indexCount;
+
+    private readonly Dictionary<ulong, (VulkanVertexBuffer vb, VulkanIndexBuffer ib, uint indexCount)> _meshCache = new();
 
     private int _frameIndex;
     private bool _disposed;
@@ -38,15 +37,6 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
-
-        var mesh = LoadMesh("Content/torusknot.obj");
-        _indexCount = (uint)mesh.Indices.Length;
-
-        _vertexBuffer = new VulkanVertexBuffer(ctx.Device, ctx.PhysicalDevice,
-            _frameResources.CommandPool, ctx.GraphicsQueue, ctx, mesh.Vertices);
-
-        _indexBuffer = new VulkanIndexBuffer(ctx.Device, _frameResources.CommandPool,
-            ctx.GraphicsQueue, ctx, mesh.Indices);
     }
 
     public void RenderWorld(World world)
@@ -71,10 +61,28 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY) * proj;
         }
 
-        Render(vp);
+        var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)>();
+
+        world.Each((Entity e, ref Transform t, ref Mesh m) =>
+        {
+            var eid = (ulong)e.Id;
+            if (!_meshCache.TryGetValue(eid, out var entry))
+            {
+                var vb = new VulkanVertexBuffer(_ctx.Device, _ctx.PhysicalDevice,
+                    _frameResources.CommandPool, _ctx.GraphicsQueue, _ctx, m.Vertices);
+                var ib = new VulkanIndexBuffer(_ctx.Device, _frameResources.CommandPool,
+                    _ctx.GraphicsQueue, _ctx, m.Indices);
+                entry = (vb, ib, (uint)m.Indices.Length);
+                _meshCache[eid] = entry;
+            }
+
+            drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix()));
+        });
+
+        Render(vp, drawCalls);
     }
 
-    private void Render(Matrix4x4 vp)
+    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)> drawCalls)
     {
         _frameResources.WaitFrame(_frameIndex);
 
@@ -86,7 +94,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         {
             _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
                                 _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
-            Render(vp);
+            Render(vp, drawCalls);
             return;
         }
 
@@ -185,17 +193,17 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         Vk.vkCmdBindDescriptorSets(cmd, VkPipelineBindPoint.Graphics, _pipeline.PipelineLayout,
             0, 1, &descSet, 0, null);
 
-        var bufferHandle = _vertexBuffer.Buffer;
-        ulong offset = 0;
-        Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &bufferHandle, &offset);
+        foreach (var dc in drawCalls)
+        {
+            var vertexBuf = dc.vertexBuf;
+            ulong offset = 0;
+            Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
+            Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
 
-        Vk.vkCmdBindIndexBuffer(cmd, _indexBuffer.Buffer, 0, 1);
-
-        var angle = _totalTime * 0.2f;
-        var rot = Matrix4x4.CreateRotationY(angle);
-        var model = rot;
-        Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
-        Vk.vkCmdDrawIndexed(cmd, _indexCount, 1, 0, 0, 0);
+            var model = dc.model;
+            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
+            Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
+        }
 
         Vk.vkCmdEndRendering(cmd);
 
@@ -332,22 +340,6 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         Vk.vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
-    private static Mesh LoadMesh(string path)
-    {
-        if (!File.Exists(path))
-        {
-            var altPath = Path.Combine(AppContext.BaseDirectory, path);
-            if (!File.Exists(altPath))
-            {
-                altPath = Path.Combine(AppContext.BaseDirectory, "Content", Path.GetFileName(path));
-                if (!File.Exists(altPath))
-                    throw new FileNotFoundException($"Mesh file not found: {path}");
-            }
-            return ObjLoader.Load(altPath, new Vector3(0.8f, 0.6f, 0.3f));
-        }
-        return ObjLoader.Load(path, new Vector3(0.8f, 0.6f, 0.3f));
-    }
-
     private static byte[] LoadShader(string path)
     {
         if (!File.Exists(path))
@@ -390,8 +382,13 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         Vk.vkDeviceWaitIdle(_ctx.Device);
 
-        _vertexBuffer?.Dispose();
-        _indexBuffer?.Dispose();
+        foreach (var (vb, ib, _) in _meshCache.Values)
+        {
+            vb.Dispose();
+            ib.Dispose();
+        }
+        _meshCache.Clear();
+
         _frameResources?.Dispose();
         _pipeline?.Dispose();
     }
