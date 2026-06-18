@@ -6,6 +6,7 @@ using Engine.Graphics.Loaders;
 using Engine.Graphics.Vulkan;
 using Engine.Physics;
 using Flecs.NET.Core;
+using ImGuiNET;
 
 namespace CortexEngine.App;
 
@@ -40,6 +41,13 @@ class Program
             Console.WriteLine("Camera: FreeFly (WASD + right-click mouse look, Q/E up/down, Shift boost)");
 
             CreateScene(world);
+
+            var hasImGui = renderer.GetType().Name == "VulkanRenderer";
+            if (hasImGui)
+            {
+                ImGui.GetIO().DisplaySize = new System.Numerics.Vector2(window.Width, window.Height);
+                Console.WriteLine("[App] ImGui initialized.");
+            }
 
             var lastWidth = window.Width;
             var lastHeight = window.Height;
@@ -82,6 +90,30 @@ class Program
 
                 physicsWorld.Update((float)timing.DeltaTime);
                 physicsWorld.SyncTransforms(world);
+
+                if (hasImGui)
+                {
+                    renderer.BeginImGuiFrame();
+
+                    ImGui.Begin("Cortex Engine Debug");
+                    ImGui.Text($"FPS: {frames}");
+                    ImGui.Text($"Delta: {timing.DeltaTime * 1000.0:F2} ms");
+
+                    var cam = cameraEntity.Get<Camera>();
+                    ImGui.Separator();
+                    ImGui.Text($"Camera Pos: ({cam.Position.X:F2}, {cam.Position.Y:F2}, {cam.Position.Z:F2})");
+                    ImGui.Text($"Camera Target: ({cam.Target.X:F2}, {cam.Target.Y:F2}, {cam.Target.Z:F2})");
+                    ImGui.Separator();
+
+                    var entityCount = 0;
+                    world.Each((Entity e, ref Transform _) => entityCount++);
+                    ImGui.Text($"Entities: {entityCount}");
+                    ImGui.Text("WASD: move | RMB: look | Q/E: up/down | Shift: boost");
+                    ImGui.End();
+
+                    renderer.EndImGuiFrame();
+                }
+
                 renderer.RenderWorld(world);
 
                 frames++;

@@ -55,6 +55,7 @@ public enum VkStructureType : int
     PipelineDynamicStateCreateInfo = 27,
     GraphicsPipelineCreateInfo = 28,
     PipelineLayoutCreateInfo = 30,
+    SamplerCreateInfo = 31,
     RenderPassCreateInfo = 38,
     CommandPoolCreateInfo = 39,
     CommandBufferAllocateInfo = 40,
@@ -231,6 +232,26 @@ public enum VkImageTiling : int
 {
     Optimal = 0,
     Linear = 1,
+}
+
+public enum VkFilter : int
+{
+    Nearest = 0,
+    Linear = 1,
+}
+
+public enum VkSamplerMipmapMode : int
+{
+    Nearest = 0,
+    Linear = 1,
+}
+
+public enum VkSamplerAddressMode : int
+{
+    Repeat = 0,
+    MirroredRepeat = 1,
+    ClampToEdge = 2,
+    ClampToBorder = 3,
 }
 
 public enum VkBlendFactor : int

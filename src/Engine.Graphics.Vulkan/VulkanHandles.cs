@@ -44,3 +44,5 @@ public struct VkDescriptorSetLayout { public nint Handle; public static readonly
 public struct VkDescriptorPool { public nint Handle; public static readonly VkDescriptorPool Null = new() { Handle = 0 }; }
 [StructLayout(LayoutKind.Sequential)]
 public struct VkDescriptorSet { public nint Handle; public static readonly VkDescriptorSet Null = new() { Handle = 0 }; }
+[StructLayout(LayoutKind.Sequential)]
+public struct VkSampler { public nint Handle; public static readonly VkSampler Null = new() { Handle = 0 }; }

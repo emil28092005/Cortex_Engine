@@ -958,6 +958,57 @@ public unsafe struct VkImageCreateInfo
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkImageSubresourceLayers
+{
+    public VkImageAspectFlags aspectMask;
+    public uint mipLevel;
+    public uint baseArrayLayer;
+    public uint layerCount;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkBufferImageCopyRegion
+{
+    public ulong bufferOffset;
+    public uint bufferRowLength;
+    public uint bufferImageHeight;
+    public VkImageSubresourceLayers imageSubresource;
+    public VkOffset3D imageOffset;
+    public VkExtent3D imageExtent;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkSamplerCreateInfo
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public uint flags;
+    public VkFilter magFilter;
+    public VkFilter minFilter;
+    public VkSamplerMipmapMode mipmapMode;
+    public VkSamplerAddressMode addressModeU;
+    public VkSamplerAddressMode addressModeV;
+    public VkSamplerAddressMode addressModeW;
+    public float mipLodBias;
+    public VkBool32 anisotropyEnable;
+    public float maxAnisotropy;
+    public VkBool32 compareEnable;
+    public VkCompareOp compareOp;
+    public float minLod;
+    public float maxLod;
+    public int borderColor;
+    public VkBool32 unnormalizedCoordinates;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkDescriptorImageInfo
+{
+    public VkSampler sampler;
+    public VkImageView imageView;
+    public VkImageLayout imageLayout;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public unsafe struct VkPushConstantRange
 {
     public VkShaderStageFlags stageFlags;

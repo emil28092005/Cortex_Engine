@@ -2,8 +2,7 @@ using Engine.Core;
 
 namespace Engine.Graphics.Vulkan;
 
-internal sealed class VulkanRenderContext : IRenderContext
-{
+internal sealed class VulkanRenderContext : IRenderContext{
     private readonly VulkanContext _ctx;
     private readonly VulkanSwapchain _swapchain;
     private readonly IWindow _window;

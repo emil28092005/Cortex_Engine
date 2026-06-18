@@ -13,4 +13,16 @@ public interface IRenderer : IDisposable
     void RequestScreenshot(string path);
     bool IsScreenshotRequested { get; }
     IScreenshotProvider ScreenshotProvider { get; }
+
+    /// <summary>
+    /// Called before RenderWorld to begin a new ImGui frame.
+    /// Null if the backend doesn't support ImGui.
+    /// </summary>
+    void BeginImGuiFrame() { }
+
+    /// <summary>
+    /// Called after RenderWorld to render ImGui draw data.
+    /// Null if the backend doesn't support ImGui.
+    /// </summary>
+    void EndImGuiFrame() { }
 }

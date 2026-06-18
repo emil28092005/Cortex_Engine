@@ -13,6 +13,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     private readonly VulkanSwapchain _swapchain;
     private readonly VulkanPipeline _pipeline;
     private readonly VulkanFrameResources _frameResources;
+    internal readonly VulkanImGui? _imGui;
 
     private readonly Dictionary<ulong, (VulkanVertexBuffer vb, VulkanIndexBuffer ib, uint indexCount)> _meshCache = new();
 
@@ -37,6 +38,21 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
 
         _frameResources = new VulkanFrameResources(ctx.Device, ctx.GraphicsQueueFamilyIndex,
             swapchain.ImageCount, ctx, _pipeline.DescriptorSetLayout);
+
+        _imGui = new VulkanImGui(ctx, _frameResources.CommandPool, swapchain.Format, swapchain.DepthFormat);
+    }
+
+    internal VulkanImGui? ImGuiLayer => _imGui;
+
+    public void BeginImGuiFrame()
+    {
+        _imGui?.NewFrame();
+    }
+
+    public void EndImGuiFrame()
+    {
+        if (_imGui == null) return;
+        ImGuiNET.ImGui.Render();
     }
 
     public void RenderWorld(World world)
@@ -204,6 +220,8 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex, 0, 64, &model);
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
+
+        _imGui?.Render(cmd, _swapchain.Extent.Width, _swapchain.Extent.Height);
 
         Vk.vkCmdEndRendering(cmd);
 
@@ -389,6 +407,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
         }
         _meshCache.Clear();
 
+        _imGui?.Dispose();
         _frameResources?.Dispose();
         _pipeline?.Dispose();
     }
