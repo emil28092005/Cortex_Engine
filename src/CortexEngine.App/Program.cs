@@ -4,6 +4,7 @@ using Engine.Core.Components;
 using Engine.Graphics;
 using Engine.Graphics.Loaders;
 using Engine.Graphics.Vulkan;
+using Engine.Physics;
 using Flecs.NET.Core;
 
 namespace CortexEngine.App;
@@ -12,7 +13,7 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("Cortex Engine — Vulkan Scene (pure P/Invoke)...");
+        Console.WriteLine("Cortex Engine — Vulkan Scene + Physics (pure P/Invoke)...");
 
         try
         {
@@ -23,10 +24,11 @@ class Program
             using var renderer = renderContext.CreateRenderer();
 
             using var world = World.Create();
+            using var physicsWorld = new PhysicsWorld();
 
             var cameraEntity = world.Entity("Camera")
                 .Set(new Camera(
-                    new Vector3(0, 3, -12),
+                    new Vector3(0, 5, -15),
                     new Vector3(0, 0.5f, 0),
                     Vector3.UnitY,
                     MathF.PI / 4f,
@@ -44,7 +46,6 @@ class Program
             var frames = 0;
             var lastFpsTime = 0.0;
             var timing = new Timing();
-            var totalTime = 0.0f;
 
             while (!window.ShouldClose)
             {
@@ -64,28 +65,23 @@ class Program
 
                 cameraController.Update(input, (float)timing.DeltaTime);
 
-                totalTime += (float)timing.DeltaTime;
-                var angle = totalTime * 0.3f;
-
-                var torusEntity = world.Lookup("TorusKnot");
-                if ((ulong)torusEntity.Id != 0)
+                var toInit = new List<(Entity, RigidBody, Transform)>();
+                world.Each((Entity e, ref RigidBody rb, ref Transform t) =>
                 {
-                    var t = torusEntity.Get<Transform>();
-                    t.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle);
-                    torusEntity.Set(t);
+                    if (!rb.IsInitialized)
+                        toInit.Add((e, rb, t));
+                });
+
+                foreach (var (e, rb, t) in toInit)
+                {
+                    var rbInit = rb;
+                    rbInit.IsInitialized = true;
+                    e.Set(rbInit);
+                    physicsWorld.CreateBody(e, rbInit, t);
                 }
 
-                for (var i = 0; i < 4; i++)
-                {
-                    var cubeEntity = world.Lookup($"Cube{(i == 0 ? "Left" : i == 1 ? "Right" : i == 2 ? "Front" : "Back")}");
-                    if ((ulong)cubeEntity.Id != 0)
-                    {
-                        var t = cubeEntity.Get<Transform>();
-                        t.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle * (1f + i * 0.3f));
-                        cubeEntity.Set(t);
-                    }
-                }
-
+                physicsWorld.Update((float)timing.DeltaTime);
+                physicsWorld.SyncTransforms(world);
                 renderer.RenderWorld(world);
 
                 frames++;
@@ -111,20 +107,19 @@ class Program
     static void CreateScene(World world)
     {
         var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.9f, 0.7f, 0.3f));
-        var cube = LoadMesh("Content/cube.obj", new Vector3(0.8f, 0.5f, 0.2f));
         var sphere = ProceduralMesh.CreateSphere(0.7f, 32, 16, new Vector3(0.3f, 0.6f, 0.9f));
         var grid = ProceduralMesh.CreateGrid(20, 1.0f, new Vector3(0.4f, 0.4f, 0.45f));
 
         world.Entity("TorusKnot")
-            .Set(new Transform(new Vector3(0, 1.5f, 0), Quaternion.Identity, new Vector3(1.5f)))
+            .Set(new Transform(new Vector3(0, 4f, 0), Quaternion.Identity, new Vector3(1.5f)))
             .Set(torusKnot);
 
         var cubes = new (string name, Vector3 pos, float scale, Vector3 color)[]
         {
-            ("CubeLeft",   new(-5, 1, 0),   1.5f, new(0.8f, 0.2f, 0.2f)),
-            ("CubeRight",  new(5, 1, 0),    1.5f, new(0.2f, 0.8f, 0.3f)),
-            ("CubeFront",  new(0, 1, 5),    1.5f, new(0.2f, 0.4f, 0.9f)),
-            ("CubeBack",   new(0, 1, -5),   1.5f, new(0.9f, 0.9f, 0.2f)),
+            ("CubeLeft",   new(-5, 5, 0),   1.5f, new(0.8f, 0.2f, 0.2f)),
+            ("CubeRight",  new(5, 8, 0),    1.5f, new(0.2f, 0.8f, 0.3f)),
+            ("CubeFront",  new(0, 6, 5),    1.5f, new(0.2f, 0.4f, 0.9f)),
+            ("CubeBack",   new(0, 10, -5),  1.5f, new(0.9f, 0.9f, 0.2f)),
         };
 
         foreach (var (name, pos, scale, color) in cubes)
@@ -132,26 +127,29 @@ class Program
             var c = LoadMesh("Content/cube.obj", color);
             world.Entity(name)
                 .Set(new Transform(pos, Quaternion.Identity, new Vector3(scale)))
-                .Set(c);
+                .Set(c)
+                .Set(RigidBody.DynamicBox(new Vector3(scale * 0.5f), mass: scale * 2f));
         }
 
         var spheres = new (string name, Vector3 pos)[]
         {
-            ("Sphere1", new(-3, 3, -2)),
-            ("Sphere2", new(3, 3, 2)),
-            ("Sphere3", new(-2, 4, 3)),
+            ("Sphere1", new(-3, 7, -2)),
+            ("Sphere2", new(3, 9, 2)),
+            ("Sphere3", new(-2, 12, 3)),
         };
 
         foreach (var (name, pos) in spheres)
         {
             world.Entity(name)
                 .Set(new Transform(pos, Quaternion.Identity, Vector3.One))
-                .Set(sphere);
+                .Set(sphere)
+                .Set(RigidBody.DynamicSphere(0.7f, mass: 1.5f));
         }
 
         world.Entity("Floor")
             .Set(new Transform(new Vector3(0, -0.5f, 0), Quaternion.Identity, new Vector3(20, 0.5f, 20)))
-            .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)));
+            .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)))
+            .Set(RigidBody.StaticBox(new Vector3(20, 0.5f, 20)));
 
         world.Entity("Grid")
             .Set(new Transform(Vector3.Zero, Quaternion.Identity, Vector3.One))
@@ -159,7 +157,7 @@ class Program
 
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
-        Console.WriteLine($"[Scene] {entityCount} entities: torus knot + 4 cubes + 3 spheres + floor + grid");
+        Console.WriteLine($"[Scene] {entityCount} entities: torus knot + 4 dynamic cubes + 3 dynamic spheres + static floor + grid");
     }
 
     static Mesh LoadMesh(string path, Vector3 color)

@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
     <ProjectReference Include="..\Engine.Graphics\Engine.Graphics.csproj" />
     <ProjectReference Include="..\Engine.Graphics.Vulkan\Engine.Graphics.Vulkan.csproj" />
+    <ProjectReference Include="..\Engine.Physics\Engine.Physics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
