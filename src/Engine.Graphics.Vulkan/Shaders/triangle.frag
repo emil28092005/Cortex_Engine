@@ -12,9 +12,7 @@ layout(set = 0, binding = 0) uniform CameraUBO {
     vec4 pointLightColor;   // xyz = color, w = range
 };
 
-const vec3 DIR_LIGHT_DIR = normalize(vec3(0.5, 0.8, 0.3));
-const vec3 DIR_LIGHT_COLOR = vec3(0.4, 0.38, 0.33);
-const vec3 AMBIENT = vec3(0.08, 0.09, 0.12);
+const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
 
 const float PI = 3.14159265359;
 
@@ -88,10 +86,9 @@ void main()
     float roughness = 0.5;
     float metallic = 0.1;
 
-    // Directional light (sun)
-    vec3 color = calcLight(N, V, DIR_LIGHT_DIR, DIR_LIGHT_COLOR, albedo, roughness, metallic);
+    // Only point light — no directional, near-zero ambient
+    vec3 color = AMBIENT * albedo;
 
-    // Point light
     vec3 lightPos = pointLightPos.xyz;
     float lightIntensity = pointLightPos.w;
     vec3 lightColor = pointLightColor.xyz;
@@ -101,7 +98,7 @@ void main()
     float dist = length(toLight);
     vec3 L = toLight / max(dist, 0.001);
 
-    // Unity-style attenuation: smooth falloff at range edge
+    // Unity-style attenuation
     float attenuation = pow(clamp(1.0 - dist / lightRange, 0.0, 1.0), 2.0);
     vec3 radiance = lightColor * lightIntensity * attenuation;
 
@@ -109,9 +106,6 @@ void main()
     {
         color += calcLight(N, V, L, radiance, albedo, roughness, metallic);
     }
-
-    // Ambient
-    color += AMBIENT * albedo;
 
     // Tonemap + gamma
     color = acesTonemap(color);
