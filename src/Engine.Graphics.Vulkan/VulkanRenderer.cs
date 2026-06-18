@@ -268,9 +268,6 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
     {
         var aspect = (float)_swapchain.Extent.Width / (float)_swapchain.Extent.Height;
         var proj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 4f, aspect, 0.1f, 100f);
-        proj.M22 *= -1;
-        proj.M33 = proj.M33 * 0.5f + 0.5f;
-        proj.M43 = proj.M43 * 0.5f + 0.5f;
         var view = Matrix4x4.CreateLookAt(new Vector3(0, 0, -5), Vector3.Zero, Vector3.UnitY);
         return view * proj;
     }
