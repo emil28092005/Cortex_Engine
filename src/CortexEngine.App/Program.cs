@@ -152,6 +152,13 @@ class Program
 
                 if (hasImGui)
                 {
+                    var io = ImGui.GetIO();
+                    io.DisplaySize = new System.Numerics.Vector2(window.Width, window.Height);
+                    io.MousePos = new System.Numerics.Vector2(input.MouseX, input.MouseY);
+                    io.MouseDown[0] = input.MouseLeft;
+                    io.MouseDown[1] = input.MouseRight;
+                    io.MouseDown[2] = input.MouseMiddle;
+
                     renderer.BeginImGuiFrame();
 
                     ImGui.Begin("Cortex Engine Debug");
