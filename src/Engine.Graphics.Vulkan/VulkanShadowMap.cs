@@ -5,7 +5,7 @@ namespace Engine.Graphics.Vulkan;
 
 internal sealed unsafe class VulkanShadowMap : IDisposable
 {
-    public const uint ShadowMapSize = 1024;
+    public const uint ShadowMapSize = 2048;
     public const float FarPlane = 60.0f;
 
     public VkImage ColorImage;
