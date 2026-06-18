@@ -255,7 +255,7 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             };
             Vk.vkCmdSetScissor(cmd, 0, 1, &shadowScissor);
 
-            Vk.vkCmdSetDepthBias(cmd, 2.5f, 0.0f, 3.5f);
+            Vk.vkCmdSetDepthBias(cmd, 1.75f, 0.0f, 2.5f);
 
             foreach (var dc in drawCalls)
             {

@@ -23,7 +23,6 @@ const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
 const float PI = 3.14159265359;
 const float FAR_PLANE = 60.0;
 
-// 16-tap Poisson disk samples (normalized offsets on unit sphere tangent)
 const vec3 POISSON_DISK[16] = vec3[16](
     vec3( 0.0000,  0.0000,  0.0000),
     vec3( 0.1376,  0.0000,  0.0000),
@@ -84,7 +83,6 @@ vec3 acesTonemap(vec3 color)
     return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
 }
 
-// Build a tangent-space basis for the sampling direction
 mat3 buildTangentBasis(vec3 dir)
 {
     vec3 absDir = abs(dir);
@@ -100,23 +98,14 @@ float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
     float dist = length(dir);
     vec3 dirNorm = normalize(dir);
 
-    // Base shadow check (center sample)
-    float closestDepth = texture(shadowCube, dirNorm).r;
-    float mappedDepth = closestDepth * FAR_PLANE;
-    float bias = 0.3 + 0.5 * (1.0 - max(dot(N, L), 0.0));
-    float baseResult = dist - bias < mappedDepth ? 1.0 : 0.0;
+    // Slope-dependent bias: small base + larger at grazing angles
+    float NdotL = max(dot(N, L), 0.0);
+    float bias = 0.08 + 0.15 * (1.0 - NdotL);
 
-    // If clearly lit or clearly shadowed, skip PCF
-    if (dist - bias * 3.0 < mappedDepth) return 1.0;
-    if (dist + bias * 3.0 > mappedDepth && baseResult > 0.5) return 1.0;
-
-    // Poisson disk PCF — 16 samples
+    // 16-tap Poisson disk PCF
     float shadow = 0.0;
     mat3 basis = buildTangentBasis(dirNorm);
-
-    // Sample radius scales with distance — softer shadows further from light
-    float sampleRadius = 0.02 * (dist / 20.0);
-    sampleRadius = clamp(sampleRadius, 0.005, 0.08);
+    float sampleRadius = clamp(0.015 * (dist / 20.0), 0.003, 0.05);
 
     for (int i = 0; i < 16; i++)
     {
