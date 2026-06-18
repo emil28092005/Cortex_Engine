@@ -86,7 +86,6 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
             {
                 lightPos = new Vector4(lt.Position, l.Intensity);
                 lightColor = new Vector4(l.Color, l.Range);
-                Console.WriteLine($"[Vulkan] Point light: pos={lt.Position}, intensity={l.Intensity}, range={l.Range}, color={l.Color}");
             }
         });
         if (lightPos.W == 0)
@@ -97,20 +96,27 @@ internal sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreen
                 {
                     lightPos = new Vector4(l.Position, l.Intensity);
                     lightColor = new Vector4(l.Color, l.Range);
-                    Console.WriteLine($"[Vulkan] Point light (fallback): pos={l.Position}, intensity={l.Intensity}");
                 }
             });
-        }
-        if (lightPos.W == 0)
-        {
-            Console.WriteLine("[Vulkan] WARNING: No point light found in ECS!");
         }
 
         // Pack UBO: mat4 vp (64 bytes) + vec4 lightPos (16) + vec4 lightColor (16) = 96 bytes
         var uboData = stackalloc byte[128];
-        Marshal.StructureToPtr(vp, (nint)uboData, false);
-        *(Vector4*)(uboData + 64) = lightPos;
-        *(Vector4*)(uboData + 80) = lightColor;
+        {
+            var vpCopy = vp;
+            var src = &vpCopy;
+            System.Buffer.MemoryCopy(src, uboData, 64, 64);
+        }
+        {
+            var lpCopy = lightPos;
+            var src = &lpCopy;
+            System.Buffer.MemoryCopy(src, uboData + 64, 16, 16);
+        }
+        {
+            var lcCopy = lightColor;
+            var src = &lcCopy;
+            System.Buffer.MemoryCopy(src, uboData + 80, 16, 16);
+        }
 
         var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model)>();
 
