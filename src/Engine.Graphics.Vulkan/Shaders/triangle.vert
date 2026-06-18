@@ -6,11 +6,11 @@ layout(location = 2) in vec3 inNormal;
 
 layout(location = 0) out vec3 fragColor;
 
-layout(row_major, set = 0, binding = 0) uniform CameraUBO {
+layout(set = 0, binding = 0) uniform CameraUBO {
     mat4 vp;
 };
 
-layout(row_major, push_constant) uniform PC {
+layout(push_constant) uniform PC {
     mat4 model;
 } pc;
 
