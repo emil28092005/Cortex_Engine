@@ -39,29 +39,8 @@ class Program
 
 #if !RELEASE_AOT
             WebApplication? mcpApp = null;
-            if (mcpPort > 0)
-            {
-                var mcpThread = new Thread(() =>
-                {
-                    Thread.Sleep(2000);
-                    try
-                    {
-                        mcpApp = McpEngineServerHost.Create(Array.Empty<string>(), queue, port: mcpPort);
-                        mcpApp.Run();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[App] MCP server error: {ex.Message}");
-                    }
-                })
-                { IsBackground = true };
-                mcpThread.Start();
-                Console.WriteLine($"[App] MCP HTTP server starting on http://localhost:{mcpPort}/ (SSE)");
-            }
-            else
-            {
-                Console.WriteLine("[App] MCP server disabled (--mcp-port 0).");
-            }
+            var mcpStarted = false;
+            var frameCount = 0;
 #endif
 
             var cameraEntity = world.Entity("Camera")
@@ -97,6 +76,29 @@ class Program
                 timing.Tick();
                 window.PumpEvents();
                 input.BeginFrame();
+
+#if !RELEASE_AOT
+                frameCount++;
+                if (mcpPort > 0 && !mcpStarted && frameCount > 3)
+                {
+                    mcpStarted = true;
+                    var port = mcpPort;
+                    var q = queue;
+                    new Thread(() =>
+                    {
+                        try
+                        {
+                            mcpApp = McpEngineServerHost.Create(Array.Empty<string>(), q, port: port);
+                            Console.WriteLine($"[App] MCP HTTP server listening on http://localhost:{port}/ (SSE)");
+                            mcpApp.Run();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[App] MCP server error: {ex.Message}");
+                        }
+                    }) { IsBackground = true }.Start();
+                }
+#endif
 
                 if (window.Width != lastWidth || window.Height != lastHeight)
                 {
@@ -233,6 +235,24 @@ class Program
                 .Set(new Transform(pos, Quaternion.Identity, Vector3.One))
                 .Set(sphere)
                 .Set(RigidBody.DynamicSphere(0.7f, mass: 1.5f));
+        }
+
+        var rand = new Random(42);
+        for (var i = 0; i < 10; i++)
+        {
+            var x = (float)(rand.NextDouble() * 16 - 8);
+            var y = (float)(rand.NextDouble() * 15 + 5);
+            var z = (float)(rand.NextDouble() * 16 - 8);
+            var r = 0.3f + (float)rand.NextDouble() * 0.5f;
+            var color = new Vector3(
+                0.3f + (float)rand.NextDouble() * 0.7f,
+                0.3f + (float)rand.NextDouble() * 0.7f,
+                0.3f + (float)rand.NextDouble() * 0.7f);
+            var ballMesh = ProceduralMesh.CreateSphere(r, 16, 8, color);
+            world.Entity($"Ball{i}")
+                .Set(new Transform(new Vector3(x, y, z), Quaternion.Identity, Vector3.One))
+                .Set(ballMesh)
+                .Set(RigidBody.DynamicSphere(r, mass: r * 2f));
         }
 
         world.Entity("Floor")
