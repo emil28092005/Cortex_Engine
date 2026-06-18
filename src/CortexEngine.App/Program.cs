@@ -317,7 +317,7 @@ class Program
         }
 
         var rand = new Random(42);
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 50; i++)
         {
             var x = (float)(rand.NextDouble() * 16 - 8);
             var y = (float)(rand.NextDouble() * 15 + 5);
