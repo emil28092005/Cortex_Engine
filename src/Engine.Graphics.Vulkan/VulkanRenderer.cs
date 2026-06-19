@@ -18,6 +18,11 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 
     private readonly Dictionary<ulong, (VulkanVertexBuffer vb, VulkanIndexBuffer ib, uint indexCount)> _meshCache = new();
 
+    private VkBuffer _screenshotBuffer;
+    private VkDeviceMemory _screenshotMemory;
+    private ulong _screenshotBufferSize;
+    private bool _screenshotInitialized;
+
     private int _frameIndex;
     private bool _disposed;
     private bool _screenshotRequested;
@@ -27,6 +32,9 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     public float ShadowBias { get; set; } = 0.0001f;
     public float ShadowSampleRadius { get; set; } = 0.015f;
     public float ShadowFarPlane { get; set; } = 60.0f;
+
+    public bool IsRecording { get; set; }
+    public byte[]? CapturedFrame { get; private set; }
 
     public bool IsScreenshotRequested => _screenshotRequested;
     public IScreenshotProvider ScreenshotProvider => this;
@@ -53,6 +61,98 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     }
 
     internal VulkanImGui? ImGuiLayer => _imGui;
+
+    private void InitScreenshotBuffer()
+    {
+        if (_screenshotInitialized) return;
+        _screenshotInitialized = true;
+
+        var w = _swapchain.Extent.Width;
+        var h = _swapchain.Extent.Height;
+        _screenshotBufferSize = (ulong)(w * h * 4);
+
+        var info = new VkBufferCreateInfo
+        {
+            sType = VkStructureType.BufferCreateInfo,
+            size = _screenshotBufferSize,
+            usage = VkBufferUsageFlags.TransferDst,
+            sharingMode = VkSharingMode.Exclusive,
+        };
+
+        var buf = VkBuffer.Null;
+        Vk.vkCreateBuffer(_ctx.Device, &info, 0, &buf);
+        _screenshotBuffer = buf;
+
+        var reqs = new VkMemoryRequirements();
+        Vk.vkGetBufferMemoryRequirements(_ctx.Device, _screenshotBuffer, &reqs);
+        var memType = _ctx.FindMemoryType(reqs.memoryTypeBits, VkMemoryPropertyFlags.HostVisible | VkMemoryPropertyFlags.HostCoherent);
+
+        var allocInfo = new VkMemoryAllocateInfo
+        {
+            sType = VkStructureType.MemoryAllocateInfo,
+            allocationSize = reqs.size,
+            memoryTypeIndex = memType,
+        };
+
+        var mem = VkDeviceMemory.Null;
+        Vk.vkAllocateMemory(_ctx.Device, &allocInfo, 0, &mem);
+        _screenshotMemory = mem;
+        Vk.vkBindBufferMemory(_ctx.Device, _screenshotBuffer, _screenshotMemory, 0);
+    }
+
+    public byte[]? CaptureFrame(VkCommandBuffer cmd, uint imageIndex)
+    {
+        InitScreenshotBuffer();
+
+        var w = _swapchain.Extent.Width;
+        var h = _swapchain.Extent.Height;
+
+        // Transition swapchain image: PresentSrc → TransferSrc
+        TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
+            VkImageLayout.PresentSrcKHR, VkImageLayout.TransferSrcOptimal,
+            0x8000, 0, 0x10000, 0x2000);
+
+        // Copy image to buffer
+        var region = new VkBufferImageCopyRegion
+        {
+            bufferOffset = 0,
+            bufferRowLength = w,
+            bufferImageHeight = h,
+            imageSubresource = new VkImageSubresourceLayers
+            {
+                aspectMask = VkImageAspectFlags.Color,
+                mipLevel = 0,
+                baseArrayLayer = 0,
+                layerCount = 1,
+            },
+            imageOffset = new VkOffset3D { X = 0, Y = 0, Z = 0 },
+            imageExtent = new VkExtent3D { Width = w, Height = h, Depth = 1 },
+        };
+
+        Vk.vkCmdCopyImageToBuffer(cmd, _swapchain.Images[imageIndex], VkImageLayout.TransferSrcOptimal,
+            _screenshotBuffer, 1, &region);
+
+        // Transition back: TransferSrc → PresentSrc
+        TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
+            VkImageLayout.TransferSrcOptimal, VkImageLayout.PresentSrcKHR,
+            0x10000, 0x2000, 0x8000, 0);
+
+        // Map and read
+        void* pData = null;
+        Vk.vkMapMemory(_ctx.Device, _screenshotMemory, 0, _screenshotBufferSize, 0, &pData);
+
+        var result = new byte[(int)_screenshotBufferSize];
+        Marshal.Copy((nint)pData, result, 0, (int)_screenshotBufferSize);
+        Vk.vkUnmapMemory(_ctx.Device, _screenshotMemory);
+
+        // Vulkan data is BGRA, convert to RGBA
+        for (int i = 0; i < result.Length; i += 4)
+        {
+            (result[i], result[i + 2]) = (result[i + 2], result[i]);
+        }
+
+        return result;
+    }
 
     public void BeginImGuiFrame()
     {
@@ -409,6 +509,12 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 
         Vk.vkCmdEndRendering(cmd);
 
+        // Capture frame for video recording if enabled
+        if (IsRecording)
+        {
+            CapturedFrame = CaptureFrame(cmd, imageIndex);
+        }
+
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.PresentSrcKHR,
             0x400, 0x100,
@@ -591,6 +697,8 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         }
         _meshCache.Clear();
 
+        if (_screenshotBuffer.Handle != 0) Vk.vkDestroyBuffer(_ctx.Device, _screenshotBuffer, 0);
+        if (_screenshotMemory.Handle != 0) Vk.vkFreeMemory(_ctx.Device, _screenshotMemory, 0);
         _shadowMap?.Dispose();
         _imGui?.Dispose();
         _frameResources?.Dispose();

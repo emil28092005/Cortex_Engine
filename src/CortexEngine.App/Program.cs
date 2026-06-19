@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 using Engine.AI;
 using Engine.Core;
@@ -72,6 +73,12 @@ class Program
             var lastFpsTime = 0.0;
             var timing = new Timing();
             var totalTime = 0.0f;
+
+            bool isRecording = false;
+            Process? ffmpegProcess = null;
+            string? recordingPath = null;
+            int recordedFrames = 0;
+            int skipFrames = 0;
 
             while (!window.ShouldClose)
             {
@@ -307,11 +314,104 @@ class Program
 
                     ImGui.End();
 
+                    // Video recording panel
+                    ImGui.Begin("Video Recording");
+
+                    if (!isRecording)
+                    {
+                        if (ImGui.Button("Start Recording"))
+                        {
+                            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                            recordingPath = $"Videos/cortex_{timestamp}.mp4";
+                            Directory.CreateDirectory("Videos");
+
+                            var w = window.Width;
+                            var h = window.Height;
+                            var ffmpegArgs = $"-y -f rawvideo -pixel_format rgba -video_size {w}x{h} -framerate 30 -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p {recordingPath}";
+
+                            var psi = new ProcessStartInfo
+                            {
+                                FileName = "ffmpeg",
+                                Arguments = ffmpegArgs,
+                                UseShellExecute = false,
+                                RedirectStandardInput = true,
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true,
+                                CreateNoWindow = true,
+                            };
+
+                            try
+                            {
+                                ffmpegProcess = Process.Start(psi);
+                                isRecording = true;
+                                recordedFrames = 0;
+                                skipFrames = 0;
+                                Console.WriteLine($"[App] Recording started: {recordingPath}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[App] Failed to start FFmpeg: {ex.Message}");
+                                Console.WriteLine("[App] Install FFmpeg: sudo apt install ffmpeg");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (ImGui.Button("Stop Recording"))
+                        {
+                            isRecording = false;
+                            if (ffmpegProcess != null && !ffmpegProcess.HasExited)
+                            {
+                                ffmpegProcess.StandardInput.BaseStream.Flush();
+                                ffmpegProcess.StandardInput.BaseStream.Close();
+                                ffmpegProcess.WaitForExit(5000);
+                                if (!ffmpegProcess.HasExited)
+                                    ffmpegProcess.Kill();
+                            }
+                            ffmpegProcess?.Dispose();
+                            ffmpegProcess = null;
+                            Console.WriteLine($"[App] Recording stopped: {recordingPath} ({recordedFrames} frames)");
+                        }
+
+                        ImGui.SameLine();
+                        ImGui.Text($"Recording... {recordedFrames} frames");
+                    }
+
+                    ImGui.End();
+
                     renderer.EndImGuiFrame();
                 }
 
+                // Set recording flag before render so renderer can capture
+                vkRenderer!.IsRecording = isRecording;
+
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();
+
+                // If recording, get captured frame and write to FFmpeg
+                if (isRecording && ffmpegProcess != null && !ffmpegProcess.HasExited)
+                {
+                    skipFrames++;
+                    if (skipFrames >= 2) // Capture every 2nd frame for 30fps at ~60fps
+                    {
+                        skipFrames = 0;
+                        var frameData = vkRenderer.CapturedFrame;
+                        if (frameData != null && frameData.Length > 0)
+                        {
+                            try
+                            {
+                                ffmpegProcess.StandardInput.BaseStream.Write(frameData, 0, frameData.Length);
+                                ffmpegProcess.StandardInput.BaseStream.Flush();
+                                recordedFrames++;
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[App] FFmpeg write error: {ex.Message}");
+                                isRecording = false;
+                            }
+                        }
+                    }
+                }
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)

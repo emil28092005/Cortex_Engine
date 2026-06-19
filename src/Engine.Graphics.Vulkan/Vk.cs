@@ -70,6 +70,7 @@ internal static unsafe class Vk
     public delegate void VkCmdPipelineBarrier2(VkCommandBuffer commandBuffer, VkDependencyInfo* pDependencyInfo);
     public delegate void VkCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer, uint regionCount, VkBufferCopy* pRegions);
     public delegate void VkCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage, VkImageLayout dstImageLayout, uint regionCount, VkBufferImageCopyRegion* pRegions);
+    public delegate void VkCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout, VkBuffer dstBuffer, uint regionCount, VkBufferImageCopyRegion* pRegions);
     public delegate void VkCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags, uint offset, uint size, void* pValues);
     public delegate void VkCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint firstSet, uint descriptorSetCount, VkDescriptorSet* pDescriptorSets, uint dynamicOffsetCount, uint* pDynamicOffsets);
     public delegate VkResult VkCreateDescriptorSetLayout(VkDevice device, VkDescriptorSetLayoutCreateInfo* pCreateInfo, nint pAllocator, VkDescriptorSetLayout* pSetLayout);
@@ -155,6 +156,7 @@ internal static unsafe class Vk
     public static VkCmdPipelineBarrier2 vkCmdPipelineBarrier2;
     public static VkCmdCopyBuffer vkCmdCopyBuffer;
     public static VkCmdCopyBufferToImage vkCmdCopyBufferToImage;
+    public static VkCmdCopyImageToBuffer vkCmdCopyImageToBuffer;
     public static VkCmdPushConstants vkCmdPushConstants;
     public static VkCmdBindDescriptorSets vkCmdBindDescriptorSets;
     public static VkCreateDescriptorSetLayout vkCreateDescriptorSetLayout;
@@ -247,6 +249,7 @@ internal static unsafe class Vk
         vkCmdPipelineBarrier2 = LoadDev<VkCmdPipelineBarrier2>(p, "vkCmdPipelineBarrier2");
         vkCmdCopyBuffer = LoadDev<VkCmdCopyBuffer>(p, "vkCmdCopyBuffer");
         vkCmdCopyBufferToImage = LoadDev<VkCmdCopyBufferToImage>(p, "vkCmdCopyBufferToImage");
+        vkCmdCopyImageToBuffer = LoadDev<VkCmdCopyImageToBuffer>(p, "vkCmdCopyImageToBuffer");
         vkCmdPushConstants = LoadDev<VkCmdPushConstants>(p, "vkCmdPushConstants");
         vkCmdBindDescriptorSets = LoadDev<VkCmdBindDescriptorSets>(p, "vkCmdBindDescriptorSets");
         vkCreateDescriptorSetLayout = LoadDev<VkCreateDescriptorSetLayout>(p, "vkCreateDescriptorSetLayout");
