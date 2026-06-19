@@ -220,7 +220,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
             binding = 0,
             descriptorType = VkDescriptorType.UniformBuffer,
             descriptorCount = 1,
-            stageFlags = VkShaderStageFlags.Vertex,
+            stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment,
         };
         bindings[1] = new VkDescriptorSetLayoutBinding
         {
