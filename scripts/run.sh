@@ -2,17 +2,14 @@
 # Run the Cortex Engine.
 # Examples:
 #   ./scripts/run.sh                           # run with defaults
-#   ./scripts/run.sh --mcp-port 5000           # run with MCP HTTP server
-#   ./scripts/run.sh --camera-tour             # capture screenshots and exit
-#   ./scripts/run.sh --mcp-stdio               # run headless stdio MCP server
+#   ./scripts/run.sh -- --mcp-port 5000        # run with MCP HTTP server
+#   ./scripts/run.sh -- --mcp-port 0           # run without MCP
 
 ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 export DOTNET_ROOT="${DOTNET_ROOT:-$HOME/.dotnet}"
 export PATH="$DOTNET_ROOT:$PATH"
 
-# Auto-detect Wayland. SDL3 bundled with ppy.SDL3-CS supports both Wayland and X11;
-# let it choose based on available display servers. Do NOT force DISPLAY here.
 unset SDL_VIDEODRIVER 2>/dev/null
 
 cd "$ENGINE_DIR"

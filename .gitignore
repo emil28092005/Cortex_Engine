@@ -18,6 +18,12 @@ Thumbs.db
 # Generated screenshots
 Screenshots/
 
+# Video recordings
+Videos/
+
+# ImGui
+imgui.ini
+
 # dotnet
 *.dll
 *.exe
@@ -30,3 +36,4 @@ Screenshots/
 !claude_desktop_config.json
 .playwright-mcp/
 Vulkan-Guide/
+cortex.mp4
