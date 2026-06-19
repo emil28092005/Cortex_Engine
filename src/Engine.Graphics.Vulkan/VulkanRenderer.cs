@@ -149,12 +149,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         Marshal.Copy((nint)pData, result, 0, (int)_screenshotBufferSize);
         Vk.vkUnmapMemory(_ctx.Device, _screenshotMemory);
 
-        // Vulkan data is BGRA, convert to RGBA
-        for (int i = 0; i < result.Length; i += 4)
-        {
-            (result[i], result[i + 2]) = (result[i + 2], result[i]);
-        }
-
+        // Data is BGRA from swapchain — no conversion needed, FFmpeg handles bgra
         return result;
     }
 
@@ -520,10 +515,11 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 
         Vk.vkCmdEndRendering(cmd);
 
-        // Capture frame AFTER render pass ends, BEFORE present transition
+        // Capture frame for video recording — AFTER render pass, BEFORE present
+        // This captures scene + ImGui. To capture without UI, we'd need separate render pass.
         if (IsRecording)
         {
-            CaptureFrame(cmd, imageIndex); // Only records GPU commands, does NOT overwrite CapturedFrame
+            CaptureFrame(cmd, imageIndex);
         }
 
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],

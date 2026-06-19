@@ -329,7 +329,7 @@ class Program
                             var w = window.Width;
                             var h = window.Height;
                             var fps = (int)Math.Round(1000.0 / timing.DeltaTime);
-                            var ffmpegArgs = $"-y -f rawvideo -pixel_format rgba -video_size {w}x{h} -framerate {Math.Min(fps, 60)} -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -vf fps=30 {recordingPath}";
+                            var ffmpegArgs = $"-y -f rawvideo -pixel_format bgra -video_size {w}x{h} -framerate {Math.Min(fps, 60)} -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -vf fps=30 {recordingPath}";
 
                             var psi = new ProcessStartInfo
                             {
