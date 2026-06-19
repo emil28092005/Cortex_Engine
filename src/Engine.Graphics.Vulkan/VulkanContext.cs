@@ -305,20 +305,18 @@ internal sealed unsafe class VulkanContext : IDisposable
             synchronization2 = VkBool32.True,
         };
 
-        var cubeArrayFeatures = new VkPhysicalDeviceImageCubeArrayFeatures
-        {
-            sType = VkStructureType.PhysicalDeviceImageCubeArrayFeatures,
-            pNext = (nint)(&sync2Features),
-            imageCubeArray = VkBool32.True,
-        };
-
         var renderingFeatures = new VkPhysicalDeviceDynamicRenderingFeatures
         {
             sType = VkStructureType.PhysicalDeviceDynamicRenderingFeatures,
-            pNext = (nint)(&cubeArrayFeatures),
+            pNext = (nint)(&sync2Features),
             dynamicRendering = VkBool32.True,
         };
 
+
+        var features = new VkPhysicalDeviceFeatures
+        {
+            imageCubeArray = VkBool32.True,
+        };
 
         var deviceInfo = new VkDeviceCreateInfo
         {
@@ -327,7 +325,7 @@ internal sealed unsafe class VulkanContext : IDisposable
             queueCreateInfoCount = 1,
             enabledExtensionCount = (uint)extNames.Length,
             ppEnabledExtensionNames = extPtrs,
-            pEnabledFeatures = null,
+            pEnabledFeatures = &features,
             pNext = (nint)(&renderingFeatures),
         };
 
@@ -361,12 +359,12 @@ internal sealed unsafe class VulkanContext : IDisposable
         var formats = stackalloc VkSurfaceFormatKHR[(int)formatCount];
         Vk.vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &formatCount, formats);
 
-        SurfaceFormat = VkFormat.B8G8R8A8Unorm;
+        SurfaceFormat = VkFormat.B8G8R8A8Srgb;
         SurfaceColorSpace = VkColorSpaceKHR.SrgbNonlinearKHR;
 
         for (uint i = 0; i < formatCount; i++)
         {
-            if (formats[(int)i].format == VkFormat.B8G8R8A8Unorm &&
+            if (formats[(int)i].format == VkFormat.B8G8R8A8Srgb &&
                 formats[(int)i].colorSpace == VkColorSpaceKHR.SrgbNonlinearKHR)
             {
                 SurfaceFormat = formats[(int)i].format;
@@ -375,7 +373,7 @@ internal sealed unsafe class VulkanContext : IDisposable
             }
         }
 
-        if (SurfaceFormat == VkFormat.B8G8R8A8Unorm)
+        if (SurfaceFormat == VkFormat.B8G8R8A8Srgb)
         {
             SurfaceFormat = formats[0].format;
             SurfaceColorSpace = formats[0].colorSpace;
