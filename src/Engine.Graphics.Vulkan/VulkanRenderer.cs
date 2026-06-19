@@ -100,7 +100,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         Vk.vkBindBufferMemory(_ctx.Device, _screenshotBuffer, _screenshotMemory, 0);
     }
 
-    public byte[]? CaptureFrame(VkCommandBuffer cmd, uint imageIndex)
+    public void CaptureFrame(VkCommandBuffer cmd, uint imageIndex)
     {
         InitScreenshotBuffer();
 
@@ -136,8 +136,6 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.TransferSrcOptimal, VkImageLayout.ColorAttachmentOptimal,
             0x10000, 0x1000, 0x400, 0x100);
-
-        return null; // Data will be read next frame after GPU completes
     }
 
     private byte[]? ReadCapturedBuffer()
@@ -525,7 +523,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         // Capture frame AFTER render pass ends, BEFORE present transition
         if (IsRecording)
         {
-            CapturedFrame = CaptureFrame(cmd, imageIndex);
+            CaptureFrame(cmd, imageIndex); // Only records GPU commands, does NOT overwrite CapturedFrame
         }
 
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
