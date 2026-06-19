@@ -281,14 +281,21 @@ class Program
                     var bias = vkRenderer.ShadowBias;
                     var sampleRadius = vkRenderer.ShadowSampleRadius;
                     var farPlane = vkRenderer.ShadowFarPlane;
+                    var ambient = vkRenderer.AmbientColor;
 
                     ImGui.SliderFloat("Shadow Bias", ref bias, 0.0001f, 0.1f, "%.4f");
                     ImGui.SliderFloat("Sample Radius", ref sampleRadius, 0.001f, 0.1f, "%.4f");
                     ImGui.SliderFloat("Far Plane", ref farPlane, 10.0f, 120.0f, "%.1f");
+                    ImGui.Separator();
+                    ImGui.Text("Ambient Light");
+                    ImGui.SliderFloat("Ambient R", ref ambient.X, 0.0f, 0.5f, "%.3f");
+                    ImGui.SliderFloat("Ambient G", ref ambient.Y, 0.0f, 0.5f, "%.3f");
+                    ImGui.SliderFloat("Ambient B", ref ambient.Z, 0.0f, 0.5f, "%.3f");
 
                     vkRenderer.ShadowBias = bias;
                     vkRenderer.ShadowSampleRadius = sampleRadius;
                     vkRenderer.ShadowFarPlane = farPlane;
+                    vkRenderer.AmbientColor = ambient;
 
                     ImGui.Text($"Current: bias={bias:F4} radius={sampleRadius:F4} far={farPlane:F1}");
 

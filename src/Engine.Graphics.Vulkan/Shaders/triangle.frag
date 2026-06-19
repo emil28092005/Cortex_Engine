@@ -18,6 +18,7 @@ layout(set = 0, binding = 0) uniform SceneUBO {
     vec2 padding;
     LightData lights[8];
     vec4 shadowParams[4];
+    vec4 ambientColor; // xyz = ambient color, w = unused
 } scene;
 
 layout(set = 0, binding = 1) uniform samplerCubeArray shadowArray;
@@ -151,7 +152,7 @@ void main()
     float roughness = 0.5;
     float metallic = 0.1;
 
-    vec3 color = AMBIENT * albedo;
+    vec3 color = scene.ambientColor.xyz * albedo;
 
     for (int i = 0; i < scene.numLights; i++)
     {

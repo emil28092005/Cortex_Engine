@@ -32,6 +32,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     public float ShadowBias { get; set; } = 0.0001f;
     public float ShadowSampleRadius { get; set; } = 0.015f;
     public float ShadowFarPlane { get; set; } = 60.0f;
+    public Vector3 AmbientColor { get; set; } = new(0.01f, 0.01f, 0.02f);
 
     public bool IsRecording { get; set; }
     public byte[]? CapturedFrame { get; private set; }
@@ -226,6 +227,10 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             var sp = new Vector4(ShadowBias, ShadowSampleRadius, ShadowFarPlane, 0);
             System.Buffer.MemoryCopy(&sp, uboData + 336 + i * 16, 16, 16);
         }
+
+        // Ambient color at offset 400 (after 4 shadowParams = 64 bytes)
+        var ambient = new Vector4(AmbientColor, 0);
+        System.Buffer.MemoryCopy(&ambient, uboData + 400, 16, 16);
 
         // Compute light view-proj for each shadow light
         var lightViewProjs = new Matrix4x4[numShadowLights];
