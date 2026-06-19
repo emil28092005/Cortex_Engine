@@ -158,6 +158,18 @@ class Program
                     secondLight.Set(lt);
                 }
 
+                var thirdLight = world.Lookup("ThirdLight");
+                if ((ulong)thirdLight.Id != 0)
+                {
+                    var t = totalTime + MathF.PI * 1.5f;
+                    var lx = MathF.Sin(t * 0.4f) * 12f;
+                    var ly = 10f + MathF.Sin(t * 0.3f) * 3f;
+                    var lz = MathF.Cos(t * 0.5f) * 12f;
+                    var lt = thirdLight.Get<Transform>();
+                    lt.Position = new Vector3(lx, ly, lz);
+                    thirdLight.Set(lt);
+                }
+
                 var processed = queue.ProcessPending();
                 if (processed > 0)
                     Console.WriteLine($"[App] Processed {processed} AI command(s)");
@@ -229,6 +241,26 @@ class Program
                         lc2.Intensity = i2; lc2.Range = r2;
                         lc2.Color = new Vector3(cr2, cg2, cb2);
                         secondLight2.Set(lc2);
+                    }
+
+                    ImGui.Separator();
+
+                    // Third light controls
+                    var thirdLight2 = world.Lookup("ThirdLight");
+                    if ((ulong)thirdLight2.Id != 0)
+                    {
+                        var lc3 = thirdLight2.Get<Light>();
+                        var i3 = lc3.Intensity; var r3 = lc3.Range;
+                        var cr3 = lc3.Color.X; var cg3 = lc3.Color.Y; var cb3 = lc3.Color.Z;
+                        ImGui.Text("Third Light (red)");
+                        ImGui.SliderFloat("3 Intensity", ref i3, 0.0f, 50.0f, "%.1f");
+                        ImGui.SliderFloat("3 Range", ref r3, 5.0f, 100.0f, "%.1f");
+                        ImGui.SliderFloat("3 R", ref cr3, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("3 G", ref cg3, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("3 B", ref cb3, 0.0f, 1.0f, "%.2f");
+                        lc3.Intensity = i3; lc3.Range = r3;
+                        lc3.Color = new Vector3(cr3, cg3, cb3);
+                        thirdLight2.Set(lc3);
                     }
 
                     ImGui.Separator();
@@ -368,14 +400,18 @@ class Program
                 .Set(coneMesh);
         }
 
-        // Lights
+        // Lights (3 dynamic point lights, all cast shadows)
         world.Entity("MainLight")
             .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 15.0f, range: 60.0f));
+            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 12.0f, range: 60.0f));
 
         world.Entity("SecondLight")
             .Set(new Transform(new Vector3(-12, 10, 8), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 10.0f, range: 40.0f));
+            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 8.0f, range: 40.0f));
+
+        world.Entity("ThirdLight")
+            .Set(new Transform(new Vector3(10, 8, -10), Quaternion.Identity, Vector3.One))
+            .Set(Light.Point(new Vector3(10, 8, -10), new Vector3(0.9f, 0.2f, 0.3f), intensity: 8.0f, range: 40.0f));
 
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
