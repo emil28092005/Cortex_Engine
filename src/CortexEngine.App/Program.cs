@@ -83,6 +83,8 @@ class Program
             var renderFrameTime = 1.0 / renderFps;
             var renderTimer = 0.0;
 
+            bool physicsEnabled = true;
+
             while (!window.ShouldClose)
             {
                 timing.Tick();
@@ -143,8 +145,11 @@ class Program
                     physicsWorld.CreateBody(e, rbInit, t);
                 }
 
-                physicsWorld.Update((float)timing.DeltaTime);
-                physicsWorld.SyncTransforms(world);
+                if (physicsEnabled)
+                {
+                    physicsWorld.Update((float)timing.DeltaTime);
+                    physicsWorld.SyncTransforms(world);
+                }
 
                 // Move lights in chaotic circles
                 var mainLight = world.Lookup("MainLight");
@@ -213,6 +218,31 @@ class Program
                     ImGui.Text($"Entities: {entityCount}");
                     ImGui.Text($"MCP: {(mcpPort > 0 ? $"port {mcpPort}" : "disabled")}");
                     ImGui.Text("WASD: move | RMB: look | Q/E: up/down | Shift: boost");
+                    ImGui.Separator();
+                    if (ImGui.Button(physicsEnabled ? "Pause Physics" : "Resume Physics"))
+                    {
+                        physicsEnabled = !physicsEnabled;
+                        Console.WriteLine($"[App] Physics: {(physicsEnabled ? "enabled" : "paused")}");
+                    }
+                    ImGui.SameLine();
+                    if (ImGui.Button("Reset Scene"))
+                    {
+                        // Delete all entities except Camera, lights, Floor
+                        var toDelete = new List<string>();
+                        world.Each((Entity e, ref Transform t) =>
+                        {
+                            var name = e.Name();
+                            if (name != "Camera" && name != "MainLight" && name != "SecondLight" && name != "ThirdLight" && name != "Floor")
+                                toDelete.Add(name);
+                        });
+                        foreach (var name in toDelete)
+                        {
+                            var ent = world.Lookup(name);
+                            if ((ulong)ent.Id != 0) ent.Destruct();
+                        }
+                        CreateObjects(world);
+                        Console.WriteLine($"[App] Scene reset: {toDelete.Count} entities deleted, scene recreated");
+                    }
                     ImGui.End();
 
                     // Shadow parameters panel
@@ -470,6 +500,28 @@ class Program
             .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)))
             .Set(RigidBody.StaticBox(new Vector3(20, 0.5f, 20)));
 
+        CreateObjects(world);
+
+        // Lights (3 dynamic point lights, all cast shadows)
+        world.Entity("MainLight")
+            .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
+            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 8.0f, range: 15.5f));
+
+        world.Entity("SecondLight")
+            .Set(new Transform(new Vector3(-12, 10, 8), Quaternion.Identity, Vector3.One))
+            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 8.0f, range: 15.5f));
+
+        world.Entity("ThirdLight")
+            .Set(new Transform(new Vector3(10, 8, -10), Quaternion.Identity, Vector3.One))
+            .Set(Light.Point(new Vector3(10, 8, -10), new Vector3(0.9f, 0.2f, 0.3f), intensity: 8.0f, range: 15.5f));
+
+        var entityCount = 0;
+        world.Each((Entity e, ref Transform _) => entityCount++);
+        Console.WriteLine($"[Scene] {entityCount} entities");
+    }
+
+    static void CreateObjects(World world)
+    {
         // Central torus knot (floating, no physics)
         var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.9f, 0.7f, 0.3f));
         world.Entity("TorusKnot")
@@ -542,23 +594,6 @@ class Program
                 .Set(new Transform(new Vector3(x, 0, z), Quaternion.Identity, new Vector3(2f, 3f, 2f)))
                 .Set(coneMesh);
         }
-
-        // Lights (3 dynamic point lights, all cast shadows)
-        world.Entity("MainLight")
-            .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 8.0f, range: 15.5f));
-
-        world.Entity("SecondLight")
-            .Set(new Transform(new Vector3(-12, 10, 8), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 8.0f, range: 15.5f));
-
-        world.Entity("ThirdLight")
-            .Set(new Transform(new Vector3(10, 8, -10), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(10, 8, -10), new Vector3(0.9f, 0.2f, 0.3f), intensity: 8.0f, range: 15.5f));
-
-        var entityCount = 0;
-        world.Each((Entity e, ref Transform _) => entityCount++);
-        Console.WriteLine($"[Scene] {entityCount} entities: sphere pyramid + diamond rain + 8 torus rings + 4 pyramids + 4 cones + floor + grid + light");
     }
 
     static Mesh LoadMesh(string path, Vector3 color)
