@@ -268,6 +268,16 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         if (IsRecording)
         {
             CapturedFrame = ReadCapturedBuffer();
+            if (CapturedFrame != null && CapturedFrame.Length > 0)
+            {
+                // Check if data is not all zeros
+                bool hasData = false;
+                for (int i = 0; i < CapturedFrame.Length; i += 4096)
+                {
+                    if (CapturedFrame[i] != 0) { hasData = true; break; }
+                }
+                if (!hasData) CapturedFrame = null;
+            }
         }
 
         uint imageIndex;
