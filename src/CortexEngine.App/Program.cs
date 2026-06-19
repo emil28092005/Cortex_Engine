@@ -133,12 +133,13 @@ class Program
                 var toInit = new List<(Entity, RigidBody, Transform)>();
                 world.Each((Entity e, ref RigidBody rb, ref Transform t) =>
                 {
-                    if (!rb.IsInitialized)
+                    if (!rb.IsInitialized && e.IsAlive())
                         toInit.Add((e, rb, t));
                 });
 
                 foreach (var (e, rb, t) in toInit)
                 {
+                    if (!e.IsAlive()) continue;
                     var rbInit = rb;
                     rbInit.IsInitialized = true;
                     e.Set(rbInit);
@@ -228,20 +229,19 @@ class Program
                     if (ImGui.Button("Reset Scene"))
                     {
                         // Delete all entities except Camera, lights, Floor
-                        var toDelete = new List<string>();
+                        var toDelete = new List<Entity>();
                         world.Each((Entity e, ref Transform t) =>
                         {
                             var name = e.Name();
                             if (name != "Camera" && name != "MainLight" && name != "SecondLight" && name != "ThirdLight" && name != "Floor")
-                                toDelete.Add(name);
+                                toDelete.Add(e);
                         });
-                        foreach (var name in toDelete)
+                        foreach (var ent in toDelete)
                         {
-                            var ent = world.Lookup(name);
-                            if ((ulong)ent.Id != 0) ent.Destruct();
+                            if (ent.IsAlive()) ent.Destruct();
                         }
                         CreateObjects(world);
-                        Console.WriteLine($"[App] Scene reset: {toDelete.Count} entities deleted, scene recreated");
+                        Console.WriteLine($"[App] Scene reset: {toDelete.Count} entities deleted");
                     }
                     ImGui.End();
 
