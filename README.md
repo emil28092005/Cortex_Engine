@@ -2,6 +2,8 @@
 
 AI-Native 3D game engine with pure P/Invoke Vulkan 1.3 render backend.
 
+![Cortex Engine Demo](cortex_demo.gif)
+
 ## Features
 
 - **Vulkan 1.3** — dynamic rendering, synchronization2, pure P/Invoke (no wrapper libraries)
