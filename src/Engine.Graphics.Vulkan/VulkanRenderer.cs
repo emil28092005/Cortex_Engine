@@ -505,15 +505,15 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
 
-        _imGui?.Render(cmd, _swapchain.Extent.Width, _swapchain.Extent.Height);
-
-        Vk.vkCmdEndRendering(cmd);
-
-        // Capture frame for video recording if enabled
+        // Capture frame BEFORE ImGui (video without UI)
         if (IsRecording)
         {
             CapturedFrame = CaptureFrame(cmd, imageIndex);
         }
+
+        _imGui?.Render(cmd, _swapchain.Extent.Width, _swapchain.Extent.Height);
+
+        Vk.vkCmdEndRendering(cmd);
 
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.PresentSrcKHR,
