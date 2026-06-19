@@ -309,7 +309,8 @@ class Program
 
                         var paramsText = sb.ToString();
                         ImGui.SetClipboardText(paramsText);
-                        Console.WriteLine("[App] Parameters copied to clipboard:\n" + paramsText);
+                        Console.WriteLine("[App] Parameters copied to clipboard:");
+                        Console.WriteLine(paramsText);
                     }
 
                     ImGui.End();
@@ -410,8 +411,7 @@ class Program
                                 isRecording = false;
                             }
                         }
-                    }
-                }
+                    }                }
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
@@ -531,15 +531,15 @@ class Program
         // Lights (3 dynamic point lights, all cast shadows)
         world.Entity("MainLight")
             .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 12.0f, range: 60.0f));
+            .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 8.0f, range: 15.5f));
 
         world.Entity("SecondLight")
             .Set(new Transform(new Vector3(-12, 10, 8), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 8.0f, range: 40.0f));
+            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 8.0f, range: 15.5f));
 
         world.Entity("ThirdLight")
             .Set(new Transform(new Vector3(10, 8, -10), Quaternion.Identity, Vector3.One))
-            .Set(Light.Point(new Vector3(10, 8, -10), new Vector3(0.9f, 0.2f, 0.3f), intensity: 8.0f, range: 40.0f));
+            .Set(Light.Point(new Vector3(10, 8, -10), new Vector3(0.9f, 0.2f, 0.3f), intensity: 8.0f, range: 15.5f));
 
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);
