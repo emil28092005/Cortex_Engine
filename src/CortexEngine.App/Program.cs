@@ -81,12 +81,12 @@ class Program
 
             const double renderFps = 60.0;
             var renderFrameTime = 1.0 / renderFps;
-            var renderAccumulator = 0.0;
+            var renderTimer = 0.0;
 
             while (!window.ShouldClose)
             {
                 timing.Tick();
-                renderAccumulator += timing.DeltaTime;
+                renderTimer += timing.DeltaTime;
 
                 // Physics + input run at full speed (uncapped)
                 window.PumpEvents();
@@ -389,9 +389,11 @@ class Program
                 }
 
                 // Fixed render rate: 60 FPS
-                renderAccumulator -= renderFrameTime;
-                if (renderAccumulator >= 0)
+                if (renderTimer >= renderFrameTime)
                 {
+                    renderTimer -= renderFrameTime;
+                    if (renderTimer > renderFrameTime) renderTimer = 0; // prevent spiral of death
+
                     // Set recording flag before render so renderer can capture
                     vkRenderer!.IsRecording = isRecording;
 
@@ -419,12 +421,6 @@ class Program
                     }
 
                     frames++;
-                }
-                else
-                {
-                    // Not enough time for a render frame — sleep briefly
-                    Thread.Sleep(1);
-                    continue;
                 }
                 if (timing.TotalTime - lastFpsTime >= 1.0)
                 {
