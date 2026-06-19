@@ -277,6 +277,34 @@ class Program
                     vkRenderer.ShadowSampleRadius = sampleRadius;
                     vkRenderer.ShadowFarPlane = farPlane;
 
+                    ImGui.Text($"Current: bias={bias:F4} radius={sampleRadius:F4} far={farPlane:F1}");
+
+                    if (ImGui.Button("Copy Parameters to Clipboard"))
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        sb.AppendLine($"shadowBias={bias:F4}");
+                        sb.AppendLine($"shadowSampleRadius={sampleRadius:F4}");
+                        sb.AppendLine($"shadowFarPlane={farPlane:F1}");
+                        sb.AppendLine($"shadowMapSize=1024");
+                        sb.AppendLine($"numLights=3");
+
+                        for (int li = 1; li <= 3; li++)
+                        {
+                            var le = world.Lookup(li == 1 ? "MainLight" : li == 2 ? "SecondLight" : "ThirdLight");
+                            if ((ulong)le.Id != 0)
+                            {
+                                var lc = le.Get<Light>();
+                                sb.AppendLine($"light{li}Intensity={lc.Intensity:F1}");
+                                sb.AppendLine($"light{li}Range={lc.Range:F1}");
+                                sb.AppendLine($"light{li}Color=({lc.Color.X:F2},{lc.Color.Y:F2},{lc.Color.Z:F2})");
+                            }
+                        }
+
+                        var paramsText = sb.ToString();
+                        ImGui.SetClipboardText(paramsText);
+                        Console.WriteLine("[App] Parameters copied to clipboard:\n" + paramsText);
+                    }
+
                     ImGui.End();
 
                     renderer.EndImGuiFrame();
