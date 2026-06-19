@@ -361,12 +361,12 @@ internal sealed unsafe class VulkanContext : IDisposable
         var formats = stackalloc VkSurfaceFormatKHR[(int)formatCount];
         Vk.vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &formatCount, formats);
 
-        SurfaceFormat = VkFormat.B8G8R8A8Srgb;
+        SurfaceFormat = VkFormat.B8G8R8A8Unorm;
         SurfaceColorSpace = VkColorSpaceKHR.SrgbNonlinearKHR;
 
         for (uint i = 0; i < formatCount; i++)
         {
-            if (formats[(int)i].format == VkFormat.B8G8R8A8Srgb &&
+            if (formats[(int)i].format == VkFormat.B8G8R8A8Unorm &&
                 formats[(int)i].colorSpace == VkColorSpaceKHR.SrgbNonlinearKHR)
             {
                 SurfaceFormat = formats[(int)i].format;
@@ -375,7 +375,7 @@ internal sealed unsafe class VulkanContext : IDisposable
             }
         }
 
-        if (SurfaceFormat == VkFormat.B8G8R8A8Srgb)
+        if (SurfaceFormat == VkFormat.B8G8R8A8Unorm)
         {
             SurfaceFormat = formats[0].format;
             SurfaceColorSpace = formats[0].colorSpace;

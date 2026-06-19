@@ -521,16 +521,40 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
 
+        // Capture BEFORE ImGui — video without UI
+        if (IsRecording)
+        {
+            // End rendering temporarily to do copy outside render pass
+            Vk.vkCmdEndRendering(cmd);
+            CaptureFrame(cmd, imageIndex);
+            
+            // Start new render pass for ImGui
+            var imgClearValue = new VkClearValue
+            {
+                Color = new VkClearColorValue { Float0 = 0, Float1 = 0, Float2 = 0, Float3 = 0 },
+            };
+            var imgLoadAttachment = new VkRenderingAttachmentInfo
+            {
+                sType = VkStructureType.RenderingAttachmentInfo,
+                imageView = _swapchain.ImageViews[imageIndex],
+                imageLayout = VkImageLayout.ColorAttachmentOptimal,
+                loadOp = VkAttachmentLoadOp.Load, // Keep existing content
+                storeOp = VkAttachmentStoreOp.Store,
+            };
+            var imgRenderingInfo = new VkRenderingInfo
+            {
+                sType = VkStructureType.RenderingInfo,
+                renderArea = new VkRect2D { Offset = new VkOffset2D { X = 0, Y = 0 }, Extent = _swapchain.Extent },
+                layerCount = 1,
+                colorAttachmentCount = 1,
+                pColorAttachments = &imgLoadAttachment,
+            };
+            Vk.vkCmdBeginRendering(cmd, &imgRenderingInfo);
+        }
+
         _imGui?.Render(cmd, _swapchain.Extent.Width, _swapchain.Extent.Height);
 
         Vk.vkCmdEndRendering(cmd);
-
-        // Capture frame for video recording — AFTER render pass, BEFORE present
-        // This captures scene + ImGui. To capture without UI, we'd need separate render pass.
-        if (IsRecording)
-        {
-            CaptureFrame(cmd, imageIndex);
-        }
 
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.PresentSrcKHR,
