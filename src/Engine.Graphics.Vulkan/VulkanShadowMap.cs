@@ -5,17 +5,17 @@ namespace Engine.Graphics.Vulkan;
 
 internal sealed unsafe class VulkanShadowMap : IDisposable
 {
-    public const uint ShadowMapSize = 2048;
-    public const float FarPlane = 60.0f;
+    public const uint ShadowMapSize = 1024;
+    public const int MaxShadowLights = 4;
 
     public VkImage ColorImage;
     public VkDeviceMemory ColorImageMemory;
-    public VkImageView CubeColorView;
-    public VkImageView[] FaceColorViews = new VkImageView[6];
+    public VkImageView CubeArrayColorView;
+    public VkImageView[] FaceColorViews = new VkImageView[MaxShadowLights * 6];
 
     public VkImage DepthImage;
     public VkDeviceMemory DepthImageMemory;
-    public VkImageView[] FaceDepthViews = new VkImageView[6];
+    public VkImageView[] FaceDepthViews = new VkImageView[MaxShadowLights * 6];
 
     public VkSampler ShadowSampler;
     public VkPipeline Pipeline;
@@ -35,12 +35,14 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
         CreateShadowSampler();
         CreateShadowPipeline();
 
-        Console.WriteLine("[Vulkan] Shadow cubemap created (1024x1024x6, R32_SFLOAT + D32_SFLOAT)");
+        Console.WriteLine($"[Vulkan] Shadow cubemap array created ({ShadowMapSize}x{ShadowMapSize}x{MaxShadowLights*6} layers)");
     }
 
     private void CreateShadowImages()
     {
-        // Color cube (R32_SFLOAT) — stores linear distance
+        int totalLayers = MaxShadowLights * 6;
+
+        // Color cube array (R32_SFLOAT) — stores linear distance
         var colorInfo = new VkImageCreateInfo
         {
             sType = VkStructureType.ImageCreateInfo,
@@ -49,7 +51,7 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
             format = VkFormat.R32Sfloat,
             extent = new VkExtent3D { Width = ShadowMapSize, Height = ShadowMapSize, Depth = 1 },
             mipLevels = 1,
-            arrayLayers = 6,
+            arrayLayers = (uint)totalLayers,
             samples = VkSampleCountFlags.Count1,
             tiling = VkImageTiling.Optimal,
             usage = VkImageUsageFlags.ColorAttachment | VkImageUsageFlags.Sampled,
@@ -70,22 +72,22 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
         ColorImageMemory = colorMem;
         Vk.vkBindImageMemory(_device, ColorImage, ColorImageMemory, 0);
 
-        // Cube color view for sampling
-        var cubeColorViewInfo = new VkImageViewCreateInfo
+        // Cube array color view for sampling
+        var cubeArrayViewInfo = new VkImageViewCreateInfo
         {
             sType = VkStructureType.ImageViewCreateInfo,
             image = ColorImage,
-            viewType = VkImageViewType.TypeCube,
+            viewType = VkImageViewType.TypeCubeArray,
             format = VkFormat.R32Sfloat,
             components = new VkComponentMapping { R = VkComponentSwizzle.Identity, G = VkComponentSwizzle.Identity, B = VkComponentSwizzle.Identity, A = VkComponentSwizzle.Identity },
-            subresourceRange = new VkImageSubresourceRange { AspectMask = VkImageAspectFlags.Color, BaseMipLevel = 0, LevelCount = 1, BaseArrayLayer = 0, LayerCount = 6 },
+            subresourceRange = new VkImageSubresourceRange { AspectMask = VkImageAspectFlags.Color, BaseMipLevel = 0, LevelCount = 1, BaseArrayLayer = 0, LayerCount = (uint)totalLayers },
         };
-        var cubeCV = VkImageView.Null;
-        Vk.vkCreateImageView(_device, &cubeColorViewInfo, 0, &cubeCV);
-        CubeColorView = cubeCV;
+        var cubeArrayView = VkImageView.Null;
+        Vk.vkCreateImageView(_device, &cubeArrayViewInfo, 0, &cubeArrayView);
+        CubeArrayColorView = cubeArrayView;
 
-        // 6 face color views
-        for (int i = 0; i < 6; i++)
+        // Face color views for rendering
+        for (int i = 0; i < totalLayers; i++)
         {
             var faceViewInfo = new VkImageViewCreateInfo
             {
@@ -101,7 +103,7 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
             FaceColorViews[i] = fv;
         }
 
-        // Depth cube (D32_SFLOAT) — for depth testing during shadow render
+        // Depth cube array (D32_SFLOAT)
         var depthInfo = new VkImageCreateInfo
         {
             sType = VkStructureType.ImageCreateInfo,
@@ -110,7 +112,7 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
             format = VkFormat.D32Sfloat,
             extent = new VkExtent3D { Width = ShadowMapSize, Height = ShadowMapSize, Depth = 1 },
             mipLevels = 1,
-            arrayLayers = 6,
+            arrayLayers = (uint)totalLayers,
             samples = VkSampleCountFlags.Count1,
             tiling = VkImageTiling.Optimal,
             usage = VkImageUsageFlags.DepthStencilAttachment,
@@ -131,8 +133,8 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
         DepthImageMemory = depthMem;
         Vk.vkBindImageMemory(_device, DepthImage, DepthImageMemory, 0);
 
-        // 6 face depth views
-        for (int i = 0; i < 6; i++)
+        // Face depth views
+        for (int i = 0; i < totalLayers; i++)
         {
             var faceDepthViewInfo = new VkImageViewCreateInfo
             {
@@ -323,7 +325,7 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
                 pDynamicStates = dynamicStates,
             };
 
-            var pushConstantRange = new VkPushConstantRange { stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, offset = 0, size = 176 };
+            var pushConstantRange = new VkPushConstantRange { stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, offset = 0, size = 160 };
 
             var layoutInfo = new VkPipelineLayoutCreateInfo
             {
@@ -415,8 +417,8 @@ internal sealed unsafe class VulkanShadowMap : IDisposable
         if (PipelineLayout.Handle != 0) Vk.vkDestroyPipelineLayout(_device, PipelineLayout, 0);
         if (VertModule.Handle != 0) Vk.vkDestroyShaderModule(_device, VertModule, 0);
         if (ShadowSampler.Handle != 0) Vk.vkDestroySampler(_device, ShadowSampler, 0);
-        if (CubeColorView.Handle != 0) Vk.vkDestroyImageView(_device, CubeColorView, 0);
-        for (int i = 0; i < 6; i++)
+        if (CubeArrayColorView.Handle != 0) Vk.vkDestroyImageView(_device, CubeArrayColorView, 0);
+        for (int i = 0; i < MaxShadowLights * 6; i++)
         {
             if (FaceColorViews[i].Handle != 0) Vk.vkDestroyImageView(_device, FaceColorViews[i], 0);
             if (FaceDepthViews[i].Handle != 0) Vk.vkDestroyImageView(_device, FaceDepthViews[i], 0);

@@ -154,7 +154,7 @@ internal sealed unsafe class VulkanPipeline : IDisposable
             {
                 stageFlags = VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment,
                 offset = 0,
-                size = 176,
+                size = 64,
             };
 
             var descLayout = DescriptorSetLayout;

@@ -6,19 +6,21 @@ layout(location = 2) in vec3 fragAlbedo;
 
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform CameraUBO {
-    mat4 vp;
+struct LightData {
+    vec4 posAndIntensity;
+    vec4 colorAndRange;
 };
 
-layout(set = 0, binding = 1) uniform samplerCube shadowCube;
+layout(set = 0, binding = 0) uniform SceneUBO {
+    mat4 vp;
+    int numLights;
+    int numShadowLights;
+    vec2 padding;
+    LightData lights[8];
+    vec4 shadowParams[4];
+} scene;
 
-layout(push_constant) uniform PC {
-    mat4 model;
-    vec4 lightPos;
-    vec4 lightColor;
-    mat4 lightViewProj;
-    vec4 shadowParams;
-} pc;
+layout(set = 0, binding = 1) uniform samplerCubeArray shadowArray;
 
 const vec3 AMBIENT = vec3(0.01, 0.01, 0.02);
 const float PI = 3.14159265359;
@@ -92,11 +94,11 @@ mat3 buildTangentBasis(vec3 dir)
     return mat3(tangent, bitangent, dir);
 }
 
-float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
+float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L, int lightIndex)
 {
-    float bias = pc.shadowParams.x;
-    float sampleRadius = pc.shadowParams.y;
-    float farPlane = pc.shadowParams.z;
+    float bias = scene.shadowParams[lightIndex].x;
+    float sampleRadius = scene.shadowParams[lightIndex].y;
+    float farPlane = scene.shadowParams[lightIndex].z;
 
     vec3 dir = worldPos - lightPos;
     float dist = length(dir);
@@ -112,7 +114,7 @@ float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
     for (int i = 0; i < 16; i++)
     {
         vec3 sampleDir = normalize(dirNorm + basis * (POISSON_DISK[i] * radius));
-        float sampleDepth = texture(shadowCube, sampleDir).r;
+        float sampleDepth = texture(shadowArray, vec4(sampleDir, float(lightIndex))).r;
         float sampleMapped = sampleDepth * farPlane;
         shadow += (dist - slopeBias < sampleMapped) ? 1.0 : 0.0;
     }
@@ -121,28 +123,8 @@ float calcShadow(vec3 worldPos, vec3 lightPos, vec3 N, vec3 L)
     return shadow;
 }
 
-void main()
+vec3 calcPBR(vec3 N, vec3 V, vec3 L, vec3 radiance, vec3 albedo, float roughness, float metallic)
 {
-    vec3 N = normalize(fragNormal);
-    vec3 V = normalize(-fragWorldPos);
-    vec3 albedo = fragAlbedo;
-    float roughness = 0.5;
-    float metallic = 0.1;
-
-    vec3 lightPos = pc.lightPos.xyz;
-    float lightIntensity = pc.lightPos.w;
-    vec3 lightColor = pc.lightColor.xyz;
-    float lightRange = pc.lightColor.w;
-
-    vec3 toLight = lightPos - fragWorldPos;
-    float dist = length(toLight);
-    vec3 L = toLight / max(dist, 0.001);
-
-    float attenuation = pow(clamp(1.0 - dist / max(lightRange, 0.001), 0.0, 1.0), 2.0);
-    vec3 radiance = lightColor * lightIntensity * attenuation;
-
-    float shadow = calcShadow(fragWorldPos, lightPos, N, L);
-
     vec3 H = normalize(V + L);
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
@@ -158,9 +140,41 @@ void main()
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
     float NdotL = max(dot(N, L), 0.0);
-    vec3 lighting = (kD * albedo / PI + specular) * radiance * NdotL * shadow;
+    return (kD * albedo / PI + specular) * radiance * NdotL;
+}
 
-    vec3 color = AMBIENT * albedo + lighting;
+void main()
+{
+    vec3 N = normalize(fragNormal);
+    vec3 V = normalize(-fragWorldPos);
+    vec3 albedo = fragAlbedo;
+    float roughness = 0.5;
+    float metallic = 0.1;
+
+    vec3 color = AMBIENT * albedo;
+
+    for (int i = 0; i < scene.numLights; i++)
+    {
+        vec3 lightPos = scene.lights[i].posAndIntensity.xyz;
+        float lightIntensity = scene.lights[i].posAndIntensity.w;
+        vec3 lightColor = scene.lights[i].colorAndRange.xyz;
+        float lightRange = scene.lights[i].colorAndRange.w;
+
+        vec3 toLight = lightPos - fragWorldPos;
+        float dist = length(toLight);
+        vec3 L = toLight / max(dist, 0.001);
+
+        float attenuation = pow(clamp(1.0 - dist / max(lightRange, 0.001), 0.0, 1.0), 2.0);
+        vec3 radiance = lightColor * lightIntensity * attenuation;
+
+        float shadow = 1.0;
+        if (i < scene.numShadowLights)
+        {
+            shadow = calcShadow(fragWorldPos, lightPos, N, L, i);
+        }
+
+        color += calcPBR(N, V, L, radiance, albedo, roughness, metallic) * shadow;
+    }
 
     color = acesTonemap(color);
     color = pow(color, vec3(1.0 / 2.2));

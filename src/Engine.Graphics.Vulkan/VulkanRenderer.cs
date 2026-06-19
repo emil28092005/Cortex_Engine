@@ -47,7 +47,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         _shadowMap = new VulkanShadowMap(ctx.Device, ctx, _pipeline.DescriptorSetLayout);
 
         for (int i = 0; i < VulkanFrameResources.MaxFramesInFlight; i++)
-            _frameResources.UpdateShadowDescriptor(i, _shadowMap.ShadowSampler, _shadowMap.CubeColorView);
+            _frameResources.UpdateShadowDescriptor(i, _shadowMap.ShadowSampler, _shadowMap.CubeArrayColorView);
 
         _imGui = new VulkanImGui(ctx, _frameResources.CommandPool, swapchain.Format, swapchain.DepthFormat);
     }
@@ -87,40 +87,56 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             vp = Matrix4x4.CreateLookAt(new Vector3(0, 0, -6), Vector3.Zero, Vector3.UnitY) * proj;
         }
 
-        // Collect point light from ECS — prefer light attached to a moving entity
-        var lightPos = new Vector4(0, 5, 0, 0);
-        var lightColor = new Vector4(1, 1, 1, 0);
+        // Collect all point lights from ECS
+        var lights = new List<(Vector3 pos, float intensity, Vector3 color, float range)>();
         world.Each((Entity e, ref Light l, ref Transform lt) =>
         {
-            if (l.IsPoint && lightPos.W == 0)
-            {
-                lightPos = new Vector4(lt.Position, l.Intensity);
-                lightColor = new Vector4(l.Color, l.Range);
-            }
+            if (l.IsPoint)
+                lights.Add((lt.Position, l.Intensity, l.Color, l.Range));
         });
-        if (lightPos.W == 0)
+        if (lights.Count == 0)
         {
             world.Each((Entity e, ref Light l) =>
             {
-                if (l.IsPoint && lightPos.W == 0)
-                {
-                    lightPos = new Vector4(l.Position, l.Intensity);
-                    lightColor = new Vector4(l.Color, l.Range);
-                }
+                if (l.IsPoint)
+                    lights.Add((l.Position, l.Intensity, l.Color, l.Range));
             });
         }
 
-        // Pack UBO: just mat4 vp (64 bytes)
-        var uboData = stackalloc byte[64];
+        int numLights = Math.Min(lights.Count, 8);
+        int numShadowLights = Math.Min(numLights, VulkanShadowMap.MaxShadowLights);
+
+        // Pack SceneUBO: mat4 vp(64) + int numLights(4) + int numShadowLights(4) + vec2 pad(8) + LightData[8](256) + vec4 shadowParams[4](64) = 400B → pad to 448
+        var uboData = stackalloc byte[448];
         var vpCopy = vp;
         System.Buffer.MemoryCopy(&vpCopy, uboData, 64, 64);
+        *(int*)(uboData + 64) = numLights;
+        *(int*)(uboData + 68) = numShadowLights;
 
-        // Compute light view-projection matrix for shadow mapping
-        var lightPosVec = new Vector3(lightPos.X, lightPos.Y, lightPos.Z);
-        var lightView = Matrix4x4.CreateLookAt(lightPosVec, Vector3.Zero, Vector3.UnitY);
-        var lightProj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 3f, 1.0f, 0.1f, 60f);
-        lightProj.M22 *= -1;
-        var lightViewProj = lightView * lightProj;
+        for (int i = 0; i < numLights; i++)
+        {
+            var lp = new Vector4(lights[i].pos, lights[i].intensity);
+            var lc = new Vector4(lights[i].color, lights[i].range);
+            var lightOffset = 80 + i * 32;
+            System.Buffer.MemoryCopy(&lp, uboData + lightOffset, 16, 16);
+            System.Buffer.MemoryCopy(&lc, uboData + lightOffset + 16, 16, 16);
+        }
+
+        // Shadow params per shadow light
+        for (int i = 0; i < numShadowLights; i++)
+        {
+            var sp = new Vector4(ShadowBias, ShadowSampleRadius, ShadowFarPlane, 0);
+            System.Buffer.MemoryCopy(&sp, uboData + 336 + i * 16, 16, 16);
+        }
+
+        // Compute light view-proj for each shadow light
+        var lightViewProjs = new Matrix4x4[numShadowLights];
+        for (int i = 0; i < numShadowLights; i++)
+        {
+            var lightView = Matrix4x4.CreateLookAt(lights[i].pos, Vector3.Zero, Vector3.UnitY);
+            var lightProj = Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 2f, 1.0f, 0.1f, ShadowFarPlane);
+            lightViewProjs[i] = lightView * lightProj;
+        }
 
         var drawCalls = new List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)>();
 
@@ -142,10 +158,10 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             drawCalls.Add((entry.vb.Buffer, entry.ib.Buffer, entry.indexCount, t.GetMatrix(), castShadow));
         });
 
-        Render(vp, drawCalls, uboData, lightPos, lightColor, lightViewProj);
+        Render(vp, drawCalls, uboData, lights, lightViewProjs, numShadowLights);
     }
 
-    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)> drawCalls, byte* uboData, Vector4 lightPos, Vector4 lightColor, Matrix4x4 lightViewProj)
+    private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)> drawCalls, byte* uboData, List<(Vector3 pos, float intensity, Vector3 color, float range)> lights, Matrix4x4[] lightViewProjs, int numShadowLights)
     {
         _frameResources.WaitFrame(_frameIndex);
 
@@ -157,7 +173,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         {
             _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
                                 _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
-            Render(vp, drawCalls, uboData, lightPos, lightColor, lightViewProj);
+            Render(vp, drawCalls, uboData, lights, lightViewProjs, numShadowLights);
             return;
         }
 
@@ -178,122 +194,123 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         };
         Vk.vkBeginCommandBuffer(cmd, &beginInfo);
 
-        // === SHADOW CUBEMAP PASSES (6 faces) ===
-        // Transition color cube: Undefined → ColorAttachmentOptimal
+        // === SHADOW CUBEMAP ARRAY PASSES (numShadowLights × 6 faces) ===
+        int totalLayers = numShadowLights * 6;
         TransitionImageLayout(cmd, _shadowMap.ColorImage,
             VkImageLayout.Undefined, VkImageLayout.ColorAttachmentOptimal,
-            0, 0, 0x400, 0x100, 6);
-        // Transition depth cube: Undefined → DepthStencilAttachmentOptimal
+            0, 0, 0x400, 0x100, (uint)totalLayers);
         TransitionImageLayoutDepth(cmd, _shadowMap.DepthImage,
             VkImageLayout.Undefined, VkImageLayout.DepthStencilAttachmentOptimal,
-            0, 0, 0x100, 0x200, 6);
+            0, 0, 0x100, 0x200, (uint)totalLayers);
 
-        var lightPosVec = new Vector3(lightPos.X, lightPos.Y, lightPos.Z);
-
-        for (int face = 0; face < 6; face++)
+        for (int lightIdx = 0; lightIdx < numShadowLights; lightIdx++)
         {
-            var (faceView, faceProj) = VulkanShadowMap.GetFaceViewProj(lightPosVec, face);
-            var faceViewProj = faceView * faceProj;
+            var lightPosVec = lights[lightIdx].pos;
 
-            var colorClear = new VkClearValue
+            for (int face = 0; face < 6; face++)
             {
-                Color = new VkClearColorValue { Float0 = 1.0f, Float1 = 0, Float2 = 0, Float3 = 0 },
-            };
+                var (faceView, faceProj) = VulkanShadowMap.GetFaceViewProj(lightPosVec, face);
+                var faceViewProj = faceView * faceProj;
+                int faceIndex = lightIdx * 6 + face;
 
-            var shadowColorAttachment = new VkRenderingAttachmentInfo
-            {
-                sType = VkStructureType.RenderingAttachmentInfo,
-                imageView = _shadowMap.FaceColorViews[face],
-                imageLayout = VkImageLayout.ColorAttachmentOptimal,
-                loadOp = VkAttachmentLoadOp.Clear,
-                storeOp = VkAttachmentStoreOp.Store,
-                clearValue = colorClear,
-            };
+                var colorClear = new VkClearValue
+                {
+                    Color = new VkClearColorValue { Float0 = 1.0f, Float1 = 0, Float2 = 0, Float3 = 0 },
+                };
 
-            var shadowDepthClear = new VkClearValue
-            {
-                DepthStencil = new VkClearDepthStencilValue { Depth = 1.0f, Stencil = 0 },
-            };
+                var shadowColorAttachment = new VkRenderingAttachmentInfo
+                {
+                    sType = VkStructureType.RenderingAttachmentInfo,
+                    imageView = _shadowMap.FaceColorViews[faceIndex],
+                    imageLayout = VkImageLayout.ColorAttachmentOptimal,
+                    loadOp = VkAttachmentLoadOp.Clear,
+                    storeOp = VkAttachmentStoreOp.Store,
+                    clearValue = colorClear,
+                };
 
-            var shadowDepthAttachment = new VkRenderingAttachmentInfo
-            {
-                sType = VkStructureType.RenderingAttachmentInfo,
-                imageView = _shadowMap.FaceDepthViews[face],
-                imageLayout = VkImageLayout.DepthStencilAttachmentOptimal,
-                loadOp = VkAttachmentLoadOp.Clear,
-                storeOp = VkAttachmentStoreOp.Store,
-                clearValue = shadowDepthClear,
-            };
+                var shadowDepthClear = new VkClearValue
+                {
+                    DepthStencil = new VkClearDepthStencilValue { Depth = 1.0f, Stencil = 0 },
+                };
 
-            var shadowRenderingInfo = new VkRenderingInfo
-            {
-                sType = VkStructureType.RenderingInfo,
-                renderArea = new VkRect2D
+                var shadowDepthAttachment = new VkRenderingAttachmentInfo
+                {
+                    sType = VkStructureType.RenderingAttachmentInfo,
+                    imageView = _shadowMap.FaceDepthViews[faceIndex],
+                    imageLayout = VkImageLayout.DepthStencilAttachmentOptimal,
+                    loadOp = VkAttachmentLoadOp.Clear,
+                    storeOp = VkAttachmentStoreOp.Store,
+                    clearValue = shadowDepthClear,
+                };
+
+                var shadowRenderingInfo = new VkRenderingInfo
+                {
+                    sType = VkStructureType.RenderingInfo,
+                    renderArea = new VkRect2D
+                    {
+                        Offset = new VkOffset2D { X = 0, Y = 0 },
+                        Extent = new VkExtent2D { Width = VulkanShadowMap.ShadowMapSize, Height = VulkanShadowMap.ShadowMapSize },
+                    },
+                    layerCount = 1,
+                    colorAttachmentCount = 1,
+                    pColorAttachments = &shadowColorAttachment,
+                    pDepthAttachment = &shadowDepthAttachment,
+                };
+
+                Vk.vkCmdBeginRendering(cmd, &shadowRenderingInfo);
+                Vk.vkCmdBindPipeline(cmd, VkPipelineBindPoint.Graphics, _shadowMap.Pipeline);
+
+                var shadowViewport = new VkViewport
+                {
+                    X = 0, Y = 0,
+                    Width = VulkanShadowMap.ShadowMapSize,
+                    Height = VulkanShadowMap.ShadowMapSize,
+                    MinDepth = 0, MaxDepth = 1,
+                };
+                Vk.vkCmdSetViewport(cmd, 0, 1, &shadowViewport);
+
+                var shadowScissor = new VkRect2D
                 {
                     Offset = new VkOffset2D { X = 0, Y = 0 },
                     Extent = new VkExtent2D { Width = VulkanShadowMap.ShadowMapSize, Height = VulkanShadowMap.ShadowMapSize },
-                },
-                layerCount = 1,
-                colorAttachmentCount = 1,
-                pColorAttachments = &shadowColorAttachment,
-                pDepthAttachment = &shadowDepthAttachment,
-            };
+                };
+                Vk.vkCmdSetScissor(cmd, 0, 1, &shadowScissor);
+                Vk.vkCmdSetDepthBias(cmd, 1.75f, 0.0f, 2.5f);
 
-            Vk.vkCmdBeginRendering(cmd, &shadowRenderingInfo);
-
-            Vk.vkCmdBindPipeline(cmd, VkPipelineBindPoint.Graphics, _shadowMap.Pipeline);
-
-            var shadowViewport = new VkViewport
-            {
-                X = 0, Y = 0,
-                Width = VulkanShadowMap.ShadowMapSize,
-                Height = VulkanShadowMap.ShadowMapSize,
-                MinDepth = 0, MaxDepth = 1,
-            };
-            Vk.vkCmdSetViewport(cmd, 0, 1, &shadowViewport);
-
-            var shadowScissor = new VkRect2D
-            {
-                Offset = new VkOffset2D { X = 0, Y = 0 },
-                Extent = new VkExtent2D { Width = VulkanShadowMap.ShadowMapSize, Height = VulkanShadowMap.ShadowMapSize },
-            };
-            Vk.vkCmdSetScissor(cmd, 0, 1, &shadowScissor);
-
-            Vk.vkCmdSetDepthBias(cmd, 1.75f, 0.0f, 2.5f);
-
-            foreach (var dc in drawCalls)
-            {
-                if (!dc.castShadow) continue;
-
-                var vertexBuf = dc.vertexBuf;
-                ulong offset = 0;
-                Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
-                Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
-
-                var pcData = stackalloc byte[176];
-                var modelCopy = dc.model;
-                System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
-                var lpCopy = lightPos;
-                System.Buffer.MemoryCopy(&lpCopy, pcData + 64, 16, 16);
-                var lcCopy = lightColor;
-                System.Buffer.MemoryCopy(&lcCopy, pcData + 80, 16, 16);
-                var lvpCopy = faceViewProj;
-                System.Buffer.MemoryCopy(&lvpCopy, pcData + 96, 64, 64);
+                var lpVec4 = new Vector4(lightPosVec, lights[lightIdx].intensity);
                 var sp = new Vector4(ShadowBias, ShadowSampleRadius, ShadowFarPlane, 0);
-                System.Buffer.MemoryCopy(&sp, pcData + 160, 16, 16);
 
-                Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 176, pcData);
+                foreach (var dc in drawCalls)
+                {
+                    if (!dc.castShadow) continue;
 
-                Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
+                    var vertexBuf = dc.vertexBuf;
+                    ulong offset = 0;
+                    Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
+                    Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
+
+                    // Pack shadow push constants: model(64) + lightViewProj(64) + lightPos(16) + shadowParams(16) = 160
+                    var pcData = stackalloc byte[160];
+                    var modelCopy = dc.model;
+                    System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
+                    var lvpCopy = faceViewProj;
+                    System.Buffer.MemoryCopy(&lvpCopy, pcData + 64, 64, 64);
+                    System.Buffer.MemoryCopy(&lpVec4, pcData + 128, 16, 16);
+                    System.Buffer.MemoryCopy(&sp, pcData + 144, 16, 16);
+
+                    Vk.vkCmdPushConstants(cmd, _shadowMap.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 160, pcData);
+
+                    Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
+                }
+
+                Vk.vkCmdEndRendering(cmd);
             }
-
-            Vk.vkCmdEndRendering(cmd);
         }
 
-        // Transition shadow color cube: ColorAttachmentOptimal → ShaderReadOnlyOptimal
+        // Transition shadow color array: ColorAttachmentOptimal → ShaderReadOnlyOptimal
         TransitionImageLayout(cmd, _shadowMap.ColorImage,
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.ShaderReadOnlyOptimal,
-            0x400, 0x100, 0x8, 0x20, 6);
+            0x400, 0x100, 0x8, 0x20, (uint)totalLayers);
 
         // === MAIN PASS ===
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
@@ -381,20 +398,9 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             Vk.vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuf, &offset);
             Vk.vkCmdBindIndexBuffer(cmd, dc.indexBuf, 0, 1);
 
-            // Pack all push constants: model(64) + lightPos(16) + lightColor(16) + lightViewProj(64) = 160
-            var pcData = stackalloc byte[176];
-            var modelCopy = dc.model;
-            System.Buffer.MemoryCopy(&modelCopy, pcData, 64, 64);
-            var lpCopy = lightPos;
-            System.Buffer.MemoryCopy(&lpCopy, pcData + 64, 16, 16);
-            var lcCopy = lightColor;
-            System.Buffer.MemoryCopy(&lcCopy, pcData + 80, 16, 16);
-            var lvpCopy = lightViewProj;
-            System.Buffer.MemoryCopy(&lvpCopy, pcData + 96, 64, 64);
-            var sp = new Vector4(ShadowBias, ShadowSampleRadius, ShadowFarPlane, 0);
-            System.Buffer.MemoryCopy(&sp, pcData + 160, 16, 16);
-
-            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 176, pcData);
+            // Main pass push constants: model only (64B)
+            var model = dc.model;
+            Vk.vkCmdPushConstants(cmd, _pipeline.PipelineLayout, VkShaderStageFlags.Vertex | VkShaderStageFlags.Fragment, 0, 64, &model);
 
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }

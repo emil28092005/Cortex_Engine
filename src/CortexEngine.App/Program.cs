@@ -133,17 +133,29 @@ class Program
                 physicsWorld.Update((float)timing.DeltaTime);
                 physicsWorld.SyncTransforms(world);
 
-                // Move light in a chaotic circle
-                var lightEntity = world.Lookup("MainLight");
-                if ((ulong)lightEntity.Id != 0)
+                // Move lights in chaotic circles
+                var mainLight = world.Lookup("MainLight");
+                if ((ulong)mainLight.Id != 0)
                 {
                     var t = totalTime;
                     var lx = MathF.Sin(t * 0.7f) * 8f + MathF.Cos(t * 0.3f) * 3f;
                     var ly = 12f + MathF.Sin(t * 0.5f) * 5f;
                     var lz = MathF.Cos(t * 0.6f) * 8f + MathF.Sin(t * 0.4f) * 3f;
-                    var lt = lightEntity.Get<Transform>();
+                    var lt = mainLight.Get<Transform>();
                     lt.Position = new Vector3(lx, ly, lz);
-                    lightEntity.Set(lt);
+                    mainLight.Set(lt);
+                }
+
+                var secondLight = world.Lookup("SecondLight");
+                if ((ulong)secondLight.Id != 0)
+                {
+                    var t = totalTime + MathF.PI;
+                    var lx = MathF.Cos(t * 0.5f) * 10f + MathF.Sin(t * 0.2f) * 4f;
+                    var ly = 8f + MathF.Cos(t * 0.4f) * 4f;
+                    var lz = MathF.Sin(t * 0.6f) * 10f + MathF.Cos(t * 0.3f) * 3f;
+                    var lt = secondLight.Get<Transform>();
+                    lt.Position = new Vector3(lx, ly, lz);
+                    secondLight.Set(lt);
                 }
 
                 var processed = queue.ProcessPending();
@@ -179,58 +191,59 @@ class Program
                     ImGui.End();
 
                     // Shadow parameters panel
-                    ImGui.Begin("Shadow Parameters");
+                    ImGui.Begin("Shadow & Light Parameters");
 
-                    var lightEntity2 = world.Lookup("MainLight");
-                    if ((ulong)lightEntity2.Id != 0)
+                    // Main light controls
+                    var mainLight2 = world.Lookup("MainLight");
+                    if ((ulong)mainLight2.Id != 0)
                     {
-                        var lightComp = lightEntity2.Get<Light>();
-                        var intensity = lightComp.Intensity;
-                        var range = lightComp.Range;
-                        var colorR = lightComp.Color.X;
-                        var colorG = lightComp.Color.Y;
-                        var colorB = lightComp.Color.Z;
-
-                        ImGui.SliderFloat("Light Intensity", ref intensity, 0.0f, 100.0f, "%.1f");
-                        ImGui.SliderFloat("Light Range", ref range, 5.0f, 100.0f, "%.1f");
-                        ImGui.SliderFloat("Light R", ref colorR, 0.0f, 1.0f, "%.2f");
-                        ImGui.SliderFloat("Light G", ref colorG, 0.0f, 1.0f, "%.2f");
-                        ImGui.SliderFloat("Light B", ref colorB, 0.0f, 1.0f, "%.2f");
-                        ImGui.Separator();
-
-                        lightComp.Intensity = intensity;
-                        lightComp.Range = range;
-                        lightComp.Color = new Vector3(colorR, colorG, colorB);
-                        lightEntity2.Set(lightComp);
+                        var lc1 = mainLight2.Get<Light>();
+                        var i1 = lc1.Intensity; var r1 = lc1.Range;
+                        var cr1 = lc1.Color.X; var cg1 = lc1.Color.Y; var cb1 = lc1.Color.Z;
+                        ImGui.Text("Main Light (warm)");
+                        ImGui.SliderFloat("1 Intensity", ref i1, 0.0f, 50.0f, "%.1f");
+                        ImGui.SliderFloat("1 Range", ref r1, 5.0f, 100.0f, "%.1f");
+                        ImGui.SliderFloat("1 R", ref cr1, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("1 G", ref cg1, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("1 B", ref cb1, 0.0f, 1.0f, "%.2f");
+                        lc1.Intensity = i1; lc1.Range = r1;
+                        lc1.Color = new Vector3(cr1, cg1, cb1);
+                        mainLight2.Set(lc1);
                     }
+
+                    ImGui.Separator();
+
+                    // Second light controls
+                    var secondLight2 = world.Lookup("SecondLight");
+                    if ((ulong)secondLight2.Id != 0)
+                    {
+                        var lc2 = secondLight2.Get<Light>();
+                        var i2 = lc2.Intensity; var r2 = lc2.Range;
+                        var cr2 = lc2.Color.X; var cg2 = lc2.Color.Y; var cb2 = lc2.Color.Z;
+                        ImGui.Text("Second Light (cool)");
+                        ImGui.SliderFloat("2 Intensity", ref i2, 0.0f, 50.0f, "%.1f");
+                        ImGui.SliderFloat("2 Range", ref r2, 5.0f, 100.0f, "%.1f");
+                        ImGui.SliderFloat("2 R", ref cr2, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("2 G", ref cg2, 0.0f, 1.0f, "%.2f");
+                        ImGui.SliderFloat("2 B", ref cb2, 0.0f, 1.0f, "%.2f");
+                        lc2.Intensity = i2; lc2.Range = r2;
+                        lc2.Color = new Vector3(cr2, cg2, cb2);
+                        secondLight2.Set(lc2);
+                    }
+
+                    ImGui.Separator();
 
                     var bias = vkRenderer.ShadowBias;
                     var sampleRadius = vkRenderer.ShadowSampleRadius;
                     var farPlane = vkRenderer.ShadowFarPlane;
 
-                    ImGui.SliderFloat("Shadow Bias", ref bias, 0.001f, 0.5f, "%.4f");
+                    ImGui.SliderFloat("Shadow Bias", ref bias, 0.0001f, 0.1f, "%.4f");
                     ImGui.SliderFloat("Sample Radius", ref sampleRadius, 0.001f, 0.1f, "%.4f");
                     ImGui.SliderFloat("Far Plane", ref farPlane, 10.0f, 120.0f, "%.1f");
-                    ImGui.Separator();
 
                     vkRenderer.ShadowBias = bias;
                     vkRenderer.ShadowSampleRadius = sampleRadius;
                     vkRenderer.ShadowFarPlane = farPlane;
-
-                    ImGui.Text($"Current: bias={bias:F4} radius={sampleRadius:F4} far={farPlane:F1}");
-
-                    if (ImGui.Button("Copy Parameters to Clipboard"))
-                    {
-                        var paramsText = $"bias={bias:F4}\nsampleRadius={sampleRadius:F4}\nfarPlane={farPlane:F1}\nshadowMapSize=2048";
-                        var lightEntity3 = world.Lookup("MainLight");
-                        if ((ulong)lightEntity3.Id != 0)
-                        {
-                            var lc = lightEntity3.Get<Light>();
-                            paramsText += $"\nlightIntensity={lc.Intensity:F1}\nlightRange={lc.Range:F1}\nlightColor=({lc.Color.X:F2},{lc.Color.Y:F2},{lc.Color.Z:F2})";
-                        }
-                        ImGui.SetClipboardText(paramsText);
-                        Console.WriteLine("[App] Parameters copied to clipboard:\n" + paramsText);
-                    }
 
                     ImGui.End();
 
@@ -355,10 +368,14 @@ class Program
                 .Set(coneMesh);
         }
 
-        // Light
+        // Lights
         world.Entity("MainLight")
             .Set(new Transform(new Vector3(0, 20, 0), Quaternion.Identity, Vector3.One))
             .Set(Light.Point(new Vector3(0, 20, 0), new Vector3(1.0f, 0.95f, 0.85f), intensity: 15.0f, range: 60.0f));
+
+        world.Entity("SecondLight")
+            .Set(new Transform(new Vector3(-12, 10, 8), Quaternion.Identity, Vector3.One))
+            .Set(Light.Point(new Vector3(-12, 10, 8), new Vector3(0.3f, 0.6f, 1.0f), intensity: 10.0f, range: 40.0f));
 
         var entityCount = 0;
         world.Each((Entity e, ref Transform _) => entityCount++);

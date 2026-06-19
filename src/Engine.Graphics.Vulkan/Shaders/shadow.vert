@@ -4,9 +4,8 @@ layout(location = 0) in vec3 inPosition;
 
 layout(push_constant) uniform PC {
     mat4 model;
-    vec4 lightPos;
-    vec4 lightColor;
     mat4 lightViewProj;
+    vec4 lightPos;
     vec4 shadowParams;
 } pc;
 
