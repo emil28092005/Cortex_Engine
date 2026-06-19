@@ -120,7 +120,7 @@ internal sealed unsafe class VulkanImGui : IDisposable
         var cmd = BeginOneTimeCommands();
         TransitionImageLayoutCmd(cmd, _fontImage,
             VkImageLayout.Undefined, VkImageLayout.TransferDstOptimal,
-            0, 0, 0x1000, 0x2000);
+            0, 0, 0x1000, 0x1000);
 
         var region = new VkBufferImageCopyRegion
         {
@@ -141,7 +141,7 @@ internal sealed unsafe class VulkanImGui : IDisposable
 
         TransitionImageLayoutCmd(cmd, _fontImage,
             VkImageLayout.TransferDstOptimal, VkImageLayout.ShaderReadOnlyOptimal,
-            0x1000, 0x2000, 0x8, 0x20);
+            0x1000, 0x1000, 0x8, 0x20);
 
         EndOneTimeCommands(cmd);
 
