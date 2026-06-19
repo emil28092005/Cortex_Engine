@@ -228,6 +228,9 @@ class Program
                     ImGui.SameLine();
                     if (ImGui.Button("Reset Scene"))
                     {
+                        // Pause physics during reset
+                        physicsEnabled = false;
+
                         // Delete all entities except Camera, lights, Floor
                         var toDelete = new List<Entity>();
                         world.Each((Entity e, ref Transform t) =>
@@ -236,11 +239,20 @@ class Program
                             if (name != "Camera" && name != "MainLight" && name != "SecondLight" && name != "ThirdLight" && name != "Floor")
                                 toDelete.Add(e);
                         });
+
+                        // Remove RigidBody from physics before destructing
                         foreach (var ent in toDelete)
                         {
-                            if (ent.IsAlive()) ent.Destruct();
+                            if (ent.IsAlive())
+                            {
+                                if (ent.Has<RigidBody>())
+                                    physicsWorld.RemoveBody(ent);
+                                ent.Destruct();
+                            }
                         }
+
                         CreateObjects(world);
+                        physicsEnabled = true;
                         Console.WriteLine($"[App] Scene reset: {toDelete.Count} entities deleted");
                     }
                     ImGui.End();
