@@ -359,21 +359,41 @@ internal sealed unsafe class VulkanContext : IDisposable
         var formats = stackalloc VkSurfaceFormatKHR[(int)formatCount];
         Vk.vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, Surface, &formatCount, formats);
 
-        SurfaceFormat = VkFormat.B8G8R8A8Srgb;
+        // Prefer B8G8R8A8_UNORM for compatibility with video capture (raw byte layout)
+        SurfaceFormat = VkFormat.B8G8R8A8Unorm;
         SurfaceColorSpace = VkColorSpaceKHR.SrgbNonlinearKHR;
+        bool found = false;
 
         for (uint i = 0; i < formatCount; i++)
         {
-            if (formats[(int)i].format == VkFormat.B8G8R8A8Srgb &&
+            if (formats[(int)i].format == VkFormat.B8G8R8A8Unorm &&
                 formats[(int)i].colorSpace == VkColorSpaceKHR.SrgbNonlinearKHR)
             {
                 SurfaceFormat = formats[(int)i].format;
                 SurfaceColorSpace = formats[(int)i].colorSpace;
+                found = true;
                 break;
             }
         }
 
-        if (SurfaceFormat == VkFormat.B8G8R8A8Srgb)
+        // Fallback to SRGB if UNORM not available
+        if (!found)
+        {
+            for (uint i = 0; i < formatCount; i++)
+            {
+                if (formats[(int)i].format == VkFormat.B8G8R8A8Srgb &&
+                    formats[(int)i].colorSpace == VkColorSpaceKHR.SrgbNonlinearKHR)
+                {
+                    SurfaceFormat = formats[(int)i].format;
+                    SurfaceColorSpace = formats[(int)i].colorSpace;
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        // Last resort: first available
+        if (!found)
         {
             SurfaceFormat = formats[0].format;
             SurfaceColorSpace = formats[0].colorSpace;

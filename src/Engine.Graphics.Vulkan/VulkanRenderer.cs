@@ -149,34 +149,8 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         Marshal.Copy((nint)pData, result, 0, (int)_screenshotBufferSize);
         Vk.vkUnmapMemory(_ctx.Device, _screenshotMemory);
 
-        // Swapchain is B8G8R8A8_SRGB — raw bytes are SRGB-encoded
-        // Convert SRGB→linear for FFmpeg (which expects linear bgra)
-        for (int i = 0; i < result.Length; i += 4)
-        {
-            result[i] = SrgbToLinear(result[i]);     // B
-            result[i + 1] = SrgbToLinear(result[i + 1]); // G
-            result[i + 2] = SrgbToLinear(result[i + 2]); // R
-            // result[i + 3] = A (keep as-is)
-        }
-
         return result;
     }
-
-    private static readonly byte[] SrgbLut = BuildSrgbLut();
-
-    private static byte[] BuildSrgbLut()
-    {
-        var lut = new byte[256];
-        for (int i = 0; i < 256; i++)
-        {
-            float s = i / 255.0f;
-            float l = s <= 0.04045f ? s / 12.92f : MathF.Pow((s + 0.055f) / 1.055f, 2.4f);
-            lut[i] = (byte)Math.Clamp(l * 255.0f, 0, 255);
-        }
-        return lut;
-    }
-
-    private static byte SrgbToLinear(byte srgb) => SrgbLut[srgb];
 
     public void BeginImGuiFrame()
     {
