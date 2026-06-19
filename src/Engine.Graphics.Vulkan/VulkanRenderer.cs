@@ -308,12 +308,13 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 
         // === SHADOW CUBEMAP ARRAY PASSES (numShadowLights × 6 faces) ===
         int totalLayers = numShadowLights * 6;
+        // Always transition ALL layers (24) to avoid UNDEFINED layout errors for unused layers
         TransitionImageLayout(cmd, _shadowMap.ColorImage,
             VkImageLayout.Undefined, VkImageLayout.ColorAttachmentOptimal,
-            0, 0, 0x400, 0x100, (uint)totalLayers);
+            0, 0, 0x400, 0x100, (uint)(VulkanShadowMap.MaxShadowLights * 6));
         TransitionImageLayoutDepth(cmd, _shadowMap.DepthImage,
             VkImageLayout.Undefined, VkImageLayout.DepthStencilAttachmentOptimal,
-            0, 0, 0x100, 0x200, (uint)totalLayers);
+            0, 0, 0x100, 0x200, (uint)(VulkanShadowMap.MaxShadowLights * 6));
 
         for (int lightIdx = 0; lightIdx < numShadowLights; lightIdx++)
         {
@@ -422,7 +423,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         // Transition shadow color array: ColorAttachmentOptimal → ShaderReadOnlyOptimal
         TransitionImageLayout(cmd, _shadowMap.ColorImage,
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.ShaderReadOnlyOptimal,
-            0x400, 0x100, 0x8, 0x20, (uint)totalLayers);
+            0x400, 0x100, 0x8, 0x20, (uint)(VulkanShadowMap.MaxShadowLights * 6));
 
         // === MAIN PASS ===
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],

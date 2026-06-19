@@ -78,6 +78,7 @@ public enum VkStructureType : int
     BufferMemoryBarrier2 = 1000314001,
     DependencyInfo = 1000314003,
     PhysicalDeviceDynamicRenderingFeatures = 1000044003,
+    PhysicalDeviceImageCubeArrayFeatures = 1000056000,
     PhysicalDeviceSynchronization2Features = 1000314007,
 }
 

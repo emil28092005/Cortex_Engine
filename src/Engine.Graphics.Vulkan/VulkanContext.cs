@@ -305,10 +305,17 @@ internal sealed unsafe class VulkanContext : IDisposable
             synchronization2 = VkBool32.True,
         };
 
+        var cubeArrayFeatures = new VkPhysicalDeviceImageCubeArrayFeatures
+        {
+            sType = VkStructureType.PhysicalDeviceImageCubeArrayFeatures,
+            pNext = (nint)(&sync2Features),
+            imageCubeArray = VkBool32.True,
+        };
+
         var renderingFeatures = new VkPhysicalDeviceDynamicRenderingFeatures
         {
             sType = VkStructureType.PhysicalDeviceDynamicRenderingFeatures,
-            pNext = (nint)(&sync2Features),
+            pNext = (nint)(&cubeArrayFeatures),
             dynamicRendering = VkBool32.True,
         };
 

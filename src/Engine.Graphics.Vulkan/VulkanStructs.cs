@@ -209,6 +209,14 @@ public unsafe struct VkPhysicalDeviceDynamicRenderingFeatures
 }
 
 [StructLayout(LayoutKind.Sequential)]
+public unsafe struct VkPhysicalDeviceImageCubeArrayFeatures
+{
+    public VkStructureType sType;
+    public nint pNext;
+    public VkBool32 imageCubeArray;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 public unsafe struct VkPhysicalDeviceSynchronization2Features
 {
     public VkStructureType sType;
