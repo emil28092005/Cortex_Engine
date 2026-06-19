@@ -79,24 +79,16 @@ class Program
             string? recordingPath = null;
             int recordedFrames = 0;
 
-            const double targetFps = 60.0;
-            var targetFrameTime = 1.0 / targetFps;
-            var lastFrameTime = 0.0;
+            const double renderFps = 60.0;
+            var renderFrameTime = 1.0 / renderFps;
+            var renderAccumulator = 0.0;
 
             while (!window.ShouldClose)
             {
                 timing.Tick();
-                var now = timing.TotalTime;
-                var elapsed = now - lastFrameTime;
-                if (elapsed < targetFrameTime)
-                {
-                    var sleepMs = (int)((targetFrameTime - elapsed) * 1000);
-                    if (sleepMs > 0) Thread.Sleep(sleepMs);
-                    timing.Tick();
-                    now = timing.TotalTime;
-                }
-                lastFrameTime = now;
+                renderAccumulator += timing.DeltaTime;
 
+                // Physics + input run at full speed (uncapped)
                 window.PumpEvents();
                 input.BeginFrame();
 
@@ -396,32 +388,44 @@ class Program
                     renderer.EndImGuiFrame();
                 }
 
-                // Set recording flag before render so renderer can capture
-                vkRenderer!.IsRecording = isRecording;
-
-                renderer.RenderWorld(world);
-                queue.CompletePendingScreenshots();
-                // If recording, get captured frame and write to FFmpeg
-                if (isRecording && ffmpegProcess != null && !ffmpegProcess.HasExited)
+                // Fixed render rate: 60 FPS
+                renderAccumulator -= renderFrameTime;
+                if (renderAccumulator >= 0)
                 {
-                    var frameData = vkRenderer.CapturedFrame;
-                    if (frameData != null && frameData.Length > 0)
+                    // Set recording flag before render so renderer can capture
+                    vkRenderer!.IsRecording = isRecording;
+
+                    renderer.RenderWorld(world);
+                    queue.CompletePendingScreenshots();
+
+                    // If recording, get captured frame and write to FFmpeg
+                    if (isRecording && ffmpegProcess != null && !ffmpegProcess.HasExited)
                     {
-                        try
+                        var frameData = vkRenderer.CapturedFrame;
+                        if (frameData != null && frameData.Length > 0)
                         {
-                            ffmpegProcess.StandardInput.BaseStream.Write(frameData, 0, frameData.Length);
-                            ffmpegProcess.StandardInput.BaseStream.Flush();
-                            recordedFrames++;
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[App] FFmpeg write error: {ex.Message}");
-                            isRecording = false;
+                            try
+                            {
+                                ffmpegProcess.StandardInput.BaseStream.Write(frameData, 0, frameData.Length);
+                                ffmpegProcess.StandardInput.BaseStream.Flush();
+                                recordedFrames++;
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[App] FFmpeg write error: {ex.Message}");
+                                isRecording = false;
+                            }
                         }
                     }
-                }
 
-                frames++;
+                    frames++;
+                }
+                else
+                {
+                    // Not enough time for a render frame — sleep briefly
+                    Thread.Sleep(1);
+                    continue;
+                }
                 if (timing.TotalTime - lastFpsTime >= 1.0)
                 {
                     Console.WriteLine($"FPS: {frames}, Delta: {timing.DeltaTime * 1000.0:F2} ms");
