@@ -78,11 +78,25 @@ class Program
             Process? ffmpegProcess = null;
             string? recordingPath = null;
             int recordedFrames = 0;
-            int skipFrames = 0;
+
+            const double targetFps = 60.0;
+            var targetFrameTime = 1.0 / targetFps;
+            var lastFrameTime = 0.0;
 
             while (!window.ShouldClose)
             {
                 timing.Tick();
+                var now = timing.TotalTime;
+                var elapsed = now - lastFrameTime;
+                if (elapsed < targetFrameTime)
+                {
+                    var sleepMs = (int)((targetFrameTime - elapsed) * 1000);
+                    if (sleepMs > 0) Thread.Sleep(sleepMs);
+                    timing.Tick();
+                    now = timing.TotalTime;
+                }
+                lastFrameTime = now;
+
                 window.PumpEvents();
                 input.BeginFrame();
 
@@ -328,8 +342,7 @@ class Program
 
                             var w = window.Width;
                             var h = window.Height;
-                            var fps = (int)Math.Round(1000.0 / timing.DeltaTime);
-                            var ffmpegArgs = $"-y -f rawvideo -pixel_format bgra -video_size {w}x{h} -framerate {Math.Min(fps, 60)} -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -vf fps=30 {recordingPath}";
+                            var ffmpegArgs = $"-y -f rawvideo -pixel_format bgra -video_size {w}x{h} -framerate 60 -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -vf fps=30 {recordingPath}";
 
                             var psi = new ProcessStartInfo
                             {
@@ -347,7 +360,6 @@ class Program
                                 ffmpegProcess = Process.Start(psi);
                                 isRecording = true;
                                 recordedFrames = 0;
-                                skipFrames = 0;
                                 Console.WriteLine($"[App] Recording started: {recordingPath}");
                             }
                             catch (Exception ex)
