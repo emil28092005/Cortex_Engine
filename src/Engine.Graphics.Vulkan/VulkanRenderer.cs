@@ -110,7 +110,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         // Transition: ColorAttachmentOptimal → TransferSrcOptimal
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.TransferSrcOptimal,
-            0x400, 0x100, 0x10000, 0x2000);
+            0x400, 0x100, 0x10000, 0x1000);
 
         // Copy image to buffer
         var region = new VkBufferImageCopyRegion
@@ -135,7 +135,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         // Transition back: TransferSrcOptimal → ColorAttachmentOptimal
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.TransferSrcOptimal, VkImageLayout.ColorAttachmentOptimal,
-            0x10000, 0x2000, 0x400, 0x100);
+            0x10000, 0x1000, 0x400, 0x100);
 
         return null; // Data will be read next frame after GPU completes
     }
