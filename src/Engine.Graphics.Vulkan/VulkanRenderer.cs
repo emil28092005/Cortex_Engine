@@ -107,10 +107,10 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         var w = _swapchain.Extent.Width;
         var h = _swapchain.Extent.Height;
 
-        // Transition swapchain image: PresentSrc → TransferSrc
+        // Transition: ColorAttachmentOptimal → TransferSrcOptimal
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
-            VkImageLayout.PresentSrcKHR, VkImageLayout.TransferSrcOptimal,
-            0x8000, 0, 0x10000, 0x2000);
+            VkImageLayout.ColorAttachmentOptimal, VkImageLayout.TransferSrcOptimal,
+            0x400, 0x100, 0x10000, 0x2000);
 
         // Copy image to buffer
         var region = new VkBufferImageCopyRegion
@@ -132,12 +132,18 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         Vk.vkCmdCopyImageToBuffer(cmd, _swapchain.Images[imageIndex], VkImageLayout.TransferSrcOptimal,
             _screenshotBuffer, 1, &region);
 
-        // Transition back: TransferSrc → PresentSrc
+        // Transition back: TransferSrcOptimal → ColorAttachmentOptimal
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
-            VkImageLayout.TransferSrcOptimal, VkImageLayout.PresentSrcKHR,
-            0x10000, 0x2000, 0x8000, 0);
+            VkImageLayout.TransferSrcOptimal, VkImageLayout.ColorAttachmentOptimal,
+            0x10000, 0x2000, 0x400, 0x100);
 
-        // Map and read
+        return null; // Data will be read next frame after GPU completes
+    }
+
+    private byte[]? ReadCapturedBuffer()
+    {
+        if (!_screenshotInitialized) return null;
+
         void* pData = null;
         Vk.vkMapMemory(_ctx.Device, _screenshotMemory, 0, _screenshotBufferSize, 0, &pData);
 
@@ -264,6 +270,12 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)> drawCalls, byte* uboData, List<(Vector3 pos, float intensity, Vector3 color, float range)> lights, Matrix4x4[] lightViewProjs, int numShadowLights)
     {
         _frameResources.WaitFrame(_frameIndex);
+
+        // Read captured frame from previous render (GPU has finished by now)
+        if (IsRecording)
+        {
+            CapturedFrame = ReadCapturedBuffer();
+        }
 
         uint imageIndex;
         var acquireResult = Vk.vkAcquireNextImageKHR(_ctx.Device, _swapchain.Swapchain,
@@ -505,15 +517,15 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
             Vk.vkCmdDrawIndexed(cmd, dc.indexCount, 1, 0, 0, 0);
         }
 
-        // Capture frame BEFORE ImGui (video without UI)
+        _imGui?.Render(cmd, _swapchain.Extent.Width, _swapchain.Extent.Height);
+
+        Vk.vkCmdEndRendering(cmd);
+
+        // Capture frame AFTER render pass ends, BEFORE present transition
         if (IsRecording)
         {
             CapturedFrame = CaptureFrame(cmd, imageIndex);
         }
-
-        _imGui?.Render(cmd, _swapchain.Extent.Width, _swapchain.Extent.Height);
-
-        Vk.vkCmdEndRendering(cmd);
 
         TransitionImageLayout(cmd, _swapchain.Images[imageIndex],
             VkImageLayout.ColorAttachmentOptimal, VkImageLayout.PresentSrcKHR,

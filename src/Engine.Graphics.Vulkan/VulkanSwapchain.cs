@@ -78,7 +78,7 @@ internal sealed unsafe class VulkanSwapchain : IDisposable
             imageColorSpace = _surfaceFormat.colorSpace,
             imageExtent = Extent,
             imageArrayLayers = 1,
-            imageUsage = VkImageUsageFlags.ColorAttachment | VkImageUsageFlags.TransferDst,
+            imageUsage = VkImageUsageFlags.ColorAttachment | VkImageUsageFlags.TransferDst | VkImageUsageFlags.TransferSrc,
             imageSharingMode = VkSharingMode.Exclusive,
             preTransform = caps.currentTransform,
             compositeAlpha = VkCompositeAlphaFlagsKHR.Opaque,
