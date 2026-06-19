@@ -328,7 +328,8 @@ class Program
 
                             var w = window.Width;
                             var h = window.Height;
-                            var ffmpegArgs = $"-y -f rawvideo -pixel_format rgba -video_size {w}x{h} -framerate 30 -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p {recordingPath}";
+                            var fps = (int)Math.Round(1000.0 / timing.DeltaTime);
+                            var ffmpegArgs = $"-y -f rawvideo -pixel_format rgba -video_size {w}x{h} -framerate {Math.Min(fps, 60)} -i - -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -vf fps=30 {recordingPath}";
 
                             var psi = new ProcessStartInfo
                             {
@@ -388,30 +389,25 @@ class Program
 
                 renderer.RenderWorld(world);
                 queue.CompletePendingScreenshots();
-
                 // If recording, get captured frame and write to FFmpeg
                 if (isRecording && ffmpegProcess != null && !ffmpegProcess.HasExited)
                 {
-                    skipFrames++;
-                    if (skipFrames >= 2) // Capture every 2nd frame for 30fps at ~60fps
+                    var frameData = vkRenderer.CapturedFrame;
+                    if (frameData != null && frameData.Length > 0)
                     {
-                        skipFrames = 0;
-                        var frameData = vkRenderer.CapturedFrame;
-                        if (frameData != null && frameData.Length > 0)
+                        try
                         {
-                            try
-                            {
-                                ffmpegProcess.StandardInput.BaseStream.Write(frameData, 0, frameData.Length);
-                                ffmpegProcess.StandardInput.BaseStream.Flush();
-                                recordedFrames++;
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[App] FFmpeg write error: {ex.Message}");
-                                isRecording = false;
-                            }
+                            ffmpegProcess.StandardInput.BaseStream.Write(frameData, 0, frameData.Length);
+                            ffmpegProcess.StandardInput.BaseStream.Flush();
+                            recordedFrames++;
                         }
-                    }                }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[App] FFmpeg write error: {ex.Message}");
+                            isRecording = false;
+                        }
+                    }
+                }
 
                 frames++;
                 if (timing.TotalTime - lastFpsTime >= 1.0)
