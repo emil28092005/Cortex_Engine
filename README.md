@@ -25,6 +25,9 @@ dotnet build CORTEX_ENGINE.sln -c Debug
 # Run
 ./scripts/run.sh
 
+# Run the alternative Solar Sanctuary demo scene
+./scripts/run.sh -- --scene sanctuary
+
 # Run with AI/MCP server
 ./scripts/run.sh -- --mcp-port 5000
 
@@ -45,6 +48,11 @@ dotnet test tests/Engine.Tests/Engine.Tests.csproj -c Debug
 - **Cortex Engine Debug** — FPS, camera, entity count, physics toggle, reset scene
 - **Shadow & Light Parameters** — per-light intensity/range/RGB, shadow bias/radius/farplane, ambient RGB
 - **Video Recording** — start/stop recording to MP4
+
+## Demo Scenes
+
+- **Kinetic Gallery** (default) — sphere pyramid, diamond rain, orbiting torus rings and physics.
+- **Solar Sanctuary** (`--scene sanctuary`) — a luminous torus-knot core, three orbital rings, an obelisk circle and falling physical comets.
 
 ## MCP Tools
 

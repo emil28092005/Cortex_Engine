@@ -18,6 +18,12 @@ namespace CortexEngine.App;
 
 class Program
 {
+    private enum DemoScene
+    {
+        KineticGallery,
+        SolarSanctuary,
+    }
+
     static async Task Main(string[] args)
     {
         Console.WriteLine("Cortex Engine — Vulkan + Physics + AI/MCP (pure P/Invoke)...");
@@ -25,6 +31,7 @@ class Program
         try
         {
             var mcpPort = ParseMcpPort(args);
+            var scene = ParseScene(args);
 
             using var world = World.Create();
             using var physicsWorld = new PhysicsWorld();
@@ -54,10 +61,11 @@ class Program
                     0.1f,
                     100f));
 
+            CreateScene(world, scene);
+            ConfigureCamera(cameraEntity, scene);
             var cameraController = new FreeFlyCameraController(cameraEntity);
             Console.WriteLine("Camera: FreeFly (WASD + right-click mouse look, Q/E up/down, Shift boost)");
-
-            CreateScene(world);
+            Console.WriteLine($"[Scene] Active demo: {GetSceneName(scene)}");
 
             var hasImGui = renderer.GetType().Name == "VulkanRenderer";
             VulkanRenderer? vkRenderer = hasImGui ? (VulkanRenderer)renderer : null;
@@ -220,6 +228,7 @@ class Program
                     var entityCount = 0;
                     world.Each((Entity e, ref Transform _) => entityCount++);
                     ImGui.Text($"Entities: {entityCount}");
+                    ImGui.Text($"Scene: {GetSceneName(scene)}");
                     ImGui.Text($"MCP: {(mcpPort > 0 ? $"port {mcpPort}" : "disabled")}");
                     ImGui.Text("WASD: move | RMB: look | Q/E: up/down | Shift: boost");
                     ImGui.Separator();
@@ -254,7 +263,9 @@ class Program
                             }
                         }
 
-                        CreateObjects(world);
+                        CreateSceneObjects(world, scene);
+                        ConfigureCamera(cameraEntity, scene);
+                        cameraController = new FreeFlyCameraController(cameraEntity);
                         physicsEnabled = true;
                         Console.WriteLine($"[App] Scene reset: {toDelete.Count} entities deleted");
                     }
@@ -507,7 +518,49 @@ class Program
         return 0;
     }
 
-    static void CreateScene(World world)
+    static DemoScene ParseScene(string[] args)
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i] != "--scene" || i + 1 >= args.Length)
+                continue;
+
+            return args[++i].ToLowerInvariant() switch
+            {
+                "gallery" or "kinetic-gallery" => DemoScene.KineticGallery,
+                "sanctuary" or "solar-sanctuary" => DemoScene.SolarSanctuary,
+                var name => throw new ArgumentException(
+                    $"Unknown scene '{name}'. Use 'gallery' or 'sanctuary'.")
+            };
+        }
+
+        return DemoScene.KineticGallery;
+    }
+
+    static string GetSceneName(DemoScene scene) => scene switch
+    {
+        DemoScene.KineticGallery => "Kinetic Gallery",
+        DemoScene.SolarSanctuary => "Solar Sanctuary",
+        _ => scene.ToString(),
+    };
+
+    static void ConfigureCamera(Entity cameraEntity, DemoScene scene)
+    {
+        var camera = cameraEntity.Get<Camera>();
+        if (scene == DemoScene.SolarSanctuary)
+        {
+            camera.Position = new Vector3(18, 12, -22);
+            camera.Target = new Vector3(0, 5, 0);
+        }
+        else
+        {
+            camera.Position = new Vector3(0, 5, -15);
+            camera.Target = new Vector3(0, 0.5f, 0);
+        }
+        cameraEntity.Set(camera);
+    }
+
+    static void CreateScene(World world, DemoScene scene)
     {
         // Floor
         world.Entity("Floor")
@@ -515,7 +568,7 @@ class Program
             .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)))
             .Set(RigidBody.StaticBox(new Vector3(20, 0.5f, 20)));
 
-        CreateObjects(world);
+        CreateSceneObjects(world, scene);
 
         // Lights (3 dynamic point lights, all cast shadows)
         world.Entity("MainLight")
@@ -535,7 +588,16 @@ class Program
         Console.WriteLine($"[Scene] {entityCount} entities");
     }
 
-    static void CreateObjects(World world)
+    static void CreateSceneObjects(World world, DemoScene scene)
+    {
+        if (scene == DemoScene.SolarSanctuary)
+            CreateSolarSanctuary(world);
+        else
+            CreateKineticGallery(world);
+    }
+
+    // The original scene remains available as the default demo.
+    static void CreateKineticGallery(World world)
     {
         // Central torus knot (floating, no physics)
         var torusKnot = LoadMesh("Content/torusknot.obj", new Vector3(0.9f, 0.7f, 0.3f));
@@ -608,6 +670,80 @@ class Program
             world.Entity($"Cone{i}")
                 .Set(new Transform(new Vector3(x, 0, z), Quaternion.Identity, new Vector3(2f, 3f, 2f)))
                 .Set(coneMesh);
+        }
+    }
+
+    // A calmer architectural contrast to the physics-heavy Kinetic Gallery:
+    // a luminous core, three tilted orbital rings, a circle of obelisks, and a
+    // small stream of physical "comets" falling into the sanctuary.
+    static void CreateSolarSanctuary(World world)
+    {
+        var goldKnot = LoadMesh("Content/torusknot.obj", new Vector3(1.0f, 0.48f, 0.08f));
+        world.Entity("SolarCore")
+            .Set(new Transform(new Vector3(0, 7, 0), Quaternion.CreateFromAxisAngle(Vector3.UnitY, 0.35f), new Vector3(2.4f)))
+            .Set(goldKnot);
+
+        var ringMesh = LoadMesh("Content/torus.obj", new Vector3(0.08f, 0.62f, 1.0f));
+        var ringRotations = new[]
+        {
+            Quaternion.CreateFromYawPitchRoll(0.15f, 0.55f, 0.05f),
+            Quaternion.CreateFromYawPitchRoll(1.25f, -0.38f, 0.45f),
+            Quaternion.CreateFromYawPitchRoll(2.15f, 0.18f, -0.62f),
+        };
+        for (var i = 0; i < ringRotations.Length; i++)
+        {
+            world.Entity($"SolarOrbit_{i}")
+                .Set(new Transform(new Vector3(0, 7, 0), ringRotations[i], new Vector3(4.5f + i * 1.15f)))
+                .Set(ringMesh);
+        }
+
+        var obeliskMesh = LoadMesh("Content/pyramid.obj", new Vector3(0.82f, 0.16f, 0.06f));
+        for (var i = 0; i < 10; i++)
+        {
+            var angle = i * MathF.Tau / 10f;
+            var position = new Vector3(MathF.Cos(angle) * 13f, 2.6f, MathF.Sin(angle) * 13f);
+            world.Entity($"SunObelisk_{i}")
+                .Set(new Transform(position, Quaternion.CreateFromAxisAngle(Vector3.UnitY, -angle), new Vector3(1.8f, 4.8f, 1.8f)))
+                .Set(obeliskMesh)
+                .Set(RigidBody.StaticBox(new Vector3(0.9f, 2.4f, 0.9f)));
+        }
+
+        var portalMesh = LoadMesh("Content/cone.obj", new Vector3(0.18f, 0.08f, 0.5f));
+        for (var i = 0; i < 4; i++)
+        {
+            var angle = i * MathF.Tau / 4f + MathF.PI / 4f;
+            var position = new Vector3(MathF.Cos(angle) * 8.5f, 2f, MathF.Sin(angle) * 8.5f);
+            world.Entity($"SanctuarySpire_{i}")
+                .Set(new Transform(position, Quaternion.CreateFromAxisAngle(Vector3.UnitY, -angle), new Vector3(2.2f, 3.5f, 2.2f)))
+                .Set(portalMesh);
+        }
+
+        var moonMesh = LoadMesh("Content/sphere.obj", new Vector3(0.38f, 0.75f, 1.0f));
+        for (var i = 0; i < 12; i++)
+        {
+            var angle = i * MathF.Tau / 12f;
+            var radius = 5.6f + (i % 3) * 0.8f;
+            world.Entity($"SanctuaryMoon_{i}")
+                .Set(new Transform(
+                    new Vector3(MathF.Cos(angle) * radius, 4.2f + (i % 2) * 1.4f, MathF.Sin(angle) * radius),
+                    Quaternion.Identity,
+                    new Vector3(0.7f)))
+                .Set(moonMesh);
+        }
+
+        var cometMesh = LoadMesh("Content/diamond.obj", new Vector3(1.0f, 0.12f, 0.35f));
+        var random = new Random(20260719);
+        for (var i = 0; i < 18; i++)
+        {
+            var angle = (float)random.NextDouble() * MathF.Tau;
+            var radius = 3.0f + (float)random.NextDouble() * 8f;
+            world.Entity($"SolarComet_{i}")
+                .Set(new Transform(
+                    new Vector3(MathF.Cos(angle) * radius, 12f + i * 0.75f, MathF.Sin(angle) * radius),
+                    Quaternion.CreateFromYawPitchRoll(angle, angle * 0.5f, 0),
+                    new Vector3(0.52f)))
+                .Set(cometMesh)
+                .Set(RigidBody.DynamicBox(new Vector3(0.28f), mass: 0.35f));
         }
     }
 
