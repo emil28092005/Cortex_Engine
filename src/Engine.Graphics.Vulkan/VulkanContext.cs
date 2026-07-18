@@ -27,7 +27,6 @@ internal sealed unsafe class VulkanContext : IDisposable
     public VkPhysicalDeviceMemoryProperties MemoryProperties;
     public VkFormat SurfaceFormat;
     public VkColorSpaceKHR SurfaceColorSpace;
-    public VkExtent2D SurfaceExtent;
     public bool ValidationEnabled;
 
     private VkDebugUtilsMessengerEXT _debugMessenger;

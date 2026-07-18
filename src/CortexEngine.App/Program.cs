@@ -121,10 +121,13 @@ class Program
                 {
                     lastWidth = window.Width;
                     lastHeight = window.Height;
-                    renderContext.Resize(lastWidth, lastHeight);
-                    ref var cam = ref cameraEntity.Ensure<Camera>();
-                    cam.AspectRatio = (float)lastWidth / lastHeight;
-                    cameraEntity.Set(cam);
+                    if (lastWidth > 0 && lastHeight > 0)
+                    {
+                        renderContext.Resize(lastWidth, lastHeight);
+                        ref var cam = ref cameraEntity.Ensure<Camera>();
+                        cam.AspectRatio = (float)lastWidth / lastHeight;
+                        cameraEntity.Set(cam);
+                    }
                 }
 
                 cameraController.Update(input, (float)timing.DeltaTime);

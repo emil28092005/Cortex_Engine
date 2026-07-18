@@ -6,6 +6,7 @@ internal sealed class VulkanRenderContext : IRenderContext{
     private readonly VulkanContext _ctx;
     private readonly VulkanSwapchain _swapchain;
     private readonly IWindow _window;
+    private VulkanRenderer? _renderer;
     private bool _disposed;
 
     public IWindow Window => _window;
@@ -27,12 +28,18 @@ internal sealed class VulkanRenderContext : IRenderContext{
 
     public IRenderer CreateRenderer()
     {
-        return new VulkanRenderer(_ctx, _swapchain);
+        return _renderer ??= new VulkanRenderer(_ctx, _swapchain, _window);
     }
 
     public void Resize(int width, int height)
     {
-        _swapchain.Recreate(width, height);
+        if (width <= 0 || height <= 0)
+            return;
+
+        if (_renderer is not null)
+            _renderer.RecreateSwapchain(width, height);
+        else
+            _swapchain.Recreate(width, height);
     }
 
     public void Dispose()

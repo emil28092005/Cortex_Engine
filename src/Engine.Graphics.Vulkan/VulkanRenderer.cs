@@ -11,6 +11,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 {
     private readonly VulkanContext _ctx;
     private readonly VulkanSwapchain _swapchain;
+    private readonly IWindow _window;
     private readonly VulkanPipeline _pipeline;
     private readonly VulkanFrameResources _frameResources;
     private readonly VulkanShadowMap _shadowMap;
@@ -40,10 +41,11 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     public bool IsScreenshotRequested => _screenshotRequested;
     public IScreenshotProvider ScreenshotProvider => this;
 
-    internal VulkanRenderer(VulkanContext ctx, VulkanSwapchain swapchain)
+    internal VulkanRenderer(VulkanContext ctx, VulkanSwapchain swapchain, IWindow window)
     {
         _ctx = ctx;
         _swapchain = swapchain;
+        _window = window;
 
         var vertSpv = LoadShader("Shaders/triangle.vert.spv");
         var fragSpv = LoadShader("Shaders/triangle.frag.spv");
@@ -62,6 +64,16 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
     }
 
     internal VulkanImGui? ImGuiLayer => _imGui;
+
+    internal void RecreateSwapchain(int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            return;
+
+        _swapchain.Recreate(width, height);
+        _frameResources.RecreateSubmitSemaphores(_swapchain.ImageCount);
+        DisposeScreenshotBuffer();
+    }
 
     private void InitScreenshotBuffer()
     {
@@ -99,6 +111,20 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         Vk.vkAllocateMemory(_ctx.Device, &allocInfo, 0, &mem);
         _screenshotMemory = mem;
         Vk.vkBindBufferMemory(_ctx.Device, _screenshotBuffer, _screenshotMemory, 0);
+    }
+
+    private void DisposeScreenshotBuffer()
+    {
+        if (_screenshotBuffer.Handle != 0)
+            Vk.vkDestroyBuffer(_ctx.Device, _screenshotBuffer, 0);
+        if (_screenshotMemory.Handle != 0)
+            Vk.vkFreeMemory(_ctx.Device, _screenshotMemory, 0);
+
+        _screenshotBuffer = VkBuffer.Null;
+        _screenshotMemory = VkDeviceMemory.Null;
+        _screenshotBufferSize = 0;
+        _screenshotInitialized = false;
+        CapturedFrame = null;
     }
 
     public void CaptureFrame(VkCommandBuffer cmd, uint imageIndex)
@@ -266,7 +292,12 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 
     private void Render(Matrix4x4 vp, List<(VkBuffer vertexBuf, VkBuffer indexBuf, uint indexCount, Matrix4x4 model, bool castShadow)> drawCalls, byte* uboData, List<(Vector3 pos, float intensity, Vector3 color, float range)> lights, Matrix4x4[] lightViewProjs, int numShadowLights)
     {
-        _frameResources.WaitFrame(_frameIndex);
+        _frameResources.WaitForFrame(_frameIndex);
+
+        // A minimized window has no drawable surface. Keep the frame fence signaled and wait
+        // for the window event loop to provide a non-zero extent before trying to acquire.
+        if (_window.Width <= 0 || _window.Height <= 0)
+            return;
 
         // Read captured frame from previous render (GPU has finished by now)
         if (IsRecording)
@@ -288,16 +319,22 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         var acquireResult = Vk.vkAcquireNextImageKHR(_ctx.Device, _swapchain.Swapchain,
             ulong.MaxValue, _frameResources.AcquireSemaphores[_frameIndex], VkFence.Null, &imageIndex);
 
-        if (acquireResult == VkResult.ErrorOutOfDateKHR || acquireResult == VkResult.SuboptimalKHR)
+        // An out-of-date acquire does not signal the semaphore. Do not reset the frame fence
+        // until an image has been acquired and a submission is guaranteed; otherwise returning
+        // from this frame would leave the next WaitForFrame blocked forever.
+        if (acquireResult == VkResult.ErrorOutOfDateKHR)
         {
-            _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
-                                _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
-            Render(vp, drawCalls, uboData, lights, lightViewProjs, numShadowLights);
+            RecreateSwapchain(_window.Width, _window.Height);
             return;
         }
 
-        if (acquireResult != VkResult.Success)
+        // SuboptimalKHR is a success code: the semaphore WAS signaled and imageIndex is valid.
+        // Render and present this frame normally; the post-present check below recreates the
+        // swapchain at a safe point, after this frame's submit has re-armed the frame fence.
+        if (acquireResult != VkResult.Success && acquireResult != VkResult.SuboptimalKHR)
             throw new InvalidOperationException($"vkAcquireNextImageKHR failed: {acquireResult}");
+
+        _frameResources.ResetFrameFence(_frameIndex);
 
         _totalTime += 0.016f;
 
@@ -620,8 +657,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
 
         if (presentResult == VkResult.ErrorOutOfDateKHR || presentResult == VkResult.SuboptimalKHR)
         {
-            _swapchain.Recreate(_ctx.SurfaceExtent.Width == 0 ? 1280 : (int)_ctx.SurfaceExtent.Width,
-                                _ctx.SurfaceExtent.Height == 0 ? 720 : (int)_ctx.SurfaceExtent.Height);
+            RecreateSwapchain(_window.Width, _window.Height);
         }
 
         _frameIndex = (_frameIndex + 1) % VulkanFrameResources.MaxFramesInFlight;
@@ -742,8 +778,7 @@ public sealed unsafe class VulkanRenderer : IRenderer, Engine.Graphics.IScreensh
         }
         _meshCache.Clear();
 
-        if (_screenshotBuffer.Handle != 0) Vk.vkDestroyBuffer(_ctx.Device, _screenshotBuffer, 0);
-        if (_screenshotMemory.Handle != 0) Vk.vkFreeMemory(_ctx.Device, _screenshotMemory, 0);
+        DisposeScreenshotBuffer();
         _shadowMap?.Dispose();
         _imGui?.Dispose();
         _frameResources?.Dispose();

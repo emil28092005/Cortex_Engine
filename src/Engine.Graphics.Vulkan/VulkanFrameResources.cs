@@ -241,12 +241,35 @@ internal sealed unsafe class VulkanFrameResources : IDisposable
         Vk.vkUnmapMemory(_device, UboMemories[frameIndex]);
     }
 
-    public void WaitFrame(int frameIndex)
+    public void WaitForFrame(int frameIndex)
     {
         fixed (VkFence* fencePtr = &FrameFences[frameIndex])
-        {
             Vk.vkWaitForFences(_device, 1, fencePtr, VkBool32.True, ulong.MaxValue);
+    }
+
+    public void ResetFrameFence(int frameIndex)
+    {
+        fixed (VkFence* fencePtr = &FrameFences[frameIndex])
             Vk.vkResetFences(_device, 1, fencePtr);
+    }
+
+    public void RecreateSubmitSemaphores(uint swapchainImageCount)
+    {
+        foreach (var semaphore in SubmitSemaphores)
+        {
+            if (semaphore.Handle != 0)
+                Vk.vkDestroySemaphore(_device, semaphore, 0);
+        }
+
+        SubmitSemaphores = new VkSemaphore[swapchainImageCount];
+        var semInfo = new VkSemaphoreCreateInfo { sType = VkStructureType.SemaphoreCreateInfo };
+        for (int i = 0; i < SubmitSemaphores.Length; i++)
+        {
+            var semaphore = VkSemaphore.Null;
+            var result = Vk.vkCreateSemaphore(_device, &semInfo, 0, &semaphore);
+            if (result != VkResult.Success)
+                throw new InvalidOperationException($"vkCreateSemaphore (submit) failed: {result}");
+            SubmitSemaphores[i] = semaphore;
         }
     }
 
