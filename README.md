@@ -58,6 +58,10 @@ dotnet test tests/Engine.Tests/Engine.Tests.csproj -c Debug
 - **Solar Sanctuary** (`--scene sanctuary`) — a luminous torus-knot core, three orbital rings, an obelisk circle and falling physical comets.
 - **Arena Strike** (`--scene shooter`) — a playable FPS arena with hitscan targets, attacking drones, health, score, waves and reloadable ammunition. Use **LMB** to fire and **R** to reload.
 
+### Arena Strike Gameplay
+
+![Arena Strike FPS demo](arena_strike_demo.gif)
+
 ## MCP Tools
 
 Connect via `http://localhost:5000/` (SSE):
