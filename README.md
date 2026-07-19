@@ -64,6 +64,10 @@ dotnet test tests/Engine.Tests/Engine.Tests.csproj -c Debug
 
 ![Arena Strike FPS demo](arena_strike_demo.gif)
 
+### Arena Strike UI
+
+![Arena Strike HUD and debug controls](arena_strike_ui.png)
+
 ## MCP Tools
 
 Connect via `http://localhost:5000/` (SSE):
