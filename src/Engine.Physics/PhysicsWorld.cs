@@ -28,6 +28,7 @@ public sealed class PhysicsWorld : IDisposable
     private readonly ObjectVsBroadPhaseLayerFilterTable _objectVsBroadPhaseLayerFilter;
     private readonly Dictionary<Entity, BodyID> _entityToBody = new();
     private readonly Dictionary<BodyID, Entity> _bodyToEntity = new();
+    private readonly Dictionary<BodyID, Body> _bodyObjects = new();
     private readonly List<Body> _bodies = new();
     private bool _disposed;
 
@@ -102,6 +103,7 @@ public sealed class PhysicsWorld : IDisposable
 
         _entityToBody[entity] = body.ID;
         _bodyToEntity[body.ID] = entity;
+        _bodyObjects[body.ID] = body;
         _bodies.Add(body);
     }
 
@@ -114,6 +116,11 @@ public sealed class PhysicsWorld : IDisposable
         _bodyInterface.DestroyBody(bodyId);
         _entityToBody.Remove(entity);
         _bodyToEntity.Remove(bodyId);
+        if (_bodyObjects.Remove(bodyId, out var body))
+        {
+            _bodies.Remove(body);
+            body.Dispose();
+        }
     }
 
     public void Update(float deltaTime, int collisionSteps = 1)
@@ -187,6 +194,7 @@ public sealed class PhysicsWorld : IDisposable
         foreach (var body in _bodies)
             body.Dispose();
         _bodies.Clear();
+        _bodyObjects.Clear();
         _entityToBody.Clear();
         _bodyToEntity.Clear();
 

@@ -22,12 +22,14 @@ public sealed class FreeFlyCameraController : ICameraController
     private int _lastMouseY;
     private bool _wasRightMouseDown;
     private Vector3 _position;
+    private readonly Func<Vector3, Vector3>? _positionConstraint;
 
     public string Name => "FreeFly";
 
-    public FreeFlyCameraController(Entity cameraEntity)
+    public FreeFlyCameraController(Entity cameraEntity, Func<Vector3, Vector3>? positionConstraint = null)
     {
         _cameraEntity = cameraEntity;
+        _positionConstraint = positionConstraint;
         var camera = cameraEntity.Get<Camera>();
         _position = camera.Position;
 
@@ -60,7 +62,8 @@ public sealed class FreeFlyCameraController : ICameraController
         {
             move = Vector3.Normalize(move);
             var speed = input.IsKeyDown(Key.LeftShift) ? _fastSpeed : _speed;
-            _position += move * speed * deltaTime;
+            var desiredPosition = _position + move * speed * deltaTime;
+            _position = _positionConstraint?.Invoke(desiredPosition) ?? desiredPosition;
         }
 
         if (input.MouseWheelDelta != 0)

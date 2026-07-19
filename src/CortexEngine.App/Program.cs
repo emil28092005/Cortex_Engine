@@ -22,6 +22,7 @@ class Program
     {
         KineticGallery,
         SolarSanctuary,
+        ArenaStrike,
     }
 
     static async Task Main(string[] args)
@@ -61,9 +62,14 @@ class Program
                     0.1f,
                     100f));
 
-            CreateScene(world, scene);
+            FpsShooterGame? shooter = scene == DemoScene.ArenaStrike
+                ? new FpsShooterGame(world, LoadMesh)
+                : null;
+            Func<Vector3, Vector3>? playerPositionConstraint = shooter is null ? null : shooter.ConstrainPlayerPosition;
+
+            CreateScene(world, scene, shooter);
             ConfigureCamera(cameraEntity, scene);
-            var cameraController = new FreeFlyCameraController(cameraEntity);
+            var cameraController = new FreeFlyCameraController(cameraEntity, playerPositionConstraint);
             Console.WriteLine("Camera: FreeFly (WASD + right-click mouse look, Q/E up/down, Shift boost)");
             Console.WriteLine($"[Scene] Active demo: {GetSceneName(scene)}");
 
@@ -98,9 +104,10 @@ class Program
                 timing.Tick();
                 renderTimer += timing.DeltaTime;
 
-                // Physics + input run at full speed (uncapped)
-                window.PumpEvents();
                 input.BeginFrame();
+                // Physics + input run at full speed (uncapped). Edge input must be cleared
+                // before SDL events are pumped so IsKeyPressed works for gameplay controls.
+                window.PumpEvents();
 
 #if !RELEASE_AOT
                 frameCount++;
@@ -140,6 +147,8 @@ class Program
 
                 cameraController.Update(input, (float)timing.DeltaTime);
                 totalTime += (float)timing.DeltaTime;
+                var allowGameplayInput = !hasImGui || (!ImGui.GetIO().WantCaptureMouse && !ImGui.GetIO().WantCaptureKeyboard);
+                shooter?.Update(input, cameraEntity, totalTime, (float)timing.DeltaTime, allowGameplayInput);
 
                 var toInit = new List<(Entity, RigidBody, Transform)>();
                 world.Each((Entity e, ref RigidBody rb, ref Transform t) =>
@@ -263,13 +272,15 @@ class Program
                             }
                         }
 
-                        CreateSceneObjects(world, scene);
+                        CreateSceneObjects(world, scene, shooter);
                         ConfigureCamera(cameraEntity, scene);
-                        cameraController = new FreeFlyCameraController(cameraEntity);
+                        cameraController = new FreeFlyCameraController(cameraEntity, playerPositionConstraint);
                         physicsEnabled = true;
                         Console.WriteLine($"[App] Scene reset: {toDelete.Count} entities deleted");
                     }
                     ImGui.End();
+
+                    shooter?.DrawHud(window.Width, window.Height);
 
                     // Shadow parameters panel
                     ImGui.Begin("Shadow & Light Parameters");
@@ -529,8 +540,9 @@ class Program
             {
                 "gallery" or "kinetic-gallery" => DemoScene.KineticGallery,
                 "sanctuary" or "solar-sanctuary" => DemoScene.SolarSanctuary,
+                "shooter" or "arena" or "arena-strike" => DemoScene.ArenaStrike,
                 var name => throw new ArgumentException(
-                    $"Unknown scene '{name}'. Use 'gallery' or 'sanctuary'.")
+                    $"Unknown scene '{name}'. Use 'gallery', 'sanctuary', or 'shooter'.")
             };
         }
 
@@ -541,6 +553,7 @@ class Program
     {
         DemoScene.KineticGallery => "Kinetic Gallery",
         DemoScene.SolarSanctuary => "Solar Sanctuary",
+        DemoScene.ArenaStrike => "Arena Strike",
         _ => scene.ToString(),
     };
 
@@ -552,6 +565,11 @@ class Program
             camera.Position = new Vector3(18, 12, -22);
             camera.Target = new Vector3(0, 5, 0);
         }
+        else if (scene == DemoScene.ArenaStrike)
+        {
+            camera.Position = new Vector3(0, 2.3f, -17f);
+            camera.Target = new Vector3(0, 2.3f, -5f);
+        }
         else
         {
             camera.Position = new Vector3(0, 5, -15);
@@ -560,7 +578,7 @@ class Program
         cameraEntity.Set(camera);
     }
 
-    static void CreateScene(World world, DemoScene scene)
+    static void CreateScene(World world, DemoScene scene, FpsShooterGame? shooter)
     {
         // Floor
         world.Entity("Floor")
@@ -568,7 +586,7 @@ class Program
             .Set(LoadMesh("Content/cube.obj", new Vector3(0.3f, 0.3f, 0.35f)))
             .Set(RigidBody.StaticBox(new Vector3(20, 0.5f, 20)));
 
-        CreateSceneObjects(world, scene);
+        CreateSceneObjects(world, scene, shooter);
 
         // Lights (3 dynamic point lights, all cast shadows)
         world.Entity("MainLight")
@@ -588,9 +606,11 @@ class Program
         Console.WriteLine($"[Scene] {entityCount} entities");
     }
 
-    static void CreateSceneObjects(World world, DemoScene scene)
+    static void CreateSceneObjects(World world, DemoScene scene, FpsShooterGame? shooter = null)
     {
-        if (scene == DemoScene.SolarSanctuary)
+        if (scene == DemoScene.ArenaStrike)
+            (shooter ?? throw new InvalidOperationException("Shooter scene requires its game state.")).CreateArena();
+        else if (scene == DemoScene.SolarSanctuary)
             CreateSolarSanctuary(world);
         else
             CreateKineticGallery(world);

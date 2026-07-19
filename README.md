@@ -28,6 +28,9 @@ dotnet build CORTEX_ENGINE.sln -c Debug
 # Run the alternative Solar Sanctuary demo scene
 ./scripts/run.sh -- --scene sanctuary
 
+# Run the playable Arena Strike FPS demo
+./scripts/run.sh -- --scene shooter
+
 # Run with AI/MCP server
 ./scripts/run.sh -- --mcp-port 5000
 
@@ -53,6 +56,7 @@ dotnet test tests/Engine.Tests/Engine.Tests.csproj -c Debug
 
 - **Kinetic Gallery** (default) — sphere pyramid, diamond rain, orbiting torus rings and physics.
 - **Solar Sanctuary** (`--scene sanctuary`) — a luminous torus-knot core, three orbital rings, an obelisk circle and falling physical comets.
+- **Arena Strike** (`--scene shooter`) — a playable FPS arena with hitscan targets, attacking drones, health, score, waves and reloadable ammunition. Use **LMB** to fire and **R** to reload.
 
 ## MCP Tools
 
