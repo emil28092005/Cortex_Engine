@@ -60,6 +60,8 @@ dotnet test tests/Engine.Tests/Engine.Tests.csproj -c Debug
 
 ### Arena Strike Gameplay
 
+*Pure scene render — UI intentionally hidden.*
+
 ![Arena Strike FPS demo](arena_strike_demo.gif)
 
 ## MCP Tools
